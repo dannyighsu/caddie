@@ -37,6 +37,7 @@ Tools are organized into **tool sets** — modular groups that can be composed d
 | `calendarTools` | `get_today_events`, `get_upcoming_events`, `get_events_in_range` | Check-in, conversation |
 | `notionTools` | `notion_search`, `notion_query_database`, `notion_read_page` | Check-in, conversation |
 | `workspaceTools` | `read_file`, `write_file`, `list_directory`, `create_directory` | Check-in, conversation, X Manager |
+| `webSearchTools` | `web_search` | Check-in, conversation, X Manager |
 | `browserTools` | `browser_navigate`, `browser_click`, `browser_type`, `browser_screenshot`, `browser_scroll`, `browser_close_all` | X Manager skills |
 | `finishTools` | `finish` | All executions |
 
@@ -99,7 +100,37 @@ Browser automation is provided via MCP:
 - Browser tools operate on a shared browser instance within a single skill execution.
 - The `retry_with_browser_use_agent` tool MUST be excluded from tool sets to maintain authenticated sessions.
 
-#### 2.5 Finish Tool
+#### 2.5 Web Search Tools
+
+Web search provides fast, lightweight information retrieval from the web without browser automation overhead.
+
+| Tool | Description |
+|------|-------------|
+| `web_search` | Search the web for information. Accepts `query` (string) and optional `num_results` (integer, default 5, max 10). Returns structured results. |
+
+**Result structure:**
+```typescript
+interface WebSearchResult {
+  title: string;        // Page title
+  snippet: string;      // Relevant excerpt from the page
+  url: string;          // Full URL to the page
+  publishedDate?: string; // ISO 8601 date if available
+}
+```
+
+- Web search MUST be stateless — each call is independent, no session maintained.
+- Web search MUST return results within a reasonable timeout (implementation-defined, suggested 10 seconds).
+- Web search SHOULD prefer authoritative sources when available.
+- Web search is for information retrieval only — for interacting with web pages (clicking, typing, screenshots), use browser tools.
+- If no results are found for a query, the tool MUST return an empty array (not an error).
+
+**Use cases:**
+- Quick fact lookups during conversations
+- Researching context for X engagement opportunities
+- Verifying current events or news
+- Getting background information on people, companies, or topics
+
+#### 2.6 Finish Tool
 
 | Tool | Description |
 |------|-------------|
@@ -219,7 +250,7 @@ Skills are multi-step processes with embedded procedural guidance. Unlike tools,
 #### 5.1 Check-In Run
 1. The system MUST reject the request if an active run exists for the user.
 2. The system MUST acquire a run lock before execution and release it after completion (including on failure).
-3. The system MUST build context from calendar events, Notion pages, and conversation history.
+3. The system MUST build context from calendar events, Notion pages, and conversation history. Web search tools are available for additional information retrieval as needed.
 4. The agent MUST execute with the context and call `finish` to return a response and next check-in time.
 5. The system MUST schedule the next check-in based on the agent's recommendation.
 6. The system MUST produce a complete execution trace.
@@ -237,6 +268,7 @@ Skills are multi-step processes with embedded procedural guidance. Unlike tools,
 
 - **No calendar events today**: The check-in skill MUST still execute and provide value from other context sources (Notion, tasks, memory).
 - **Notion unavailable**: If Notion tools fail to initialize, the agent MUST proceed with remaining tools. Notion is not required for execution.
+- **Web search unavailable**: If web search tools fail to initialize, the agent MUST proceed with remaining tools. Web search is not required for execution — it enhances context but is not critical.
 - **Browser fails to launch**: If browser tools fail to initialize during an X Manager run, the run MUST fail with a clear error — browser is required for feed scanning and metrics checking.
 - **Empty run record**: If a feed scan or metrics check produces no results, the X Manager orchestration MUST still generate a Slack digest noting that no opportunities or metrics were found.
 - **Concurrent run attempt**: If a run is attempted while another is active for the same user, the system MUST reject with an error (not queue or wait).
@@ -275,6 +307,7 @@ Skills are multi-step processes with embedded procedural guidance. Unlike tools,
 - **Google Calendar**: OAuth 2.0 with stored credentials in database. Automatic token refresh on expiry. Primary calendar only.
 - **Notion**: Dual auth support — internal integration token OR OAuth. MCP-based tool access (local stdio server or hosted SSE).
 - **Browser automation**: browser-use MCP client (local stdio or cloud). Profile-based sessions for persistent login state.
+- **Web search**: MCP-based tool (local stdio or cloud). Suggested providers: Brave Search API, Tavily, or SerpAPI. The implementation SHOULD support configurable search provider via environment variable.
 - **Filesystem**: Constellation MCP backend for workspace operations. Scoped per user and workspace name.
 - **Redis**: Used for active run tracking, check-in scheduling, and X Manager run state.
 - **Langfuse**: System prompt management (fetch by name with fallbacks), execution tracing and telemetry.
