@@ -4,6 +4,7 @@ import { getFeedScanPrompt } from "../agents/skills/x-feed-scan";
 import { getMetricsCheckPrompt } from "../agents/skills/x-metrics-check";
 import {
   createBrowserToolSet,
+  createWebSearchToolSet,
   createWorkspaceToolSet,
   createXManagerSubTaskFinishToolSet,
   mergeToolSets,
@@ -538,6 +539,7 @@ The user will manually enter their credentials in the browser window that opens.
     const cleanup = {
       browserToolSet: null as ToolSetHandle | null,
       workspaceToolSet: null as ToolSetHandle | null,
+      webSearchToolSet: null as ToolSetHandle | null,
     };
 
     try {
@@ -575,10 +577,14 @@ The user will manually enter their credentials in the browser window that opens.
             workspace: "xmanager",
           });
 
+          // Web search tools for researching context during X Manager runs
+          cleanup.webSearchToolSet = await createWebSearchToolSet();
+
           const finishToolSet = createXManagerSubTaskFinishToolSet();
           const subTaskTools = mergeToolSets(
             { tools: cleanup.browserToolSet.tools, close: async () => {} }, // Don't close browser between sub-tasks
             cleanup.workspaceToolSet,
+            cleanup.webSearchToolSet,
             finishToolSet
           );
 
@@ -723,6 +729,13 @@ The user will manually enter their credentials in the browser window that opens.
           await cleanup.workspaceToolSet.close();
         } catch (err) {
           console.error("[XManager] Error closing workspace tool set:", err);
+        }
+      }
+      if (cleanup.webSearchToolSet) {
+        try {
+          await cleanup.webSearchToolSet.close();
+        } catch (err) {
+          console.error("[XManager] Error closing web search tool set:", err);
         }
       }
       console.log("[XManager] All cleanup complete");

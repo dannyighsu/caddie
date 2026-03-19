@@ -45,6 +45,10 @@ export interface AppConfig {
   BROWSER_USE_HEADLESS: boolean; // Whether to run browser in headless mode
   // X_USERNAME is now configured via UI settings, not env vars
 
+  // Web Search (MCP-based)
+  // Supported providers: "brave", "tavily", "serpapi"
+  WEB_SEARCH_PROVIDER?: "brave" | "tavily" | "serpapi";
+
   // Porter/ChatKit
   CHATKIT_BASE_URL: string;
   CHATKIT_SECRET: string;
@@ -131,6 +135,9 @@ export function createAppConfig(): AppConfig {
     BROWSER_USE_PROFILE_ID: getOptionalEnvVar("BROWSER_USE_PROFILE_ID"),
     BROWSER_USE_HEADLESS: isProduction, // Show browser in dev, headless in prod
     // X_USERNAME is now configured via UI settings
+
+    // Web Search
+    WEB_SEARCH_PROVIDER: getOptionalEnvVar("WEB_SEARCH_PROVIDER") as "brave" | "tavily" | "serpapi" | undefined || undefined,
 
     // Porter/ChatKit
     CHATKIT_BASE_URL: requireEnvVar("CHATKIT_BASE_URL"),

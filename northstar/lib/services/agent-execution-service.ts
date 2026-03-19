@@ -5,6 +5,7 @@ import {
   createCalendarToolSet,
   createCheckinFinishToolSet,
   createNotionToolSet,
+  createWebSearchToolSet,
   createWorkspaceToolSet,
   mergeToolSets,
   type ToolSetHandle,
@@ -199,17 +200,19 @@ export class AgentExecutionService {
 
   /**
    * Create the tool sets for a check-in or conversation execution.
+   * Includes calendar, notion, workspace, web search, and finish tools.
    */
   private async createCheckinToolSets(userId: string): Promise<ToolSetHandle> {
-    const [calendarTools, notionTools, workspaceTools, finishTools] =
+    const [calendarTools, notionTools, workspaceTools, webSearchTools, finishTools] =
       await Promise.all([
         createCalendarToolSet(),
         createNotionToolSet(userId),
         createWorkspaceToolSet({ userId }),
+        createWebSearchToolSet(),
         Promise.resolve(createCheckinFinishToolSet()),
       ]);
 
-    return mergeToolSets(calendarTools, notionTools, workspaceTools, finishTools);
+    return mergeToolSets(calendarTools, notionTools, workspaceTools, webSearchTools, finishTools);
   }
 
   async executeCheckIn(

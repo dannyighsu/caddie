@@ -18,6 +18,7 @@ import { createNotionMCPClient } from "./notion-mcp";
 import {
   createBrowserUseMCPClient,
 } from "./browser-use-mcp-client";
+import { createWebSearchMCPClient } from "./web-search-mcp-client";
 import { finishTool } from "./agent-tools";
 
 /**
@@ -107,6 +108,24 @@ export async function createNotionToolSet(
 ): Promise<ToolSetHandle> {
   const client = await createNotionMCPClient({ userId });
   if (!client) {
+    return { tools: {}, close: async () => {} };
+  }
+
+  const tools = await client.tools() as ToolSet;
+  return {
+    tools,
+    close: () => client.close(),
+  };
+}
+
+// ============================================================================
+// Web Search Tools — Web Search MCP
+// ============================================================================
+
+export async function createWebSearchToolSet(): Promise<ToolSetHandle> {
+  const client = await createWebSearchMCPClient();
+  if (!client) {
+    console.log("[ToolSets] Web search tools not available (no API key configured)");
     return { tools: {}, close: async () => {} };
   }
 
