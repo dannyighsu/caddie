@@ -1,0 +1,7 @@
+{
+  "id": "writer",
+  "name": "Content Writer",
+  "persona": "./persona.md",
+  "capabilities": ["notion", "web-search"],
+  "maxTurns": 30
+}
