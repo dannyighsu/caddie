@@ -1,0 +1,4 @@
+{
+  "name": "chrome",
+  "description": "Chrome browser automation (enables --chrome flag on Claude Code runtime)"
+}
