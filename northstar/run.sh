@@ -23,6 +23,13 @@ else
   ENV_FILE=".env.production"
 fi
 
+# Load env vars for pre-Next.js steps (Next.js loads .env.local automatically, but migrations run via tsx)
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  source "$ENV_FILE"
+  set +a
+fi
+
 # Run database migrations
 echo "Running database migrations..."
 pnpm run db:migrate || echo "Migrations skipped (no database configured or migration failed)"
