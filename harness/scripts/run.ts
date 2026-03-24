@@ -1,57 +1,51 @@
 /**
- * Smoke test — launches a workflow via the harness CLI.
+ * Smoke test — launches an agent via the harness CLI.
  *
  * Usage:
- *   pnpm smoke                                    # defaults to writer workflow
- *   pnpm smoke -- --workflow writer --prompt "..."
+ *   pnpm smoke                                    # defaults to writer agent
+ *   pnpm smoke -- --agent writer --prompt "..."
  */
 
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { mkdir } from "fs/promises";
 import { createRuntime } from "../src/runtime/factory.js";
-import { createLauncher } from "../src/workflow/launcher.js";
+import { createLauncher } from "../src/agent/launcher.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(__dirname, "..");
 
-// Parse CLI args
-function parseArgs(): { workflowId: string; prompt: string } {
+function parseArgs(): { agentId: string; prompt: string } {
   const args = process.argv.slice(2);
-  let workflowId = "writer";
+  let agentId = "writer";
   let prompt = "Suggest 3 article ideas about AI agents in production. Keep it brief.";
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--workflow" && args[i + 1]) {
-      workflowId = args[++i];
+    if ((args[i] === "--agent" || args[i] === "--workflow") && args[i + 1]) {
+      agentId = args[++i];
     } else if (args[i] === "--prompt" && args[i + 1]) {
       prompt = args[++i];
     }
   }
 
-  return { workflowId, prompt };
+  return { agentId, prompt };
 }
 
 async function main() {
-  const { workflowId, prompt } = parseArgs();
+  const { agentId, prompt } = parseArgs();
 
-  console.log(`[smoke] Launching workflow: ${workflowId}`);
+  console.log(`[smoke] Launching agent: ${agentId}`);
   console.log(`[smoke] Prompt: ${prompt.substring(0, 80)}...`);
 
   const runtime = createRuntime();
-  const workspaceRoot = resolve(harnessRoot, "workspace");
-
-  // Ensure workspace exists
-  await mkdir(resolve(workspaceRoot, "default", workflowId), { recursive: true });
-
   const launcher = createLauncher(runtime, {
-    workflowsDir: resolve(harnessRoot, "workflows"),
+    agentsDir: resolve(harnessRoot, "agents"),
     capabilitiesDir: resolve(harnessRoot, "capabilities"),
-    workspaceRoot,
+    resolversDir: resolve(harnessRoot, "resolvers"),
+    workspaceRoot: resolve(harnessRoot, "workspace"),
   });
 
   const result = await launcher.launch({
-    workflowId,
+    agentId,
     prompt,
     context: {
       currentTime: new Date().toLocaleString("en-US", {

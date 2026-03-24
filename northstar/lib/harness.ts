@@ -7,7 +7,7 @@
 
 import { resolve } from "path";
 import { createRuntime, createLauncher } from "@agints/harness";
-import type { WorkflowConfig } from "@agints/harness";
+import type { AgentConfig } from "@agints/harness";
 import { readdir, readFile } from "fs/promises";
 
 // The harness package lives alongside northstar in the monorepo
@@ -19,8 +19,9 @@ export function getLauncher() {
   if (!launcherInstance) {
     const runtime = createRuntime();
     launcherInstance = createLauncher(runtime, {
-      workflowsDir: resolve(harnessRoot, "workflows"),
+      agentsDir: resolve(harnessRoot, "agents"),
       capabilitiesDir: resolve(harnessRoot, "capabilities"),
+      resolversDir: resolve(harnessRoot, "resolvers"),
       workspaceRoot: resolve(process.cwd(), "workspace"),
     });
   }
@@ -28,36 +29,36 @@ export function getLauncher() {
 }
 
 /**
- * List all available workflows by reading the harness/workflows directory.
+ * List all available agents by reading the harness/agents directory.
  */
-export async function listWorkflows(): Promise<WorkflowConfig[]> {
-  const workflowsDir = resolve(harnessRoot, "workflows");
-  const entries = await readdir(workflowsDir, { withFileTypes: true });
-  const workflows: WorkflowConfig[] = [];
+export async function listAgents(): Promise<AgentConfig[]> {
+  const agentsDir = resolve(harnessRoot, "agents");
+  const entries = await readdir(agentsDir, { withFileTypes: true });
+  const agents: AgentConfig[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     try {
-      const configPath = resolve(workflowsDir, entry.name, "workflow.json");
+      const configPath = resolve(agentsDir, entry.name, "agent.json");
       const content = await readFile(configPath, "utf-8");
-      workflows.push(JSON.parse(content) as WorkflowConfig);
+      agents.push(JSON.parse(content) as AgentConfig);
     } catch {
-      // Skip directories without a valid workflow.json
+      // Skip directories without a valid agent.json
     }
   }
 
-  return workflows;
+  return agents;
 }
 
 /**
- * Get a single workflow config by ID.
+ * Get a single agent config by ID.
  */
-export async function getWorkflow(id: string): Promise<WorkflowConfig | null> {
-  const workflowsDir = resolve(harnessRoot, "workflows");
+export async function getAgent(id: string): Promise<AgentConfig | null> {
+  const agentsDir = resolve(harnessRoot, "agents");
   try {
-    const configPath = resolve(workflowsDir, id, "workflow.json");
+    const configPath = resolve(agentsDir, id, "agent.json");
     const content = await readFile(configPath, "utf-8");
-    return JSON.parse(content) as WorkflowConfig;
+    return JSON.parse(content) as AgentConfig;
   } catch {
     return null;
   }

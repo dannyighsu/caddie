@@ -1,0 +1,9 @@
+{
+  "id": "xmanager",
+  "name": "X Manager",
+  "persona": "./persona.md",
+  "capabilities": ["chrome"],
+  "maxTurns": 20,
+  "mode": "triggered",
+  "triggerRoute": "/api/xmanager/run"
+}
