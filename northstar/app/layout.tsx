@@ -14,9 +14,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-gray-950 text-gray-100 min-h-screen">
-        <header className="border-b border-gray-800 px-6 py-4">
+        <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
           <a href="/" className="text-lg font-semibold tracking-tight">
             Northstar
+          </a>
+          <a href="/settings" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+            Settings
           </a>
         </header>
         <main className="max-w-4xl mx-auto px-6 py-8">{children}</main>

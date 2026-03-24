@@ -1,4 +1,4 @@
-import { getLauncher, getWorkflow } from "@/lib/harness";
+import { getLauncher, getAgent } from "@/lib/harness";
 import {
   createConversation,
   getConversation,
@@ -13,17 +13,16 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const workflow = await getWorkflow(id);
+  const agent = await getAgent(id);
 
-  if (!workflow) {
-    return NextResponse.json({ error: "Workflow not found" }, { status: 404 });
+  if (!agent) {
+    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   }
 
   const body = await request.json().catch(() => ({}));
-  const { prompt, conversationId, userId, context } = body as {
+  const { prompt, conversationId, context } = body as {
     prompt?: string;
     conversationId?: string;
-    userId?: string;
     context?: Record<string, string>;
   };
 
@@ -31,7 +30,6 @@ export async function POST(
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
   }
 
-  // Inject current time into context if not provided
   const resolvedContext: Record<string, string> = {
     currentTime: new Date().toLocaleString("en-US", {
       timeZone: "America/Los_Angeles",
@@ -51,7 +49,6 @@ export async function POST(
     let sessionId: string | undefined;
 
     if (conversationId) {
-      // Continue existing conversation
       conversation = await getConversation(conversationId);
       if (!conversation) {
         return NextResponse.json(
@@ -61,21 +58,18 @@ export async function POST(
       }
       sessionId = conversation.session_id ?? undefined;
     } else {
-      // Start new conversation
       const title = prompt.length > 80 ? prompt.substring(0, 80) + "..." : prompt;
       conversation = await createConversation(id, title);
     }
 
     const launcher = getLauncher();
     const result = await launcher.launch({
-      workflowId: id,
+      agentId: id,
       prompt,
-      userId,
       sessionId,
       context: resolvedContext,
     });
 
-    // Record messages
     const now = new Date().toISOString();
     const newMessages: Message[] = [
       { role: "user", content: prompt, timestamp: now },
@@ -89,7 +83,6 @@ export async function POST(
     }
     await appendMessages(conversation.id, newMessages);
 
-    // Save session ID for resumption
     if (result.sessionId) {
       await updateSessionId(conversation.id, result.sessionId);
     }
