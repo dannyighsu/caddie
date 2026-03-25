@@ -11,6 +11,7 @@ import {
   getConversation,
   appendMessages,
   updateSessionId,
+  getSetting,
   type Message,
 } from "@/lib/db";
 import { isRunActive, setActiveRun, clearActiveRun, scheduleRun } from "@/lib/redis";
@@ -22,12 +23,19 @@ export async function POST(request: NextRequest) {
   const {
     conversationId,
     prompt = "Conduct a check-in.",
-    slackChannel,
+    slackChannel: explicitChannel,
   } = body as {
     conversationId?: string;
     prompt?: string;
     slackChannel?: string;
   };
+
+  // Use explicit channel or fall back to default from settings
+  let slackChannel = explicitChannel;
+  if (!slackChannel) {
+    const defaultChannel = await getSetting<{ channelId: string }>("default_slack_channel");
+    slackChannel = defaultChannel?.channelId;
+  }
 
   // Prevent concurrent runs
   if (await isRunActive("checkin")) {

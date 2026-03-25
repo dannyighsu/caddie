@@ -1,22 +1,21 @@
 /**
  * Redis Client
  *
- * Upstash Redis wrapper for scheduling, active run locking, and session mapping.
- * Combines check-in and X Manager scheduling into a unified interface.
+ * ioredis wrapper for scheduling, active run locking, and session mapping.
+ * Connects via REDIS_URL (standard connection string, e.g., from Railway).
  */
 
-import { Redis } from "@upstash/redis";
+import Redis from "ioredis";
 
 let redis: Redis | null = null;
 
 function getRedis(): Redis {
   if (!redis) {
-    const url = process.env.KV_REST_API_URL;
-    const token = process.env.KV_REST_API_TOKEN;
-    if (!url || !token) {
-      throw new Error("KV_REST_API_URL and KV_REST_API_TOKEN must be set");
+    const url = process.env.REDIS_URL;
+    if (!url) {
+      throw new Error("REDIS_URL environment variable is not set");
     }
-    redis = new Redis({ url, token });
+    redis = new Redis(url);
   }
   return redis;
 }
@@ -24,27 +23,30 @@ function getRedis(): Redis {
 // --- Active Run Locking ---
 
 export async function setActiveRun(
-  workflowId: string,
-  ttlSeconds = 900 // 15 min default
+  agentId: string,
+  ttlSeconds = 900
 ): Promise<void> {
-  await getRedis().set(`northstar:active:${workflowId}`, Date.now(), {
-    ex: ttlSeconds,
-  });
+  await getRedis().set(
+    `northstar:active:${agentId}`,
+    String(Date.now()),
+    "EX",
+    ttlSeconds
+  );
 }
 
-export async function isRunActive(workflowId: string): Promise<boolean> {
-  const val = await getRedis().get(`northstar:active:${workflowId}`);
+export async function isRunActive(agentId: string): Promise<boolean> {
+  const val = await getRedis().get(`northstar:active:${agentId}`);
   return val !== null;
 }
 
-export async function clearActiveRun(workflowId: string): Promise<void> {
-  await getRedis().del(`northstar:active:${workflowId}`);
+export async function clearActiveRun(agentId: string): Promise<void> {
+  await getRedis().del(`northstar:active:${agentId}`);
 }
 
 // --- Scheduling ---
 
 interface ScheduleEntry {
-  workflowId: string;
+  agentId: string;
   scheduledTime: number; // epoch ms
   metadata?: Record<string, unknown>;
 }
@@ -53,30 +55,31 @@ const SCHEDULE_QUEUE = "northstar:schedule:queue";
 const SCHEDULE_DETAIL_PREFIX = "northstar:schedule:detail:";
 
 export async function scheduleRun(
-  workflowId: string,
+  agentId: string,
   scheduledTime: Date,
   metadata?: Record<string, unknown>
 ): Promise<void> {
   const score = scheduledTime.getTime();
-  const member = `${workflowId}:${score}`;
+  const member = `${agentId}:${score}`;
 
-  await getRedis().zadd(SCHEDULE_QUEUE, { score, member });
+  await getRedis().zadd(SCHEDULE_QUEUE, score, member);
   await getRedis().set(
     `${SCHEDULE_DETAIL_PREFIX}${member}`,
-    JSON.stringify({ workflowId, scheduledTime: score, metadata, status: "pending" }),
-    { ex: 86400 } // 24h TTL
+    JSON.stringify({ agentId, scheduledTime: score, metadata, status: "pending" }),
+    "EX",
+    86400
   );
 }
 
 export async function getDueRuns(): Promise<ScheduleEntry[]> {
   const now = Date.now();
-  const members = await getRedis().zrange(SCHEDULE_QUEUE, 0, now, { byScore: true });
+  const members = await getRedis().zrangebyscore(SCHEDULE_QUEUE, 0, now);
   const entries: ScheduleEntry[] = [];
 
   for (const member of members) {
     const detail = await getRedis().get(`${SCHEDULE_DETAIL_PREFIX}${member}`);
     if (detail) {
-      const parsed = typeof detail === "string" ? JSON.parse(detail) : detail;
+      const parsed = JSON.parse(detail);
       if (parsed.status === "pending") {
         entries.push(parsed as ScheduleEntry);
       }
@@ -87,29 +90,34 @@ export async function getDueRuns(): Promise<ScheduleEntry[]> {
 }
 
 export async function markRunTriggered(
-  workflowId: string,
+  agentId: string,
   scheduledTime: number
 ): Promise<void> {
-  const member = `${workflowId}:${scheduledTime}`;
+  const member = `${agentId}:${scheduledTime}`;
   await getRedis().zrem(SCHEDULE_QUEUE, member);
   await getRedis().set(
     `${SCHEDULE_DETAIL_PREFIX}${member}`,
-    JSON.stringify({ workflowId, scheduledTime, status: "triggered" }),
-    { ex: 86400 }
+    JSON.stringify({ agentId, scheduledTime, status: "triggered" }),
+    "EX",
+    86400
   );
 }
 
 export async function getNextScheduledRun(
-  workflowId: string
+  agentId: string
 ): Promise<{ scheduledTime: Date } | null> {
-  const members = await getRedis().zrange(SCHEDULE_QUEUE, 0, -1, {
-    withScores: true,
-  });
+  const results = await getRedis().zrangebyscore(
+    SCHEDULE_QUEUE,
+    0,
+    "+inf",
+    "WITHSCORES"
+  );
 
-  for (let i = 0; i < members.length; i += 2) {
-    const member = members[i] as string;
-    const score = members[i + 1] as number;
-    if (member.startsWith(`${workflowId}:`)) {
+  // Results come as [member, score, member, score, ...]
+  for (let i = 0; i < results.length; i += 2) {
+    const member = results[i];
+    const score = parseInt(results[i + 1], 10);
+    if (member.startsWith(`${agentId}:`)) {
       return { scheduledTime: new Date(score) };
     }
   }
@@ -117,12 +125,12 @@ export async function getNextScheduledRun(
   return null;
 }
 
-export async function cancelAllRuns(workflowId: string): Promise<number> {
+export async function cancelAllRuns(agentId: string): Promise<number> {
   const members = await getRedis().zrange(SCHEDULE_QUEUE, 0, -1);
   let cancelled = 0;
 
   for (const member of members) {
-    if ((member as string).startsWith(`${workflowId}:`)) {
+    if (member.startsWith(`${agentId}:`)) {
       await getRedis().zrem(SCHEDULE_QUEUE, member);
       await getRedis().del(`${SCHEDULE_DETAIL_PREFIX}${member}`);
       cancelled++;

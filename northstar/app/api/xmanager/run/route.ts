@@ -11,6 +11,7 @@ import { resolve, dirname } from "path";
 import { getLauncher } from "@/lib/harness";
 import { isRunActive, setActiveRun, clearActiveRun, scheduleRun } from "@/lib/redis";
 import { sendMessage, isSlackConfigured } from "@/lib/slack";
+import { getSetting } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
 const WORKSPACE_ROOT = resolve(process.cwd(), "workspace");
@@ -91,7 +92,14 @@ function buildSlackDigest(entries: RunRecordEntry[]): string {
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
-  const { slackChannel } = body as { slackChannel?: string };
+  const explicitChannel = (body as { slackChannel?: string }).slackChannel;
+
+  // Use explicit channel or fall back to default from settings
+  let slackChannel = explicitChannel;
+  if (!slackChannel) {
+    const defaultChannel = await getSetting<{ channelId: string }>("default_slack_channel");
+    slackChannel = defaultChannel?.channelId;
+  }
 
   if (await isRunActive("xmanager")) {
     return NextResponse.json(
