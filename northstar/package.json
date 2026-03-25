@@ -11,7 +11,7 @@
   "dependencies": {
     "@agints/harness": "workspace:*",
     "@slack/web-api": "^7.8.0",
-    "@upstash/redis": "^1.34.0",
+    "ioredis": "^5.4.0",
     "next": "16.0.10",
     "pg": "^8.13.0",
     "react": "19.2.1",

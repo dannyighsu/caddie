@@ -29,7 +29,7 @@ export async function POST() {
     }> = [];
 
     for (const entry of dueRuns) {
-      const agentId = entry.workflowId; // Redis still uses workflowId internally
+      const agentId = entry.agentId;
       const route = GATEWAY_ROUTES[agentId];
 
       if (!route) {

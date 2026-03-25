@@ -123,7 +123,13 @@ function TriggeredView({ agent }: { agent: Agent }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { success: false, error: `Server returned: ${res.status} ${text.substring(0, 200) || "(empty response)"}` };
+      }
       setLastResult(data);
       setHistory((prev) => [
         { timestamp: new Date().toISOString(), result: data },

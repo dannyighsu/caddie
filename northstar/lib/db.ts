@@ -57,12 +57,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_conversations_agent
-  ON conversations(agent_id, updated_at DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_conversations_external
-  ON conversations(external_id) WHERE external_id IS NOT NULL;
-
--- Migration: rename workflow_id to agent_id if needed
+-- Migrations must run before index creation (column may still be named workflow_id)
 DO $$ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -72,7 +67,6 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- Migration: add external_id column if missing
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -81,6 +75,11 @@ DO $$ BEGIN
     ALTER TABLE conversations ADD COLUMN external_id TEXT;
   END IF;
 END $$;
+
+CREATE INDEX IF NOT EXISTS idx_conversations_agent
+  ON conversations(agent_id, updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversations_external
+  ON conversations(external_id) WHERE external_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS app_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -108,6 +108,13 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   }
 
   private spawn(args: string[], cwd: string): Promise<string> {
+    // Log the command being run (redact prompt content for brevity)
+    const logArgs = args.map((a, i) =>
+      args[i - 1] === "-p" && a.length > 100 ? `"${a.substring(0, 100)}..."` : a
+    );
+    console.log(`[ClaudeCodeRuntime] Spawning: ${this.binary} ${logArgs.join(" ")}`);
+    console.log(`[ClaudeCodeRuntime] cwd: ${cwd}`);
+
     return new Promise((resolve, reject) => {
       let settled = false;
       const settle = (fn: typeof resolve | typeof reject, value: string | Error) => {
@@ -128,7 +135,8 @@ export class ClaudeCodeRuntime implements AgentRuntime {
         },
         (error, stdout, stderr) => {
           if (stderr) {
-            console.error(`[ClaudeCodeRuntime] stderr: ${stderr.substring(0, 500)}`);
+            // Log full stderr (Claude Code progress, warnings, etc.)
+            console.error(`[ClaudeCodeRuntime] stderr:\n${stderr}`);
           }
           if (error) {
             settle(reject, new Error(`claude process failed: ${error.message}`));
@@ -137,6 +145,13 @@ export class ClaudeCodeRuntime implements AgentRuntime {
           settle(resolve, stdout);
         }
       );
+
+      // Stream stderr in real-time so progress is visible during long runs
+      if (proc.stderr) {
+        proc.stderr.on("data", (chunk: Buffer) => {
+          process.stderr.write(`[claude] ${chunk.toString()}`);
+        });
+      }
 
       proc.on("error", (err) => {
         settle(reject, new Error(`Failed to spawn claude: ${err.message}`));
