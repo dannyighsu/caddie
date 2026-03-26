@@ -131,7 +131,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
           cwd,
           timeout: this.timeoutMs,
           maxBuffer: 50 * 1024 * 1024, // 50MB
-          env: process.env,
+          env: { ...process.env, CLAUDECODE: undefined },
         },
         (error, stdout, stderr) => {
           if (stderr) {
