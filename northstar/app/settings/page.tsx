@@ -117,30 +117,89 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Environment Status */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Environment</h2>
-        <div className="border border-gray-800 rounded-lg p-4">
-          <div className="space-y-2 text-sm">
-            <EnvStatus name="SLACK_BOT_TOKEN" />
-            <EnvStatus name="SLACK_SIGNING_SECRET" />
-            <EnvStatus name="KV_REST_API_URL" label="Redis" />
-            <EnvStatus name="POSTGRES_URL" label="Postgres" />
-            <EnvStatus name="GOOGLE_CLIENT_ID" label="Google Calendar" />
-          </div>
-        </div>
-      </section>
+      {/* Capabilities Health */}
+      <CapabilitiesHealth />
     </div>
   );
 }
 
-function EnvStatus({ name, label }: { name: string; label?: string }) {
-  // We can't read env vars client-side — this is a static display
-  // In a real implementation, we'd have an API endpoint for this
+interface HealthResult {
+  name: string;
+  type: "mcp" | "flag";
+  status: "ok" | "error" | "skipped";
+  message?: string;
+  durationMs?: number;
+}
+
+function CapabilitiesHealth() {
+  const [results, setResults] = useState<HealthResult[]>([]);
+  const [checking, setChecking] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  async function runChecks() {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/health");
+      setResults(await res.json());
+      setLoaded(true);
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  useEffect(() => {
+    runChecks();
+  }, []);
+
+  const statusColor = {
+    ok: "text-green-400",
+    error: "text-red-400",
+    skipped: "text-gray-500",
+  };
+
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-gray-400">{label ?? name}</span>
-      <span className="text-xs text-gray-600">Set in .env.local</span>
-    </div>
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Capabilities</h2>
+        <button
+          onClick={runChecks}
+          disabled={checking}
+          className="text-xs px-3 py-1 bg-gray-800 rounded hover:bg-gray-700 disabled:opacity-40 transition-colors"
+        >
+          {checking ? "Checking..." : "Re-check"}
+        </button>
+      </div>
+      <div className="border border-gray-800 rounded-lg p-4">
+        {!loaded ? (
+          <p className="text-sm text-gray-500">Running health checks...</p>
+        ) : results.length === 0 ? (
+          <p className="text-sm text-gray-500">No capabilities configured.</p>
+        ) : (
+          <div className="space-y-2">
+            {results.map((r) => (
+              <div key={r.name} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className={statusColor[r.status]}>
+                    {r.status === "ok" ? "ok" : r.status === "error" ? "err" : "skip"}
+                  </span>
+                  <span className="text-gray-300">{r.name}</span>
+                  <span className="text-xs text-gray-600">{r.type}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {r.message && (
+                    <span className="text-xs text-gray-500 truncate max-w-xs">
+                      {r.message}
+                    </span>
+                  )}
+                  {r.durationMs !== undefined && (
+                    <span className="text-xs text-gray-600">{r.durationMs}ms</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

@@ -2,17 +2,12 @@
  * Scheduler Trigger Route
  *
  * Called by an external scheduler (cron, Azure Functions, etc.) to process
- * due agent runs. Polls Redis for scheduled items and fires each one.
+ * due agent runs. Polls Redis for scheduled items and fires each via the gateway.
  */
 
 import { getDueRuns, markRunTriggered } from "@/lib/redis";
+import { getOrchestrator } from "@/lib/orchestrators";
 import { NextResponse } from "next/server";
-
-// Map agentId to the internal gateway route that handles it
-const GATEWAY_ROUTES: Record<string, string> = {
-  checkin: "/api/checkin/run",
-  xmanager: "/api/xmanager/run",
-};
 
 export async function POST() {
   try {
@@ -30,35 +25,25 @@ export async function POST() {
 
     for (const entry of dueRuns) {
       const agentId = entry.agentId;
-      const route = GATEWAY_ROUTES[agentId];
 
-      if (!route) {
-        console.warn(`[Scheduler] No gateway route for agent "${agentId}", skipping`);
-        results.push({ agentId, success: false, error: "No gateway route configured" });
-        continue;
-      }
-
-      // Mark as triggered before executing (prevents re-triggering on slow runs)
       await markRunTriggered(agentId, entry.scheduledTime);
 
       try {
-        // Call the gateway route internally
-        const baseUrl = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
-        const res = await fetch(`${baseUrl}${route}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(entry.metadata ?? {}),
-        });
-
-        const data = await res.json();
-        results.push({
-          agentId,
-          success: data.success ?? res.ok,
-          error: data.error,
-        });
+        const orchestrator = getOrchestrator(agentId);
+        if (orchestrator) {
+          const data = await orchestrator(entry.metadata as Record<string, string> ?? {});
+          results.push({
+            agentId,
+            success: !!data.success,
+            error: data.error as string | undefined,
+          });
+        } else {
+          console.warn(`[Scheduler] No orchestrator for agent "${agentId}", skipping`);
+          results.push({ agentId, success: false, error: "No orchestrator configured" });
+        }
 
         console.log(
-          `[Scheduler] Triggered ${agentId}: ${data.success ? "success" : "failed"}`
+          `[Scheduler] Triggered ${agentId}: ${results[results.length - 1].success ? "success" : "failed"}`
         );
       } catch (err) {
         const error = err instanceof Error ? err.message : "Unknown error";
@@ -67,10 +52,7 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({
-      triggered: results.length,
-      results,
-    });
+    return NextResponse.json({ triggered: results.length, results });
   } catch (err) {
     const error = err instanceof Error ? err.message : "Unknown error";
     console.error("[Scheduler] Trigger failed:", error);

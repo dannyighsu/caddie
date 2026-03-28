@@ -59,7 +59,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
         args.push("--mcp-config", mcpConfigPath);
       }
 
-      const stdout = await this.spawn(args, input.workingDirectory);
+      const stdout = await this.spawn(args, input.workingDirectory, input.additionalEnv);
       return this.parseOutput(stdout);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -107,7 +107,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     return args;
   }
 
-  private spawn(args: string[], cwd: string): Promise<string> {
+  private spawn(args: string[], cwd: string, additionalEnv?: Record<string, string>): Promise<string> {
     // Log the command being run (redact prompt content for brevity)
     const logArgs = args.map((a, i) =>
       args[i - 1] === "-p" && a.length > 100 ? `"${a.substring(0, 100)}..."` : a
@@ -131,7 +131,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
           cwd,
           timeout: this.timeoutMs,
           maxBuffer: 50 * 1024 * 1024, // 50MB
-          env: { ...process.env, CLAUDECODE: undefined },
+          env: { ...process.env, CLAUDECODE: undefined, ...additionalEnv },
         },
         (error, stdout, stderr) => {
           if (stderr) {
@@ -167,6 +167,12 @@ export class ClaudeCodeRuntime implements AgentRuntime {
         sessionId: parsed.session_id ?? "",
         rawText: parsed.result ?? "",
         error: parsed.is_error ? (parsed.result ?? "Unknown error") : undefined,
+        usage: parsed.usage ? {
+          ...parsed.usage,
+          totalCostUsd: parsed.total_cost_usd,
+          durationMs: parsed.duration_ms,
+          numTurns: parsed.num_turns,
+        } : undefined,
       };
     } catch {
       console.warn("[ClaudeCodeRuntime] Failed to parse JSON output, treating as raw text");

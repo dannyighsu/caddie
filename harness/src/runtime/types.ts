@@ -29,6 +29,8 @@ export interface AgentRuntimeInput {
   enableChrome?: boolean;
   /** Runtime-specific additional arguments (escape hatch). */
   additionalArgs?: string[];
+  /** Additional environment variables for the subprocess. */
+  additionalEnv?: Record<string, string>;
 }
 
 export interface AgentRuntimeOutput {
@@ -40,6 +42,8 @@ export interface AgentRuntimeOutput {
   rawText: string;
   /** Error description if the execution failed. */
   error?: string;
+  /** Token usage and cost metadata from the runtime, if available. */
+  usage?: Record<string, unknown>;
 }
 
 /**

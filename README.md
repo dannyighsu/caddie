@@ -1,57 +1,46 @@
 # agints
 
-Workflows and agents that run the business. Each workflow is a declarative config (JSON + persona prompt) that the Agent Harness executes via an underlying runtime (currently Claude Code CLI).
-
-## Table of Contents
-
-- [Repository Structure](#repository-structure)
-- [Quick Start](#quick-start)
-- [Creating a Workflow](#creating-a-workflow)
-- [Adding a Capability](#adding-a-capability)
-- [Architecture](#architecture)
-- [Running](#running)
-- [Prerequisites](#prerequisites)
+Agents that run the business. Each agent is a declarative config (JSON + persona prompt + optional skills) that the Agent Harness executes via an underlying runtime (currently Claude Code CLI).
 
 ## Repository Structure
 
 ```
 agints/
 ├── harness/              # Agent Harness library (@agints/harness)
-│   ├── src/              # Runtime, launcher, capability resolver
+│   ├── src/              # Runtime, launcher, capability + resolver system
+│   ├── agents/           # Agent definitions (agent.json + persona.md + skills)
 │   ├── capabilities/     # MCP server configs (JSON files)
-│   ├── workflows/        # Workflow definitions (workflow.json + persona.md)
+│   ├── resolvers/        # Pre-run data fetchers (e.g., Google Calendar)
 │   └── scripts/run.ts    # CLI smoke test
-├── northstar/            # Control plane + API gateway (Next.js)
+├── northstar/            # Control plane + gateway (Next.js)
+├── workspace/            # Agent working directories (gitignored)
 └── sandcastle/           # Security investigation project
 ```
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Run the control plane (dashboard + API)
-cd northstar && pnpm dev    # http://localhost:3000
-
-# Or run a workflow directly without the control plane
-cd harness && pnpm smoke
-cd harness && pnpm smoke -- --workflow writer --prompt "Draft a thread about AI agents"
+pnpm install              # install dependencies
+make run                  # start Northstar on http://localhost:3000
+make smoke                # run a smoke test directly via the harness
 ```
 
-## Creating a Workflow
+## Creating an Agent
 
-A workflow is a directory under `harness/workflows/` containing two files: a config and a persona.
+An agent is a directory under `harness/agents/` containing a config and a persona.
 
-### 1. Create the workflow directory
+### 1. Create the agent directory
 
 ```
-harness/workflows/<id>/
-├── workflow.json
-└── persona.md
+harness/agents/<id>/
+├── agent.json
+├── persona.md
+└── .claude/skills/       # optional: Claude Code native skills
+    └── <skill-name>/
+        └── SKILL.md
 ```
 
-### 2. Define workflow.json
+### 2. Define agent.json
 
 ```json
 {
@@ -67,44 +56,49 @@ harness/workflows/<id>/
 |-------|----------|-------------|
 | `id` | yes | Unique identifier, matches the directory name |
 | `name` | yes | Human-readable name shown in the dashboard |
-| `persona` | yes | Path to persona markdown (relative to workflow dir), or an inline string |
-| `capabilities` | yes | List of capability names (references JSON files in `harness/capabilities/`) |
-| `maxTurns` | no | Max agent loop iterations before forced stop. Default: 20 |
+| `persona` | yes | Path to persona markdown (relative to agent dir), or inline string |
+| `capabilities` | yes | Capability names (references JSON files in `harness/capabilities/`) |
+| `resolvers` | no | Pre-run resolver names (references files in `harness/resolvers/`) |
+| `maxTurns` | no | Max agent loop iterations. Default: 20 |
 | `enableChrome` | no | Enable Chrome browser automation. Can also be set via the `chrome` capability |
 | `outputSchema` | no | JSON Schema for structured output. Omit for conversational mode |
+| `mode` | no | `"conversational"` (default) or `"triggered"` -- controls the UI |
 
 ### 3. Write persona.md
 
-The persona is the system prompt. It supports `{{templateVar}}` interpolation -- the caller passes a `context` map and variables are replaced at launch time.
+The persona is the system prompt. Supports `{{templateVar}}` interpolation -- the caller passes a `context` map and resolvers inject additional variables before launch.
 
 ```markdown
 # Persona: Content Strategist
 
-You are a skilled content strategist helping the user brainstorm, research, draft,
-and refine articles for X/Twitter, Medium, and LinkedIn.
+You are a skilled content strategist helping the user brainstorm,
+research, draft, and refine articles.
 
 ## Current Context
 Current time: {{currentTime}}
-
-## Guidelines
-- Ask clarifying questions before diving into a draft
-- Cite sources when making factual claims
-- Save drafts to the workspace for iteration
 ```
 
-Unresolved `{{variables}}` are left as-is (not stripped), so you can spot missing context easily.
+Unresolved `{{variables}}` are left as-is so you can spot missing context.
 
-### 4. Done
+### 4. Add skills (optional)
 
-The workflow auto-appears in the Northstar dashboard. No registration step, no database entry -- the harness reads `harness/workflows/` at runtime.
+Skills use Claude Code's native SKILL.md format in `.claude/skills/`:
+
+```
+harness/agents/xmanager/.claude/skills/feed-scan/SKILL.md
+```
+
+Skills are symlinked into the agent's workspace automatically. The agent invokes them via `/skill-name` in the prompt.
+
+### 5. Done
+
+The agent auto-appears in the Northstar dashboard.
 
 ## Adding a Capability
 
-Capabilities are MCP server configurations. Each is a JSON file in `harness/capabilities/` that workflows reference by name.
+Capabilities are MCP server configurations. Each is a JSON file in `harness/capabilities/` that agents reference by name.
 
 ### MCP server capability
-
-Create `harness/capabilities/<name>.json`:
 
 ```json
 {
@@ -120,126 +114,132 @@ Create `harness/capabilities/<name>.json`:
 }
 ```
 
-`${ENV_VAR}` references in `command`, `args`, and `env` values are resolved from `process.env` at runtime. Missing env vars produce a warning but do not block execution.
+`${ENV_VAR}` references are resolved from `process.env` at runtime. Missing env vars produce warnings, not errors.
 
 ### Flag-only capability
 
-Some capabilities do not start an MCP server -- they just enable a runtime flag. Omit the `server` field:
+Omit the `server` field for capabilities that just enable a runtime flag:
 
 ```json
 {
   "name": "chrome",
-  "description": "Chrome browser automation (enables --chrome flag on Claude Code runtime)"
+  "description": "Chrome browser automation (enables --chrome flag)"
 }
 ```
 
-The harness checks for flag capabilities and passes them to the runtime accordingly.
+### Adding a Resolver
 
-### Using capabilities in a workflow
-
-Reference capability names in the workflow's `capabilities` array:
+Resolvers fetch data deterministically before each agent run and inject results as template variables. Define in `harness/resolvers/`:
 
 ```json
 {
-  "id": "researcher",
-  "name": "Deep Researcher",
-  "persona": "./persona.md",
-  "capabilities": ["web-search", "notion", "chrome"]
+  "name": "google-calendar",
+  "description": "Fetches today's calendar events as {{calendarEvents}}",
+  "module": "./google-calendar.ts",
+  "requiredEnv": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
 }
 ```
+
+Reference in agent.json: `"resolvers": ["google-calendar"]`
 
 ### Current capabilities
 
 | Name | Type | Description |
 |------|------|-------------|
-| `notion` | MCP server | Notion workspace access (`@notionhq/notion-mcp-server`) |
-| `web-search` | MCP server | Web search and fetching (`@anthropic-ai/fetch-mcp`) |
-| `chrome` | Flag | Enables Chrome browser automation in the runtime |
+| `notion` | MCP server | Notion workspace access |
+| `web-search` | MCP server | Web fetching |
+| `chrome` | Flag | Chrome browser automation |
+| `google-calendar` | Resolver | Injects `{{calendarEvents}}` from Google Calendar API |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Northstar (Next.js)                            │
-│  ┌──────────┐  ┌───────────┐  ┌──────────────┐ │
-│  │ Dashboard │  │ API Routes│  │ Postgres     │ │
-│  │ (React)   │  │ (Gateway) │  │ Conversations│ │
-│  └──────────┘  └─────┬─────┘  └──────────────┘ │
-└───────────────────────┼─────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Northstar (Next.js)                                │
+│  ┌──────────┐  ┌───────────┐  ┌──────────────────┐ │
+│  │ Dashboard │  │ Gateway   │  │ Postgres + Redis │ │
+│  │ (React)   │  │ API       │  │                  │ │
+│  └──────────┘  └─────┬─────┘  └──────────────────┘ │
+│                       │                              │
+│  Slack Socket Mode    │  Orchestrators               │
+│  (inbound messages)   │  (checkin, xmanager)         │
+└───────────────────────┼──────────────────────────────┘
                         │ imports @agints/harness
-┌───────────────────────┼─────────────────────────┐
-│  Agent Harness        │                         │
-│                       ▼                         │
-│  ┌────────────────────────────┐                 │
-│  │ Launcher                   │                 │
-│  │ load workflow.json          │                 │
-│  │ → read persona.md           │                 │
-│  │ → interpolate {{vars}}      │                 │
-│  │ → resolve MCP capabilities  │                 │
-│  │ → call runtime.execute()    │                 │
-│  └─────────────┬──────────────┘                 │
-│                │                                │
-│  ┌─────────────▼──────────────┐                 │
-│  │ AgentRuntime (interface)   │                 │
-│  │                            │                 │
-│  │ ClaudeCodeRuntime          │                 │
-│  │ (claude CLI → subprocess)  │                 │
-│  └────────────────────────────┘                 │
-└─────────────────────────────────────────────────┘
+┌───────────────────────┼──────────────────────────────┐
+│  Agent Harness        │                              │
+│                       ▼                              │
+│  ┌──────────────────────────────┐                    │
+│  │ Launcher                     │                    │
+│  │ load agent.json               │                    │
+│  │ → symlink skills + hooks      │                    │
+│  │ → run resolvers               │                    │
+│  │ → read + interpolate persona  │                    │
+│  │ → resolve MCP capabilities    │                    │
+│  │ → call runtime.execute()      │                    │
+│  └──────────────┬───────────────┘                    │
+│                 │                                    │
+│  ┌──────────────▼───────────────┐                    │
+│  │ AgentRuntime (interface)     │                    │
+│  │ ClaudeCodeRuntime            │                    │
+│  │ (claude CLI → subprocess)    │                    │
+│  └──────────────────────────────┘                    │
+└──────────────────────────────────────────────────────┘
 ```
 
-**Harness** is a pure TypeScript library with no framework dependencies. It exposes two main functions:
+**Harness** is a pure TypeScript library. Two main functions:
 
-- `createRuntime()` -- instantiates an `AgentRuntime` (currently always `ClaudeCodeRuntime`)
-- `createLauncher(runtime, config)` -- returns a `{ launch }` function bound to workflow and capability directories
+- `createRuntime()` -- instantiates an `AgentRuntime`
+- `createLauncher(runtime, config)` -- returns `{ launch }` bound to agent and capability directories
 
-The `AgentRuntime` interface is intentionally minimal:
-
-```typescript
-interface AgentRuntime {
-  readonly name: string;
-  execute(input: AgentRuntimeInput): Promise<AgentRuntimeOutput>;
-}
-```
-
-This makes it straightforward to add runtimes for other engines (Codex, local models, etc.) without changing the launcher or workflow definitions.
-
-**Northstar** imports the harness as a pnpm workspace dependency. API routes call `getLauncher().launch()` to trigger workflows. The frontend lists available workflows by scanning the `harness/workflows/` directory. Conversations (messages, session IDs for multi-turn resumption) are stored in Postgres with JSONB columns.
+**Northstar** imports the harness as a workspace dependency. The gateway API (`/api/gateway`) is the single entry point for running agents and sending notifications. Agents with orchestration logic (checkin, xmanager) have dedicated orchestrators that handle Slack posting, scheduling, and multi-step execution.
 
 ### Execution flow
 
-1. API route receives a request (workflow ID + prompt + optional session ID)
-2. `getLauncher().launch()` is called
-3. Launcher loads `workflow.json`, reads and interpolates `persona.md`, resolves MCP capabilities
-4. Runtime receives the full prompt + MCP server configs and executes the agent loop
-5. Result (structured output or raw text + session ID) is returned and persisted
+1. Gateway receives a request (agent ID + prompt)
+2. If agent has an orchestrator, it handles the full lifecycle (run lock, launch, Slack, scheduling)
+3. Launcher loads `agent.json`, symlinks skills/hooks, runs resolvers, interpolates persona, resolves capabilities
+4. Runtime spawns `claude` CLI with the prompt + MCP configs
+5. Result (text + session ID + usage) is returned and persisted
 
-Session IDs enable multi-turn conversations. On resumption, the persona is skipped (the runtime already has prior context) and only the new user prompt is sent.
+Session IDs enable multi-turn conversations. On resumption, resolvers and persona are skipped (the runtime has prior context).
+
+## Workspace
+
+Agent workspaces live at `workspace/{agentId}/` in the repo root by default. Each agent gets its own directory containing:
+
+- `config/` -- persistent config files (editable via the control plane)
+- `.claude/` -- symlinked skills and hooks from the agent definition
+- Everything else -- created by the agent during runs (task files, memory, run records, etc.)
+
+Override the workspace location with `WORKSPACE_ROOT`:
+
+```bash
+make run WORKSPACE_ROOT=/path/to/workspace
+```
+
+The workspace directory is gitignored.
 
 ## Running
 
-### Control plane (Northstar)
-
 ```bash
-cd northstar
-pnpm dev
+make run          # start Northstar on http://localhost:3000
+make build        # build harness + northstar
+make install      # install all dependencies
+make smoke        # run a quick smoke test via the harness
 ```
 
-Starts the dashboard and API gateway on `http://localhost:3000`.
-
-### Direct workflow execution
+Or directly:
 
 ```bash
-cd harness
-pnpm smoke                                                    # default: writer workflow
-pnpm smoke -- --workflow writer --prompt "Write about X"      # specify workflow and prompt
+cd northstar && pnpm dev                                      # start Northstar
+cd harness && pnpm smoke                                      # default: writer agent
+cd harness && pnpm smoke -- --agent writer --prompt "..."     # specify agent and prompt
 ```
-
-Runs a workflow directly via the harness without going through Northstar. Useful for testing new workflows.
 
 ## Prerequisites
 
 - **Node.js** and **pnpm** (10.22+)
 - **`claude` CLI** on PATH -- the Claude Code CLI is the current runtime driver
-- **Postgres** -- connection string in `northstar/.env.local` as `POSTGRES_URL`
-- **Env vars for capabilities** -- e.g., `NOTION_INTERNAL_TOKEN` for the Notion capability. Set in `.env.local` or your shell environment. Missing vars produce warnings, not errors.
+- **Postgres** -- `POSTGRES_URL` in `northstar/.env.local`
+- **Redis** -- `REDIS_URL` in `northstar/.env.local`
+- **Env vars for capabilities** -- e.g., `NOTION_INTERNAL_TOKEN` for Notion. Missing vars produce warnings, not errors.

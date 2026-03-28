@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$NORTHSTAR_TRACE_ID\" ]; then curl -s -X POST http://localhost:3000/api/traces -H 'Content-Type: application/json' -H \"X-Trace-Id: $NORTHSTAR_TRACE_ID\" -d \"$(cat)\" > /dev/null 2>&1; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$NORTHSTAR_TRACE_ID\" ]; then curl -s -X POST http://localhost:3000/api/traces -H 'Content-Type: application/json' -H \"X-Trace-Id: $NORTHSTAR_TRACE_ID\" -d '{\"type\":\"stop\"}' > /dev/null 2>&1; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

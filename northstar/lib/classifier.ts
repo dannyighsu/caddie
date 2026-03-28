@@ -62,7 +62,7 @@ No explanation, no markdown, just the JSON.`;
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-flash-lite-2.0",
+        model: "deepseek/deepseek-v3.2",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 50,
         temperature: 0,
