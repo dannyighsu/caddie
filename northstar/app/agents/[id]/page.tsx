@@ -113,15 +113,15 @@ function TriggeredView({ agent }: { agent: Agent }) {
   const [history, setHistory] = useState<Array<{ timestamp: string; result: Record<string, unknown> }>>([]);
 
   async function handleTrigger() {
-    if (running || !agent.triggerRoute) return;
+    if (running) return;
     setRunning(true);
     setLastResult(null);
 
     try {
-      const res = await fetch(agent.triggerRoute, {
+      const res = await fetch("/api/gateway", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ action: "run", agentId: agent.id }),
       });
       const text = await res.text();
       let data: Record<string, unknown>;
@@ -150,16 +150,11 @@ function TriggeredView({ agent }: { agent: Agent }) {
       <div>
         <button
           onClick={handleTrigger}
-          disabled={running || !agent.triggerRoute}
+          disabled={running}
           className="px-6 py-3 bg-white text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           {running ? "Running..." : "Run"}
         </button>
-        {!agent.triggerRoute && (
-          <p className="text-xs text-gray-500 mt-2">
-            No trigger route configured for this agent.
-          </p>
-        )}
       </div>
 
       {lastResult && (

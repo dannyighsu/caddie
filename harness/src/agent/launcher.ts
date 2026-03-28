@@ -98,6 +98,33 @@ async function ensureSkillsSymlink(
 }
 
 /**
+ * Ensure harness-level .claude/settings.json (hooks, etc.) is symlinked into the workspace.
+ */
+async function ensureHarnessClaudeConfig(
+  harnessRoot: string,
+  workingDirectory: string
+): Promise<void> {
+  const harnessSettingsFile = resolve(harnessRoot, ".claude", "settings.json");
+  const workspaceSettingsFile = resolve(workingDirectory, ".claude", "settings.json");
+
+  try {
+    await lstat(harnessSettingsFile);
+  } catch {
+    return; // No harness settings
+  }
+
+  try {
+    const stat = await lstat(workspaceSettingsFile);
+    if (stat.isSymbolicLink()) return; // Already symlinked
+  } catch {
+    // Doesn't exist yet
+  }
+
+  await mkdir(resolve(workingDirectory, ".claude"), { recursive: true });
+  await symlink(harnessSettingsFile, workspaceSettingsFile);
+}
+
+/**
  * Create an agent launcher bound to specific directories and a runtime.
  */
 export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
@@ -119,13 +146,13 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     );
 
     // 2. Determine working directory and ensure it exists
-    const workingDirectory =
-      input.workingDirectory ??
-      resolve(workspaceRoot, agent.id);
+    const workingDirectory = resolve(workspaceRoot, agent.id);
     await mkdir(workingDirectory, { recursive: true });
 
-    // 3. Symlink skills from agent definition into workspace
+    // 3. Symlink skills and hooks into workspace
     await ensureSkillsSymlink(agentDir, workingDirectory);
+    const harnessRoot = resolve(agentsDir, "..");
+    await ensureHarnessClaudeConfig(harnessRoot, workingDirectory);
 
     // 4. Run resolvers (pre-run data fetching, skipped on session resume)
     let resolverContext: Record<string, string> = {};
@@ -172,6 +199,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       sessionId: input.sessionId,
       mcpServers,
       enableChrome,
+      additionalEnv: input.additionalEnv,
     });
 
     return {
@@ -180,6 +208,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       rawText: result.rawText,
       sessionId: result.sessionId,
       error: result.error,
+      usage: result.usage,
     };
   }
 

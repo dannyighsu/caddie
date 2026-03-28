@@ -4,5 +4,6 @@
   "persona": "./persona.md",
   "capabilities": ["notion"],
   "resolvers": ["google-calendar"],
-  "maxTurns": 20
+  "maxTurns": 20,
+  "triggerRoute": "/api/checkin/run"
 }

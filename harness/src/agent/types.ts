@@ -47,8 +47,8 @@ export interface AgentInput {
   context?: Record<string, string>;
   /** How/why this agent was triggered. */
   trigger?: TriggerContext;
-  /** Override the working directory (otherwise derived from workspaceRoot + agentId). */
-  workingDirectory?: string;
+  /** Additional environment variables passed to the runtime subprocess. */
+  additionalEnv?: Record<string, string>;
 }
 
 /**
@@ -63,4 +63,6 @@ export interface AgentResult {
   /** Session ID for resumption. */
   sessionId: string;
   error?: string;
+  /** Token usage and cost metadata, if available. */
+  usage?: Record<string, unknown>;
 }

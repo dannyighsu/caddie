@@ -11,18 +11,23 @@ import type { AgentConfig } from "@agints/harness";
 import { readdir, readFile } from "fs/promises";
 
 // The harness package lives alongside northstar in the monorepo
-const harnessRoot = resolve(process.cwd(), "..", "harness");
+const repoRoot = resolve(process.cwd(), "..");
+const harnessRoot = resolve(repoRoot, "harness");
 
 let launcherInstance: ReturnType<typeof createLauncher> | null = null;
 
 export function getLauncher() {
   if (!launcherInstance) {
     const runtime = createRuntime();
+    const workspaceRoot = process.env.WORKSPACE_ROOT
+      ? resolve(process.env.WORKSPACE_ROOT)
+      : resolve(repoRoot, "workspace");
+
     launcherInstance = createLauncher(runtime, {
       agentsDir: resolve(harnessRoot, "agents"),
       capabilitiesDir: resolve(harnessRoot, "capabilities"),
       resolversDir: resolve(harnessRoot, "resolvers"),
-      workspaceRoot: resolve(process.cwd(), "workspace"),
+      workspaceRoot,
     });
   }
   return launcherInstance;
