@@ -3,6 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 
+interface AgentProfile {
+  capabilities?: string[];
+  mode?: "conversational" | "triggered";
+  triggerRoute?: string;
+}
+
 interface Agent {
   id: string;
   name: string;
@@ -11,6 +17,7 @@ interface Agent {
   enableChrome?: boolean;
   mode?: "conversational" | "triggered";
   triggerRoute?: string;
+  profiles?: Record<string, AgentProfile>;
 }
 
 interface Message {
@@ -53,7 +60,11 @@ export default function AgentPage() {
     return <p className="text-gray-500">Loading...</p>;
   }
 
-  const isTriggered = agent.mode === "triggered";
+  // Collect triggered profiles
+  const triggeredProfiles = Object.entries(agent.profiles ?? {})
+    .filter(([, p]) => p.mode === "triggered")
+    .map(([name]) => name);
+  const hasTriggeredProfiles = triggeredProfiles.length > 0;
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
@@ -62,7 +73,6 @@ export default function AgentPage() {
         <p className="text-xs text-gray-500 mt-1">
           {agent.capabilities.join(", ")}
           {" · "}Max {agent.maxTurns ?? 20} turns
-          {isTriggered && " · Triggered"}
         </p>
         <div className="flex gap-4 mt-3 border-b border-gray-800">
           <button
@@ -73,7 +83,7 @@ export default function AgentPage() {
                 : "text-gray-500 hover:text-gray-300"
             }`}
           >
-            {isTriggered ? "Runs" : "Conversations"}
+            Conversations
           </button>
           <button
             onClick={() => setTab("config")}
@@ -90,11 +100,18 @@ export default function AgentPage() {
 
       <div className="flex-1 min-h-0">
         {tab === "main" ? (
-          isTriggered ? (
-            <TriggeredView agent={agent} />
-          ) : (
-            <ConversationsView agentId={agentId} />
-          )
+          <div className="h-full flex flex-col gap-6">
+            {hasTriggeredProfiles && (
+              <div className="flex gap-3">
+                {triggeredProfiles.map((profile) => (
+                  <TriggeredButton key={profile} agent={agent} profile={profile} />
+                ))}
+              </div>
+            )}
+            <div className="flex-1 min-h-0">
+              <ConversationsView agentId={agentId} />
+            </div>
+          </div>
         ) : (
           <ConfigView agentId={agentId} />
         )}
@@ -104,13 +121,12 @@ export default function AgentPage() {
 }
 
 // =============================================================================
-// Triggered View (for xmanager etc.)
+// Triggered Profile Button
 // =============================================================================
 
-function TriggeredView({ agent }: { agent: Agent }) {
+function TriggeredButton({ agent, profile }: { agent: Agent; profile: string }) {
   const [running, setRunning] = useState(false);
   const [lastResult, setLastResult] = useState<Record<string, unknown> | null>(null);
-  const [history, setHistory] = useState<Array<{ timestamp: string; result: Record<string, unknown> }>>([]);
 
   async function handleTrigger() {
     if (running) return;
@@ -121,84 +137,36 @@ function TriggeredView({ agent }: { agent: Agent }) {
       const res = await fetch("/api/gateway", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "run", agentId: agent.id }),
+        body: JSON.stringify({ action: "run", agentId: agent.id, profile }),
       });
       const text = await res.text();
-      let data: Record<string, unknown>;
       try {
-        data = JSON.parse(text);
+        setLastResult(JSON.parse(text));
       } catch {
-        data = { success: false, error: `Server returned: ${res.status} ${text.substring(0, 200) || "(empty response)"}` };
+        setLastResult({ success: false, error: `Server returned: ${res.status} ${text.substring(0, 200) || "(empty)"}` });
       }
-      setLastResult(data);
-      setHistory((prev) => [
-        { timestamp: new Date().toISOString(), result: data },
-        ...prev,
-      ]);
     } catch (err) {
-      setLastResult({
-        success: false,
-        error: err instanceof Error ? err.message : "Request failed",
-      });
+      setLastResult({ success: false, error: err instanceof Error ? err.message : "Request failed" });
     } finally {
       setRunning(false);
     }
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <button
-          onClick={handleTrigger}
-          disabled={running}
-          className="px-6 py-3 bg-white text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          {running ? "Running..." : "Run"}
-        </button>
-      </div>
-
+    <div>
+      <button
+        onClick={handleTrigger}
+        disabled={running}
+        className="px-4 py-2 bg-gray-800 text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        {running ? `Running ${profile}...` : `Run ${profile}`}
+      </button>
       {lastResult && (
-        <div
-          className={`border rounded-lg p-4 ${
-            lastResult.success
-              ? "border-green-800 bg-green-950/30"
-              : "border-red-800 bg-red-950/30"
-          }`}
-        >
-          <span
-            className={`text-xs font-medium ${
-              lastResult.success ? "text-green-400" : "text-red-400"
-            }`}
-          >
-            {lastResult.success ? "Completed" : "Failed"}
-          </span>
-          <pre className="text-sm whitespace-pre-wrap text-gray-200 mt-2 max-h-96 overflow-y-auto">
-            {JSON.stringify(lastResult, null, 2)}
-          </pre>
-        </div>
-      )}
-
-      {history.length > 1 && (
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Previous Runs</h2>
-          <div className="space-y-2">
-            {history.slice(1).map((entry, i) => (
-              <details key={i} className="border border-gray-800 rounded-lg">
-                <summary className="p-3 text-sm cursor-pointer hover:bg-gray-900/50 flex justify-between">
-                  <span className={entry.result.success ? "text-green-400" : "text-red-400"}>
-                    {entry.result.success ? "Success" : "Failed"}
-                  </span>
-                  <span className="text-gray-500">
-                    {new Date(entry.timestamp).toLocaleTimeString()}
-                  </span>
-                </summary>
-                <pre className="p-3 border-t border-gray-800 text-xs whitespace-pre-wrap text-gray-300 max-h-48 overflow-y-auto">
-                  {JSON.stringify(entry.result, null, 2)}
-                </pre>
-              </details>
-            ))}
-          </div>
-        </div>
+        <pre className={`mt-2 text-xs p-2 rounded max-h-32 overflow-y-auto ${
+          lastResult.success ? "text-green-400 bg-green-950/20" : "text-red-400 bg-red-950/20"
+        }`}>
+          {JSON.stringify(lastResult, null, 2)}
+        </pre>
       )}
     </div>
   );
