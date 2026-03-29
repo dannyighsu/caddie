@@ -1,9 +1,0 @@
-{
-  "id": "checkin",
-  "name": "Check-In Manager",
-  "persona": "./persona.md",
-  "capabilities": ["notion"],
-  "resolvers": ["google-calendar"],
-  "maxTurns": 20,
-  "triggerRoute": "/api/checkin/run"
-}

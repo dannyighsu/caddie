@@ -13,7 +13,7 @@ interface ClassificationResult {
   confidence: "high" | "medium" | "low";
 }
 
-const FALLBACK_AGENT_ID = "checkin";
+const FALLBACK_AGENT_ID = "buri";
 
 /**
  * Classify an incoming message to determine which agent should handle it.
@@ -25,7 +25,7 @@ export async function classifyMessage(
   const agents = await listAgents();
 
   if (agents.length === 0) {
-    return { agentId: FALLBACK_AGENT_ID, agentName: "Check-In Manager", confidence: "low" };
+    return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
   }
 
   if (agents.length === 1) {
@@ -35,7 +35,7 @@ export async function classifyMessage(
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.warn("[Classifier] OPENROUTER_API_KEY not set, falling back to default agent");
-    return { agentId: FALLBACK_AGENT_ID, agentName: "Check-In Manager", confidence: "low" };
+    return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
   }
 
   // Build agent descriptions for the classifier
@@ -71,7 +71,7 @@ No explanation, no markdown, just the JSON.`;
 
     if (!res.ok) {
       console.error("[Classifier] OpenRouter error:", res.status, await res.text());
-      return { agentId: FALLBACK_AGENT_ID, agentName: "Check-In Manager", confidence: "low" };
+      return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
     }
 
     const data = await res.json();
@@ -86,12 +86,12 @@ No explanation, no markdown, just the JSON.`;
     const agent = agents.find((a) => a.id === agentId);
     if (!agent) {
       console.warn(`[Classifier] Unknown agent "${agentId}", falling back`);
-      return { agentId: FALLBACK_AGENT_ID, agentName: "Check-In Manager", confidence: "low" };
+      return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
     }
 
     return { agentId: agent.id, agentName: agent.name, confidence };
   } catch (err) {
     console.error("[Classifier] Failed:", err instanceof Error ? err.message : err);
-    return { agentId: FALLBACK_AGENT_ID, agentName: "Check-In Manager", confidence: "low" };
+    return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
   }
 }

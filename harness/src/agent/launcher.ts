@@ -139,11 +139,20 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
    * Launch an agent execution.
    */
   async function launch(input: AgentInput): Promise<AgentResult> {
-    // 1. Load agent config
-    const { config: agent, agentDir } = await loadAgentConfig(
+    // 1. Load agent config and apply profile overrides
+    const { config: baseAgent, agentDir } = await loadAgentConfig(
       agentsDir,
       input.agentId
     );
+
+    const profile = input.profile ? baseAgent.profiles?.[input.profile] : undefined;
+    const agent = {
+      ...baseAgent,
+      capabilities: profile?.capabilities ?? baseAgent.capabilities,
+      resolvers: profile?.resolvers ?? baseAgent.resolvers,
+      maxTurns: profile?.maxTurns ?? baseAgent.maxTurns,
+      enableChrome: profile?.enableChrome ?? baseAgent.enableChrome,
+    };
 
     // 2. Determine working directory and ensure it exists
     const workingDirectory = resolve(workspaceRoot, agent.id);

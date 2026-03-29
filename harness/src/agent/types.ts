@@ -31,6 +31,15 @@ export interface AgentConfig {
   mode?: "conversational" | "triggered";
   /** API route the control plane hits for triggered agents (e.g., "/api/xmanager/run"). */
   triggerRoute?: string;
+  /** Named capability profiles. Overrides base capabilities/resolvers/maxTurns/enableChrome when selected. */
+  profiles?: Record<string, {
+    capabilities?: string[];
+    resolvers?: string[];
+    maxTurns?: number;
+    enableChrome?: boolean;
+    mode?: "conversational" | "triggered";
+    triggerRoute?: string;
+  }>;
 }
 
 /**
@@ -39,6 +48,8 @@ export interface AgentConfig {
 export interface AgentInput {
   /** Which agent to run. */
   agentId: string;
+  /** Which profile to use (overrides base capabilities). */
+  profile?: string;
   /** The user's message or task prompt. */
   prompt: string;
   /** Resume a prior session for conversation continuation. */
