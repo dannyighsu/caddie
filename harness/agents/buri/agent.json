@@ -1,0 +1,19 @@
+{
+  "id": "buri",
+  "name": "Buri",
+  "persona": "./persona.md",
+  "capabilities": ["notion"],
+  "resolvers": ["google-calendar"],
+  "maxTurns": 20,
+  "profiles": {
+    "writer": {
+      "capabilities": ["notion", "web-search"],
+      "maxTurns": 30
+    },
+    "xmanager": {
+      "capabilities": ["chrome"],
+      "mode": "triggered",
+      "triggerRoute": "/api/xmanager/run"
+    }
+  }
+}

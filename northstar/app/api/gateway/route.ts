@@ -37,6 +37,7 @@ interface GatewayRequest {
 
   // --- run fields ---
   agentId?: string;
+  profile?: string;
   prompt?: string;
   conversationId?: string;
   context?: Record<string, string>;
@@ -130,7 +131,7 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
   }
 
   // Check for agent-specific orchestrator
-  const orchestrator = getOrchestrator(req.agentId);
+  const orchestrator = getOrchestrator(req.agentId, req.profile);
   if (orchestrator) {
     const params: OrchestratorParams = {
       prompt: req.prompt,

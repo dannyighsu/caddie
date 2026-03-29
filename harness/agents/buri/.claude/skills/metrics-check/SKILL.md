@@ -5,7 +5,9 @@ description: Check performance metrics on recent X posts. Records findings as JS
 
 ## Metrics Check Instructions
 
-Check metrics on recent posts (last {{lookbackHours}} hours).
+You are logged into X (Twitter) as @{{xUsername}} with an authenticated browser session.
+
+Check metrics on recent posts (last {{lookbackHours}} hours). Record findings to the run record file at {{runRecordPath}}.
 
 ### Steps
 

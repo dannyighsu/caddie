@@ -44,14 +44,19 @@ export interface OrchestratorParams {
 }
 
 const orchestrators: Record<string, Orchestrator> = {
-  checkin: runCheckin,
-  xmanager: runXManager,
+  "buri": runCheckin,
+  "buri:xmanager": runXManager,
 };
 
 /**
- * Get the orchestrator for an agent, if one exists.
+ * Get the orchestrator for an agent+profile combination.
+ * Checks for "agentId:profile" first, then falls back to "agentId".
  */
-export function getOrchestrator(agentId: string): Orchestrator | null {
+export function getOrchestrator(agentId: string, profile?: string): Orchestrator | null {
+  if (profile) {
+    const specific = orchestrators[`${agentId}:${profile}`];
+    if (specific) return specific;
+  }
   return orchestrators[agentId] ?? null;
 }
 
@@ -91,15 +96,15 @@ function currentTimePST(): string {
 
 async function runCheckin(params: OrchestratorParams): Promise<Record<string, unknown>> {
   const traceId = createTraceId();
-  await createTrace(traceId, "checkin", { trigger: "orchestrator" });
+  await createTrace(traceId, "buri", { trigger: "orchestrator" });
 
   const slackChannel = await resolveSlackChannel(params.slackChannel);
 
-  if (await isRunActive("checkin")) {
+  if (await isRunActive("buri")) {
     return { success: false, error: "A check-in is already in progress" };
   }
 
-  await setActiveRun("checkin");
+  await setActiveRun("buri");
 
   try {
     let conversation;
@@ -110,13 +115,13 @@ async function runCheckin(params: OrchestratorParams): Promise<Record<string, un
       if (!conversation) return { success: false, error: "Conversation not found" };
       sessionId = conversation.session_id ?? undefined;
     } else {
-      conversation = await createConversation("checkin", "Check-in");
+      conversation = await createConversation("buri", "Check-in");
     }
 
     const prompt = params.prompt ?? "Conduct a check-in.";
     const launcher = getLauncher();
     const result = await launcher.launch({
-      agentId: "checkin",
+      agentId: "buri",
       prompt,
       sessionId,
       context: { currentTime: currentTimePST() },
@@ -154,7 +159,7 @@ async function runCheckin(params: OrchestratorParams): Promise<Record<string, un
     const nextMinutes = (result.output?.nextCheckInTime as number) ?? 120;
     const nextTime = new Date(Date.now() + nextMinutes * 60 * 1000);
     try {
-      await scheduleRun("checkin", nextTime);
+      await scheduleRun("buri", nextTime);
     } catch (err) {
       console.error("[Check-in] Failed to schedule next run:", err);
     }
@@ -172,7 +177,7 @@ async function runCheckin(params: OrchestratorParams): Promise<Record<string, un
     await completeTrace(traceId, runResult);
     return runResult;
   } finally {
-    await clearActiveRun("checkin");
+    await clearActiveRun("buri");
   }
 }
 
@@ -254,16 +259,16 @@ async function runXManager(params: OrchestratorParams): Promise<Record<string, u
   await setActiveRun("xmanager", 1800);
 
   try {
-    const xUsername = (await readConfigFile("xmanager", "x_username.txt")).trim();
+    const xUsername = (await readConfigFile("buri", "x_username.txt")).trim();
     if (!xUsername) {
-      return { success: false, error: "X username not configured. Add workspace/xmanager/config/x_username.txt" };
+      return { success: false, error: "X username not configured. Add workspace/buri/config/x_username.txt" };
     }
 
-    const areasOfInterest = await readConfigFile("xmanager", "areas_of_interest.md");
-    const engagementCriteria = await readConfigFile("xmanager", "engagement_criteria.md");
+    const areasOfInterest = await readConfigFile("buri", "areas_of_interest.md");
+    const engagementCriteria = await readConfigFile("buri", "engagement_criteria.md");
 
     const runRecordPath = buildRunRecordPath();
-    const xmanagerWorkspace = resolve(WORKSPACE_ROOT, "xmanager");
+    const xmanagerWorkspace = resolve(WORKSPACE_ROOT, "buri");
     const fullRecordPath = resolve(xmanagerWorkspace, runRecordPath);
     await mkdir(dirname(fullRecordPath), { recursive: true });
     await writeFile(fullRecordPath, "");
@@ -274,7 +279,7 @@ async function runXManager(params: OrchestratorParams): Promise<Record<string, u
     // Feed scan
     console.log("[XManager] Running feed scan...");
     const feedResult = await launcher.launch({
-      agentId: "xmanager",
+      agentId: "buri", profile: "xmanager",
       prompt: "/feed-scan",
       context: { xUsername, areasOfInterest, engagementCriteria, runRecordPath, lookbackHours },
       additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
@@ -286,7 +291,7 @@ async function runXManager(params: OrchestratorParams): Promise<Record<string, u
     // Metrics check
     console.log("[XManager] Running metrics check...");
     const metricsResult = await launcher.launch({
-      agentId: "xmanager",
+      agentId: "buri", profile: "xmanager",
       prompt: "/metrics-check",
       context: { xUsername, runRecordPath, lookbackHours: "24" },
       additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
