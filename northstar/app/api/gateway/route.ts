@@ -146,6 +146,7 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
   const launcher = getLauncher();
   const result = await launcher.launch({
     agentId: req.agentId,
+    profile: req.profile,
     prompt: req.prompt ?? "Run.",
     context: {
       currentTime: new Date().toLocaleString("en-US", {
