@@ -27,18 +27,12 @@ export interface AgentConfig {
   maxTurns?: number;
   /** Whether this agent needs Chrome browser automation. */
   enableChrome?: boolean;
-  /** Agent mode: "conversational" (default) for chat UI, "triggered" for run-button UI. */
-  mode?: "conversational" | "triggered";
-  /** API route the control plane hits for triggered agents (e.g., "/api/xmanager/run"). */
-  triggerRoute?: string;
   /** Named capability profiles. Overrides base capabilities/resolvers/maxTurns/enableChrome when selected. */
   profiles?: Record<string, {
     capabilities?: string[];
     resolvers?: string[];
     maxTurns?: number;
     enableChrome?: boolean;
-    mode?: "conversational" | "triggered";
-    triggerRoute?: string;
   }>;
 }
 

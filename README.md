@@ -56,8 +56,7 @@ harness/agents/<id>/
       "maxTurns": 30
     },
     "xmanager": {
-      "capabilities": ["chrome"],
-      "mode": "triggered"
+      "capabilities": ["chrome"]
     }
   }
 }
@@ -72,23 +71,25 @@ harness/agents/<id>/
 | `resolvers` | no | Pre-run resolver names (references files in `harness/resolvers/`) |
 | `maxTurns` | no | Max agent loop iterations. Default: 20 |
 | `enableChrome` | no | Enable Chrome browser automation. Can also be set via the `chrome` capability |
-| `outputSchema` | no | JSON Schema for structured output. Omit for conversational mode |
-| `mode` | no | `"conversational"` (default) or `"triggered"` -- controls the UI |
-| `profiles` | no | Named profile overrides. Each profile can override `capabilities`, `resolvers`, `maxTurns`, `mode`, etc. |
+| `outputSchema` | no | JSON Schema for structured output. Omit for free-form mode |
+| `profiles` | no | Named capability profiles. Each can override `capabilities`, `resolvers`, `maxTurns` |
 
 ### Profiles
 
-Profiles let a single agent serve multiple roles. Each profile overrides the base config for the fields it specifies. Activate a profile by passing `profile` to the launcher or gateway:
+Profiles are capability sets. They control which MCP servers and resolvers are loaded for a given run. All profiles share the same persona, workspace, config, and skills. Any profile can be used conversationally (Slack, UI) or on a schedule.
 
 ```bash
-# Run buri with the writer profile (notion + web-search, maxTurns: 30)
-curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"writer"}'
+# Run with the writer profile (notion + web-search)
+curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"writer","prompt":"Draft a post about AI agents"}'
 
-# Run buri with xmanager profile (chrome, triggered mode)
-curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"xmanager"}'
+# Run with xmanager profile (chrome — can browse X)
+curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"xmanager","prompt":"/feed-scan"}'
 
-# Run buri with no profile (default: notion + google-calendar resolver)
-curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri"}'
+# Run with no profile (default: notion + google-calendar)
+curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","prompt":"Do a check-in"}'
+
+# Schedule xmanager to run every 30 minutes
+curl -X POST localhost:3000/api/gateway -d '{"action":"schedule","agentId":"buri","profile":"xmanager","cron":"0,30 * * * *","prompt":"/feed-scan"}'
 ```
 
 All profiles share the same workspace at `workspace/buri/`.

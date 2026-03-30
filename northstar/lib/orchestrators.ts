@@ -212,40 +212,6 @@ async function readRunRecord(workspacePath: string, recordPath: string): Promise
   }
 }
 
-function buildSlackDigest(entries: RunRecordEntry[]): string {
-  const opportunities = entries.filter((e) => e.type === "opportunity");
-  const metrics = entries.filter((e) => e.type === "metric");
-  const parts: string[] = [":bird: *X Manager Digest*\n"];
-
-  if (opportunities.length > 0) {
-    parts.push(`*Engagement Opportunities* (${opportunities.length})`);
-    for (const opp of opportunities) {
-      const text = String(opp.text ?? "").substring(0, 100);
-      parts.push(`- @${opp.authorHandle}: "${text}" - ${opp.reason}`);
-    }
-    parts.push("");
-  } else {
-    parts.push("*Engagement Opportunities*: None found.\n");
-  }
-
-  if (metrics.length > 0) {
-    parts.push(`*Recent Post Performance* (${metrics.length})`);
-    for (const m of metrics) {
-      const text = String(m.postText ?? "Post").substring(0, 80);
-      const stats = [
-        m.impressions ? `${m.impressions} views` : null,
-        m.likes ? `${m.likes} likes` : null,
-        m.replies ? `${m.replies} replies` : null,
-      ]
-        .filter(Boolean)
-        .join(", ");
-      parts.push(`- ${text}: ${stats}`);
-    }
-  }
-
-  return parts.join("\n");
-}
-
 async function runXManager(params: OrchestratorParams): Promise<Record<string, unknown>> {
   const traceId = createTraceId();
   await createTrace(traceId, "xmanager", { trigger: "orchestrator" });
@@ -264,16 +230,12 @@ async function runXManager(params: OrchestratorParams): Promise<Record<string, u
       return { success: false, error: "X username not configured. Add workspace/buri/config/x_username.txt" };
     }
 
-    const areasOfInterest = await readConfigFile("buri", "areas_of_interest.md");
-    const engagementCriteria = await readConfigFile("buri", "engagement_criteria.md");
-
     const runRecordPath = buildRunRecordPath();
-    const xmanagerWorkspace = resolve(WORKSPACE_ROOT, "buri");
-    const fullRecordPath = resolve(xmanagerWorkspace, runRecordPath);
+    const buriWorkspace = resolve(WORKSPACE_ROOT, "buri");
+    const fullRecordPath = resolve(buriWorkspace, runRecordPath);
     await mkdir(dirname(fullRecordPath), { recursive: true });
     await writeFile(fullRecordPath, "");
 
-    const lookbackHours = "12";
     const launcher = getLauncher();
 
     // Feed scan
@@ -281,62 +243,64 @@ async function runXManager(params: OrchestratorParams): Promise<Record<string, u
     const feedResult = await launcher.launch({
       agentId: "buri", profile: "xmanager",
       prompt: "/feed-scan",
-      context: { xUsername, areasOfInterest, engagementCriteria, runRecordPath, lookbackHours },
+      context: { xUsername, runRecordPath },
       additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
     });
     if (feedResult.error) {
       console.error("[XManager] Feed scan error:", feedResult.error);
     }
 
-    // Metrics check
-    console.log("[XManager] Running metrics check...");
-    const metricsResult = await launcher.launch({
-      agentId: "buri", profile: "xmanager",
-      prompt: "/metrics-check",
-      context: { xUsername, runRecordPath, lookbackHours: "24" },
-      additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
-    });
-    if (metricsResult.error) {
-      console.error("[XManager] Metrics check error:", metricsResult.error);
+    // Read results and build Slack message
+    const entries = await readRunRecord(buriWorkspace, runRecordPath);
+    const opportunities = entries.filter((e) => e.type === "opportunity");
+
+    let slackMessage: string;
+    if (opportunities.length > 0) {
+      const parts = [`:bird: *X Manager — ${opportunities.length} engagement ${opportunities.length === 1 ? "opportunity" : "opportunities"} found*\n`];
+      for (const opp of opportunities) {
+        const handle = opp.authorHandle ? `@${opp.authorHandle}` : opp.author;
+        const text = String(opp.text ?? "").substring(0, 120);
+        const link = opp.link ?? "";
+        parts.push(`*${handle}* ${opp.followerCount ? `(${opp.followerCount})` : ""}`);
+        parts.push(`> ${text}`);
+        if (opp.suggestedEngagement) {
+          const suggestions = opp.suggestedEngagement as string[];
+          parts.push(`_Suggested:_ ${suggestions.slice(0, 2).join(" · ")}`);
+        }
+        if (opp.discoveryMethod) {
+          parts.push(`_Found:_ ${opp.discoveryMethod}`);
+        }
+        if (link) parts.push(`<${link}|View post>`);
+        parts.push("");
+      }
+      parts.push("_Reply in this thread to discuss opportunities or approve replies._");
+      slackMessage = parts.join("\n");
+    } else {
+      slackMessage = `:bird: *X Manager — no engagement opportunities found*\n${feedResult.rawText?.substring(0, 300) ?? "Scan completed with no results."}`;
     }
 
-    // Aggregate
-    const entries = await readRunRecord(xmanagerWorkspace, runRecordPath);
-    const digest = buildSlackDigest(entries);
-
+    // Save summary
     const summaryPath = runRecordPath.replace(".jsonl", "-summary.json");
     await writeFile(
-      resolve(xmanagerWorkspace, summaryPath),
-      JSON.stringify({ timestamp: new Date().toISOString(), entries, digest }, null, 2)
+      resolve(buriWorkspace, summaryPath),
+      JSON.stringify({ timestamp: new Date().toISOString(), entries, slackMessage }, null, 2)
     );
 
-    // Post to Slack (unless caller handles it)
+    // Post to Slack
     if (!params.skipSlack && slackChannel && isSlackConfigured()) {
       try {
         const traceLink = isTracingEnabled() ? `\n<${getTraceUrl(traceId)}|View trace>` : "";
-        await sendMessage(slackChannel, digest + traceLink);
+        await sendMessage(slackChannel, slackMessage + traceLink);
       } catch (err) {
         console.error("[XManager] Failed to post to Slack:", err);
       }
     }
 
-    // Schedule next run (production only)
-    if (process.env.NODE_ENV !== "development") {
-      try {
-        await scheduleOneShot("buri", new Date(Date.now() + 60 * 60 * 1000), {
-          profile: "xmanager",
-          description: "Next X Manager run",
-        });
-      } catch (err) {
-        console.error("[XManager] Failed to schedule next run:", err);
-      }
-    }
-
     const runResult = {
       success: true,
-      digest,
-      opportunitiesFound: entries.filter((e) => e.type === "opportunity").length,
-      metricsFound: entries.filter((e) => e.type === "metric").length,
+      rawText: feedResult.rawText,
+      digest: slackMessage,
+      opportunitiesFound: opportunities.length,
       runRecordPath,
       traceUrl: isTracingEnabled() ? getTraceUrl(traceId) : undefined,
     };

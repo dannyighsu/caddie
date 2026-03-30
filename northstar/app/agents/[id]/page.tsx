@@ -5,8 +5,6 @@ import { useParams } from "next/navigation";
 
 interface AgentProfile {
   capabilities?: string[];
-  mode?: "conversational" | "triggered";
-  triggerRoute?: string;
 }
 
 interface Agent {
@@ -14,9 +12,6 @@ interface Agent {
   name: string;
   capabilities: string[];
   maxTurns?: number;
-  enableChrome?: boolean;
-  mode?: "conversational" | "triggered";
-  triggerRoute?: string;
   profiles?: Record<string, AgentProfile>;
 }
 
@@ -60,11 +55,9 @@ export default function AgentPage() {
     return <p className="text-gray-500">Loading...</p>;
   }
 
-  // Collect triggered profiles
-  const triggeredProfiles = Object.entries(agent.profiles ?? {})
-    .filter(([, p]) => p.mode === "triggered")
-    .map(([name]) => name);
-  const hasTriggeredProfiles = triggeredProfiles.length > 0;
+  // All profiles are available for quick-run
+  const profileNames = Object.keys(agent.profiles ?? {});
+  const hasProfiles = profileNames.length > 0;
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
@@ -101,10 +94,10 @@ export default function AgentPage() {
       <div className="flex-1 min-h-0">
         {tab === "main" ? (
           <div className="h-full flex flex-col gap-6">
-            {hasTriggeredProfiles && (
+            {hasProfiles && (
               <div className="flex gap-3">
-                {triggeredProfiles.map((profile) => (
-                  <TriggeredButton key={profile} agent={agent} profile={profile} />
+                {profileNames.map((p) => (
+                  <TriggeredButton key={p} agent={agent} profile={p} />
                 ))}
               </div>
             )}

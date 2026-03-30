@@ -1,4 +1,4 @@
-.PHONY: run build install smoke
+.PHONY: run build install smoke google-auth
 
 # Start the Northstar control plane + gateway
 # Override workspace: make run WORKSPACE_ROOT=/path/to/workspace
@@ -17,3 +17,7 @@ install:
 # Run a quick smoke test via the harness directly
 smoke:
 	cd harness && pnpm smoke
+
+# One-time Google Calendar OAuth setup (pulls env from northstar/.env.local)
+google-auth:
+	cd harness && env $$(grep -E '^GOOGLE_CLIENT' ../northstar/.env.local | xargs) npx tsx scripts/google-auth.ts

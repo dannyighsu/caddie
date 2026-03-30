@@ -8,18 +8,11 @@
  * Setup: Run `harness/scripts/google-auth.ts` once to authorize.
  */
 
-import { google, calendar_v3 } from "googleapis";
+import { google } from "googleapis";
 import { readFile, writeFile } from "fs/promises";
 import { resolve } from "path";
-import type { ResolverModule, ResolverConfig } from "../src/resolver/types.js";
 
 const TOKENS_FILE = "credentials/google-calendar-tokens.json";
-
-interface StoredTokens {
-  access_token: string;
-  refresh_token?: string;
-  expiry_date?: number;
-}
 
 function getOAuth2Client() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -33,29 +26,22 @@ function getOAuth2Client() {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-async function loadTokens(harnessRoot: string): Promise<StoredTokens | null> {
+async function loadTokens(harnessRoot) {
   try {
     const tokensPath = resolve(harnessRoot, TOKENS_FILE);
     const content = await readFile(tokensPath, "utf-8");
-    return JSON.parse(content) as StoredTokens;
+    return JSON.parse(content);
   } catch {
     return null;
   }
 }
 
-async function saveTokens(harnessRoot: string, tokens: StoredTokens): Promise<void> {
+async function saveTokens(harnessRoot, tokens) {
   const tokensPath = resolve(harnessRoot, TOKENS_FILE);
   await writeFile(tokensPath, JSON.stringify(tokens, null, 2));
 }
 
-interface CalendarEvent {
-  summary: string;
-  start: string;
-  end: string;
-  location?: string;
-}
-
-function formatEventsForPrompt(events: CalendarEvent[]): string {
+function formatEventsForPrompt(events) {
   if (events.length === 0) {
     return "No calendar events today.";
   }
@@ -81,8 +67,8 @@ function formatEventsForPrompt(events: CalendarEvent[]): string {
     .join("\n");
 }
 
-const resolver: ResolverModule = {
-  async resolve(config: ResolverConfig): Promise<Record<string, string>> {
+const resolver = {
+  async resolve(config) {
     try {
       const oauth2Client = getOAuth2Client();
       const tokens = await loadTokens(config.harnessRoot);
@@ -94,7 +80,6 @@ const resolver: ResolverModule = {
 
       oauth2Client.setCredentials(tokens);
 
-      // Handle token refresh
       oauth2Client.on("tokens", async (newTokens) => {
         if (newTokens.access_token) {
           await saveTokens(config.harnessRoot, {
@@ -121,14 +106,12 @@ const resolver: ResolverModule = {
         orderBy: "startTime",
       });
 
-      const events: CalendarEvent[] = (response.data.items || []).map(
-        (event: calendar_v3.Schema$Event) => ({
-          summary: event.summary || "Untitled",
-          start: event.start?.dateTime || event.start?.date || "",
-          end: event.end?.dateTime || event.end?.date || "",
-          location: event.location || undefined,
-        })
-      );
+      const events = (response.data.items || []).map((event) => ({
+        summary: event.summary || "Untitled",
+        start: event.start?.dateTime || event.start?.date || "",
+        end: event.end?.dateTime || event.end?.date || "",
+        location: event.location || undefined,
+      }));
 
       return { calendarEvents: formatEventsForPrompt(events) };
     } catch (err) {

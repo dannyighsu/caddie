@@ -18,9 +18,14 @@ export default function RootLayout({
           <a href="/" className="text-lg font-semibold tracking-tight">
             Northstar
           </a>
-          <a href="/settings" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
-            Settings
-          </a>
+          <div className="flex items-center gap-4">
+            <a href="/transcripts" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+              Traces
+            </a>
+            <a href="/settings" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+              Settings
+            </a>
+          </div>
         </header>
         <main className="max-w-4xl mx-auto px-6 py-8">{children}</main>
       </body>

@@ -40,37 +40,41 @@ export const handleSlackMessage: SlackMessageHandler = async ({
     let conversation = await getConversationByExternalId(externalId);
     let sessionId: string | undefined;
 
+    let profile: string | undefined;
+
     if (conversation) {
       sessionId = conversation.session_id ?? undefined;
+      profile = conversation.profile ?? undefined;
     } else {
       const classification = await classifyMessage(text);
       console.log(
-        `[Slack] Classified "${text.substring(0, 50)}..." as: ${classification.agentId} (${classification.confidence})`
+        `[Slack] Classified "${text.substring(0, 50)}..." as: ${classification.label} (${classification.confidence})`
       );
 
+      profile = classification.profile;
       const title = text.length > 80 ? text.substring(0, 80) + "..." : text;
       conversation = await createConversation(
         classification.agentId,
         title,
-        externalId
+        externalId,
+        profile
       );
 
       await replyInThread(
         channel,
         conversationThreadTs,
-        `_Routed to ${classification.agentName}_`
+        `_Routed to ${classification.label}_`
       );
     }
 
-    // Execute agent
-    const orchestrator = getOrchestrator(conversation.agent_id);
+    // Execute agent — check for orchestrator, then fall back to direct launch
+    const orchestrator = getOrchestrator(conversation.agent_id, profile);
 
     let rawText: string | undefined;
     let resultSessionId: string | undefined;
     let resultTraceUrl: string | undefined;
 
     if (orchestrator) {
-      // Orchestrator handles execution — tell it NOT to post to Slack (we do it)
       const result = await orchestrator({
         prompt: text,
         skipSlack: true,
@@ -79,10 +83,10 @@ export const handleSlackMessage: SlackMessageHandler = async ({
       resultSessionId = result.sessionId as string | undefined;
       resultTraceUrl = result.traceUrl as string | undefined;
     } else {
-      // Direct launch for simple agents
       const launcher = getLauncher();
       const result = await launcher.launch({
         agentId: conversation.agent_id,
+        profile,
         prompt: text,
         sessionId,
         context: {
