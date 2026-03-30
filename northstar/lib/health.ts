@@ -151,7 +151,9 @@ async function checkMcpServer(
  * Run health checks on all capabilities.
  */
 export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
-  const capabilitiesDir = resolve(process.cwd(), "..", "harness", "capabilities");
+  // Use same repo root resolution as lib/harness.ts
+  const repoRoot = resolve(process.cwd(), "..");
+  const capabilitiesDir = resolve(repoRoot, "harness", "capabilities");
   const results: HealthCheckResult[] = [];
 
   try {

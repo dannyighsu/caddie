@@ -1,7 +1,7 @@
 /**
  * Resolver Runner
  *
- * Loads and executes resolvers declared in a workflow config.
+ * Loads and executes resolvers declared in an agent config.
  * Returns merged context from all resolvers.
  */
 
@@ -40,9 +40,9 @@ function checkRequiredEnv(def: ResolverDefinition): string[] {
 }
 
 /**
- * Run all resolvers declared by a workflow and return merged context.
+ * Run all resolvers declared by a agent and return merged context.
  *
- * @param resolverNames - Resolver names from workflow config
+ * @param resolverNames - Resolver names from agent config
  * @param resolversDir - Directory containing resolver definitions and modules
  * @param config - Runtime config passed to each resolver
  * @returns Merged key-value context from all resolvers

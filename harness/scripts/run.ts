@@ -16,11 +16,11 @@ const harnessRoot = resolve(__dirname, "..");
 
 function parseArgs(): { agentId: string; prompt: string } {
   const args = process.argv.slice(2);
-  let agentId = "writer";
+  let agentId = "buri";
   let prompt = "Suggest 3 article ideas about AI agents in production. Keep it brief.";
 
   for (let i = 0; i < args.length; i++) {
-    if ((args[i] === "--agent" || args[i] === "--workflow") && args[i + 1]) {
+    if (args[i] === "--agent" && args[i + 1]) {
       agentId = args[++i];
     } else if (args[i] === "--prompt" && args[i + 1]) {
       prompt = args[++i];

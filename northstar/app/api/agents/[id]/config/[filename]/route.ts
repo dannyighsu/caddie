@@ -1,10 +1,11 @@
 import { readFile, writeFile, unlink, mkdir } from "fs/promises";
 import { resolve, basename } from "path";
 import { NextRequest, NextResponse } from "next/server";
+import { workspaceRoot } from "@/lib/harness";
 
 function getConfigPath(agentId: string, filename: string): string {
   const safe = basename(filename);
-  return resolve(process.cwd(), "workspace", agentId, "config", safe);
+  return resolve(workspaceRoot, agentId, "config", safe);
 }
 
 export async function GET(
@@ -35,7 +36,7 @@ export async function PUT(
     return NextResponse.json({ error: "content is required" }, { status: 400 });
   }
 
-  const configDir = resolve(process.cwd(), "workspace", id, "config");
+  const configDir = resolve(workspaceRoot, id, "config");
   await mkdir(configDir, { recursive: true });
 
   await writeFile(filePath, content, "utf-8");

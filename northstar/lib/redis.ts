@@ -1,7 +1,7 @@
 /**
  * Redis Client
  *
- * ioredis wrapper for scheduling, active run locking, and session mapping.
+ * ioredis wrapper for the job scheduler and active run locking.
  * Connects via REDIS_URL (standard connection string, e.g., from Railway).
  */
 
@@ -20,122 +20,217 @@ function getRedis(): Redis {
   return redis;
 }
 
-// --- Active Run Locking ---
+// =============================================================================
+// Active Run Locking
+// =============================================================================
 
 export async function setActiveRun(
-  agentId: string,
+  key: string,
   ttlSeconds = 900
 ): Promise<void> {
   await getRedis().set(
-    `northstar:active:${agentId}`,
+    `northstar:active:${key}`,
     String(Date.now()),
     "EX",
     ttlSeconds
   );
 }
 
-export async function isRunActive(agentId: string): Promise<boolean> {
-  const val = await getRedis().get(`northstar:active:${agentId}`);
+export async function isRunActive(key: string): Promise<boolean> {
+  const val = await getRedis().get(`northstar:active:${key}`);
   return val !== null;
 }
 
-export async function clearActiveRun(agentId: string): Promise<void> {
-  await getRedis().del(`northstar:active:${agentId}`);
+export async function clearActiveRun(key: string): Promise<void> {
+  await getRedis().del(`northstar:active:${key}`);
 }
 
-// --- Scheduling ---
+// =============================================================================
+// Job Scheduler
+// =============================================================================
 
-interface ScheduleEntry {
+/**
+ * A scheduled job definition stored in Redis.
+ *
+ * - Recurring jobs have a `cron` expression. After firing, `nextRun` is recomputed.
+ * - One-shot jobs have no `cron`. After firing, they're removed.
+ */
+export interface ScheduledJob {
+  /** Unique job identifier. */
+  id: string;
+  /** Agent to run. */
   agentId: string;
-  scheduledTime: number; // epoch ms
-  metadata?: Record<string, unknown>;
+  /** Profile to use (optional). */
+  profile?: string;
+  /** Cron expression for recurring jobs (e.g., "0 9 * * 2" = Tuesdays 9AM). Omit for one-shot. */
+  cron?: string;
+  /** Precomputed next run time (epoch ms). */
+  nextRun: number;
+  /** Whether the job is active. */
+  enabled: boolean;
+  /** Optional params passed to the orchestrator/launcher. */
+  params?: Record<string, unknown>;
+  /** Human-readable description. */
+  description?: string;
 }
 
-const SCHEDULE_QUEUE = "northstar:schedule:queue";
-const SCHEDULE_DETAIL_PREFIX = "northstar:schedule:detail:";
+const JOBS_HASH = "northstar:jobs";
+const JOBS_QUEUE = "northstar:jobs:queue";
 
-export async function scheduleRun(
+/**
+ * Serialize a job to JSON for Redis storage.
+ */
+function serializeJob(job: ScheduledJob): string {
+  return JSON.stringify(job);
+}
+
+/**
+ * Deserialize a job from Redis.
+ */
+function deserializeJob(data: string): ScheduledJob {
+  return JSON.parse(data) as ScheduledJob;
+}
+
+/**
+ * Compute the next occurrence from a cron expression after a given time.
+ */
+async function computeNextRun(cronExpr: string, after: Date = new Date()): Promise<number> {
+  const { CronExpressionParser } = await import("cron-parser");
+  const interval = CronExpressionParser.parse(cronExpr, { currentDate: after });
+  return interval.next().getTime();
+}
+
+/**
+ * Create or update a scheduled job.
+ */
+export async function upsertJob(job: ScheduledJob): Promise<void> {
+  const r = getRedis();
+  await r.hset(JOBS_HASH, job.id, serializeJob(job));
+  if (job.enabled) {
+    await r.zadd(JOBS_QUEUE, job.nextRun, job.id);
+  } else {
+    await r.zrem(JOBS_QUEUE, job.id);
+  }
+}
+
+/**
+ * Schedule a one-shot run at a specific time.
+ */
+export async function scheduleOneShot(
   agentId: string,
-  scheduledTime: Date,
-  metadata?: Record<string, unknown>
-): Promise<void> {
-  const score = scheduledTime.getTime();
-  const member = `${agentId}:${score}`;
-
-  await getRedis().zadd(SCHEDULE_QUEUE, score, member);
-  await getRedis().set(
-    `${SCHEDULE_DETAIL_PREFIX}${member}`,
-    JSON.stringify({ agentId, scheduledTime: score, metadata, status: "pending" }),
-    "EX",
-    86400
-  );
+  runAt: Date,
+  options?: { profile?: string; params?: Record<string, unknown>; description?: string }
+): Promise<ScheduledJob> {
+  const job: ScheduledJob = {
+    id: `oneshot:${agentId}:${runAt.getTime()}`,
+    agentId,
+    profile: options?.profile,
+    nextRun: runAt.getTime(),
+    enabled: true,
+    params: options?.params,
+    description: options?.description,
+  };
+  await upsertJob(job);
+  return job;
 }
 
-export async function getDueRuns(): Promise<ScheduleEntry[]> {
+/**
+ * Schedule a recurring job with a cron expression.
+ */
+export async function scheduleRecurring(
+  id: string,
+  agentId: string,
+  cronExpr: string,
+  options?: { profile?: string; params?: Record<string, unknown>; description?: string }
+): Promise<ScheduledJob> {
+  const nextRun = await computeNextRun(cronExpr);
+  const job: ScheduledJob = {
+    id,
+    agentId,
+    profile: options?.profile,
+    cron: cronExpr,
+    nextRun,
+    enabled: true,
+    params: options?.params,
+    description: options?.description,
+  };
+  await upsertJob(job);
+  return job;
+}
+
+/**
+ * Get all due jobs (nextRun <= now).
+ */
+export async function getDueJobs(): Promise<ScheduledJob[]> {
+  const r = getRedis();
   const now = Date.now();
-  const members = await getRedis().zrangebyscore(SCHEDULE_QUEUE, 0, now);
-  const entries: ScheduleEntry[] = [];
+  const jobIds = await r.zrangebyscore(JOBS_QUEUE, 0, now);
+  const jobs: ScheduledJob[] = [];
 
-  for (const member of members) {
-    const detail = await getRedis().get(`${SCHEDULE_DETAIL_PREFIX}${member}`);
-    if (detail) {
-      const parsed = JSON.parse(detail);
-      if (parsed.status === "pending") {
-        entries.push(parsed as ScheduleEntry);
-      }
+  for (const id of jobIds) {
+    const data = await r.hget(JOBS_HASH, id);
+    if (data) {
+      const job = deserializeJob(data);
+      if (job.enabled) jobs.push(job);
     }
   }
 
-  return entries;
+  return jobs;
 }
 
-export async function markRunTriggered(
-  agentId: string,
-  scheduledTime: number
-): Promise<void> {
-  const member = `${agentId}:${scheduledTime}`;
-  await getRedis().zrem(SCHEDULE_QUEUE, member);
-  await getRedis().set(
-    `${SCHEDULE_DETAIL_PREFIX}${member}`,
-    JSON.stringify({ agentId, scheduledTime, status: "triggered" }),
-    "EX",
-    86400
-  );
-}
+/**
+ * Mark a job as fired. Recurring jobs get rescheduled; one-shot jobs are removed.
+ */
+export async function markJobFired(jobId: string): Promise<void> {
+  const r = getRedis();
+  const data = await r.hget(JOBS_HASH, jobId);
+  if (!data) return;
 
-export async function getNextScheduledRun(
-  agentId: string
-): Promise<{ scheduledTime: Date } | null> {
-  const results = await getRedis().zrangebyscore(
-    SCHEDULE_QUEUE,
-    0,
-    "+inf",
-    "WITHSCORES"
-  );
+  const job = deserializeJob(data);
 
-  // Results come as [member, score, member, score, ...]
-  for (let i = 0; i < results.length; i += 2) {
-    const member = results[i];
-    const score = parseInt(results[i + 1], 10);
-    if (member.startsWith(`${agentId}:`)) {
-      return { scheduledTime: new Date(score) };
-    }
+  if (job.cron) {
+    // Recurring: compute next occurrence and reschedule
+    job.nextRun = await computeNextRun(job.cron);
+    await upsertJob(job);
+  } else {
+    // One-shot: remove entirely
+    await r.hdel(JOBS_HASH, jobId);
+    await r.zrem(JOBS_QUEUE, jobId);
   }
-
-  return null;
 }
 
-export async function cancelAllRuns(agentId: string): Promise<number> {
-  const members = await getRedis().zrange(SCHEDULE_QUEUE, 0, -1);
-  let cancelled = 0;
+/**
+ * Get a specific job by ID.
+ */
+export async function getJob(id: string): Promise<ScheduledJob | null> {
+  const data = await getRedis().hget(JOBS_HASH, id);
+  return data ? deserializeJob(data) : null;
+}
 
-  for (const member of members) {
-    if (member.startsWith(`${agentId}:`)) {
-      await getRedis().zrem(SCHEDULE_QUEUE, member);
-      await getRedis().del(`${SCHEDULE_DETAIL_PREFIX}${member}`);
-      cancelled++;
-    }
-  }
+/**
+ * List all jobs.
+ */
+export async function listJobs(): Promise<ScheduledJob[]> {
+  const all = await getRedis().hgetall(JOBS_HASH);
+  return Object.values(all).map(deserializeJob);
+}
 
-  return cancelled;
+/**
+ * Delete a job.
+ */
+export async function deleteJob(id: string): Promise<void> {
+  const r = getRedis();
+  await r.hdel(JOBS_HASH, id);
+  await r.zrem(JOBS_QUEUE, id);
+}
+
+/**
+ * Enable or disable a job.
+ */
+export async function setJobEnabled(id: string, enabled: boolean): Promise<void> {
+  const data = await getRedis().hget(JOBS_HASH, id);
+  if (!data) return;
+  const job = deserializeJob(data);
+  job.enabled = enabled;
+  await upsertJob(job);
 }
