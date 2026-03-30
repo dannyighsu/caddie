@@ -20,6 +20,7 @@ export interface Message {
 export interface Conversation {
   id: string;
   agent_id: string;
+  profile: string | null;
   session_id: string | null;
   title: string | null;
   external_id: string | null;
@@ -76,6 +77,15 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'conversations' AND column_name = 'profile'
+  ) THEN
+    ALTER TABLE conversations ADD COLUMN profile TEXT;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_conversations_agent
   ON conversations(agent_id, updated_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_conversations_external
@@ -103,15 +113,16 @@ export async function ensureSchema(): Promise<void> {
 export async function createConversation(
   agentId: string,
   title: string,
-  externalId?: string
+  externalId?: string,
+  profile?: string
 ): Promise<Conversation> {
   await ensureSchema();
   const id = uuid();
   const result = await getPool().query(
-    `INSERT INTO conversations (id, agent_id, title, external_id, messages)
-     VALUES ($1, $2, $3, $4, '[]'::jsonb)
+    `INSERT INTO conversations (id, agent_id, profile, title, external_id, messages)
+     VALUES ($1, $2, $3, $4, $5, '[]'::jsonb)
      RETURNING *`,
-    [id, agentId, title, externalId ?? null]
+    [id, agentId, profile ?? null, title, externalId ?? null]
   );
   return rowToConversation(result.rows[0]);
 }
@@ -222,6 +233,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
   return {
     id: row.id as string,
     agent_id: row.agent_id as string,
+    profile: (row.profile as string | null) ?? null,
     session_id: row.session_id as string | null,
     title: row.title as string | null,
     external_id: (row.external_id as string | null) ?? null,

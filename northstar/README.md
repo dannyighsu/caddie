@@ -17,7 +17,7 @@ pnpm dev    # http://localhost:3000
 
 ### Control Plane UI
 
-Open `http://localhost:3000`. Conversational agents have a chat UI. Triggered agents (e.g., buri with xmanager profile) have a Run button.
+Open `http://localhost:3000`. The agent page shows conversations, config editing, and quick-run buttons for each profile.
 
 ### Slack
 

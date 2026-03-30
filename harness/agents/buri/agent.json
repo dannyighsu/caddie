@@ -11,8 +11,7 @@
       "maxTurns": 30
     },
     "xmanager": {
-      "capabilities": ["chrome"],
-      "mode": "triggered"
+      "capabilities": ["chrome"]
     }
   }
 }

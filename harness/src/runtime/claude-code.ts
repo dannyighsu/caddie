@@ -5,7 +5,7 @@
  * Authenticates via the locally configured Claude Code OAuth token.
  */
 
-import { execFile } from "child_process";
+import { spawn } from "child_process";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -82,6 +82,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       "-p", input.prompt,
       "--output-format", "json",
       "--max-turns", String(input.maxTurns),
+      "--dangerously-skip-permissions",
     ];
 
     if (input.outputSchema) {
@@ -124,36 +125,42 @@ export class ClaudeCodeRuntime implements AgentRuntime {
         }
       };
 
-      const proc = execFile(
-        this.binary,
-        args,
-        {
-          cwd,
-          timeout: this.timeoutMs,
-          maxBuffer: 50 * 1024 * 1024, // 50MB
-          env: { ...process.env, CLAUDECODE: undefined, ...additionalEnv },
-        },
-        (error, stdout, stderr) => {
-          if (stderr) {
-            // Log full stderr (Claude Code progress, warnings, etc.)
-            console.error(`[ClaudeCodeRuntime] stderr:\n${stderr}`);
-          }
-          if (error) {
-            settle(reject, new Error(`claude process failed: ${error.message}`));
-            return;
-          }
+      const proc = spawn(this.binary, args, {
+        cwd,
+        env: { ...process.env, CLAUDECODE: undefined, ...additionalEnv },
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      // Close stdin immediately to prevent "no stdin data" warning
+      proc.stdin.end();
+
+      let stdout = "";
+      proc.stdout.on("data", (chunk: Buffer) => {
+        stdout += chunk.toString();
+      });
+
+      // Stream stderr in real-time
+      proc.stderr.on("data", (chunk: Buffer) => {
+        process.stderr.write(`[claude] ${chunk.toString()}`);
+      });
+
+      // Timeout
+      const timer = setTimeout(() => {
+        proc.kill();
+        settle(reject, new Error(`claude process timed out after ${this.timeoutMs}ms`));
+      }, this.timeoutMs);
+
+      proc.on("close", (code) => {
+        clearTimeout(timer);
+        if (code !== 0) {
+          settle(reject, new Error(`claude process exited with code ${code}`));
+        } else {
           settle(resolve, stdout);
         }
-      );
-
-      // Stream stderr in real-time so progress is visible during long runs
-      if (proc.stderr) {
-        proc.stderr.on("data", (chunk: Buffer) => {
-          process.stderr.write(`[claude] ${chunk.toString()}`);
-        });
-      }
+      });
 
       proc.on("error", (err) => {
+        clearTimeout(timer);
         settle(reject, new Error(`Failed to spawn claude: ${err.message}`));
       });
     });

@@ -1,41 +1,83 @@
 ---
 name: feed-scan
-description: Scan X feeds for engagement opportunities. Records findings as JSONL.
+description: Scan X feeds for engagement opportunities. Finds posts worth replying to based on areas of interest and engagement criteria.
 ---
 
-## Feed Scan Instructions
+## Feed Scan
 
 You are logged into X (Twitter) as @{{xUsername}} with an authenticated browser session.
 
-Navigate to your feed and scan for engagement opportunities. Record findings to the run record file at {{runRecordPath}}.
+Your job is to find engagement opportunities — posts worth replying to. You must find **at least 1** opportunity (and ideally several).
 
-**Only scan posts from the last {{lookbackHours}} hours.**
+## Scanning Process
 
-### Steps
+### Step 1: Scan feeds
 
-1. Navigate to https://twitter.com
-2. Scan the "For You" feed, paging down up to 10 times or until you've found 3 opportunities. While paging:
-    a. Apply the engagement criteria and areas of interest to identify quality engagement opportunities
-    b. **ONLY consider posts from the last {{lookbackHours}} hours**
-    c. As you find each valuable opportunity, append one JSON line to the run record file:
-    - Read current file content
-    - Append your new finding as a single JSON line and update run record file
-    d. Feel free to click into threads or profiles if you need more information to decide whether to include a given post
-3. Switch to "Following" feed, sort by recency, and then do the same as the "For You" feed
-4. Switch to "Build in Public" feed, sort by recency, and then do the same as the "For You" feed
-5. When done scanning, provide your summary
+Navigate to https://twitter.com and scan both feeds:
 
-### JSONL Format
+1. **Following feed** — switch to Following, scroll at least 5 times
+2. **For You feed** — switch to For You, scroll at least 5 times
 
-Use this format for each line:
-`{"type":"opportunity","author":"Jane Smith","authorHandle":"janesmith","text":"Interesting perspective on...","link":"https://twitter.com/janesmith/status/789012","reason":"Relevant to areas of interest, good discussion thread"}`
+Also check the **sidebar trending/news topics** — click into any current news stories relevant to your areas of interest.
 
-### Config
+### Step 2: Fallback search (if no opportunities found)
 
-Check `config/areas_of_interest.md` and `config/engagement_criteria.md` for what to look for.
+If you haven't found any opportunities from the feeds, do NOT give up. Instead:
+1. Use web search to find current hot topics in your areas of interest
+2. Search X directly for those topics
+3. Find posts with active discussion on those topics
 
-### Guidelines
+### Step 3: Report findings
 
-- Be selective - only surface truly valuable opportunities
-- Focus on posts that match areas of interest
-- Identify posts with thread potential and meaningful conversation opportunities
+For each opportunity, provide:
+- Brief description of the post
+- Link to the post
+- 2-3 suggested engagement ideas (what to reply with)
+- How you found it (e.g., "Found via Following feed", "Searched for 'AI security' after no feed hits")
+
+## Filtering Criteria
+
+**Time window**: Posts from the last 6 hours only.
+
+**Poster profile** (hover over the poster's name to check):
+- Follower count between 1K and 100K
+- Must be an **individual**, not an organization (skip TechCrunch, Google, AWS, etc.)
+- Check the **original poster**, not whoever retweeted
+
+**Post quality**:
+- Prefer highly technical posts — these have material to engage on
+- Prefer posts with bold statements or strong opinions
+- Must have potential for meaningful conversation
+- Must be within or adjacent to areas of interest
+
+**Skip**:
+- Ads
+- Retweets where the original poster doesn't meet criteria
+- Posts from organizations/brands
+- Low-effort content (memes, engagement bait)
+
+## Config
+
+Before starting the scan, read these files from the working directory using the Read tool:
+1. `config/areas_of_interest.md` — defines your topic focus
+2. `config/engagement_criteria.md` — defines filtering and engagement style rules
+
+Use the content of these files to guide your scanning and filtering.
+
+## Recording
+
+Record each opportunity to the run record file at {{runRecordPath}} as JSONL:
+
+```
+{"type":"opportunity","author":"Jane Smith","authorHandle":"janesmith","followerCount":"12.5K","text":"Bold take: most AI agent frameworks are just wrappers around...","link":"https://x.com/janesmith/status/789012","suggestedEngagement":["Challenge the premise with a specific counterexample","Share your experience building production agents","Ask about their framework evaluation criteria"],"discoveryMethod":"Found on Following feed, 3rd scroll"}
+```
+
+## Engagement Execution
+
+If the user reviews the opportunities and **explicitly approves** a reply (e.g., "yes go ahead and reply with that", "reply with ..."), then:
+1. Navigate to the post
+2. Post the reply on behalf of the user
+3. Confirm the reply was posted
+4. Include a link to the reply
+
+Do NOT post replies unless the user explicitly approves. Suggesting engagement ideas is not the same as approval.

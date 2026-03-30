@@ -1,23 +1,58 @@
 /**
  * Agent Classifier
  *
- * Lightweight LLM classifier that routes an incoming message to the right agent.
+ * Routes an incoming message to the right agent profile.
  * Uses OpenRouter for a fast, cheap classification call.
  */
 
 import { listAgents } from "./harness";
+import type { AgentConfig } from "@agints/harness";
 
-interface ClassificationResult {
+export interface ClassificationResult {
   agentId: string;
-  agentName: string;
+  profile?: string;
+  label: string;
   confidence: "high" | "medium" | "low";
 }
 
-const FALLBACK_AGENT_ID = "buri";
+const FALLBACK: ClassificationResult = {
+  agentId: "buri",
+  label: "Buri",
+  confidence: "low",
+};
 
 /**
- * Classify an incoming message to determine which agent should handle it.
- * Returns the agent ID and a confidence level.
+ * Build the list of routable profiles from agent configs.
+ */
+function buildProfileList(agents: AgentConfig[]): Array<{ agentId: string; profile?: string; label: string; description: string }> {
+  const entries: Array<{ agentId: string; profile?: string; label: string; description: string }> = [];
+
+  for (const agent of agents) {
+    // Base agent (no profile)
+    entries.push({
+      agentId: agent.id,
+      label: agent.name,
+      description: `Default — capabilities: ${agent.capabilities.join(", ")}`,
+    });
+
+    // Each profile
+    if (agent.profiles) {
+      for (const [profileName, profile] of Object.entries(agent.profiles)) {
+        entries.push({
+          agentId: agent.id,
+          profile: profileName,
+          label: `${agent.name} (${profileName})`,
+          description: `capabilities: ${(profile.capabilities ?? agent.capabilities).join(", ")}`,
+        });
+      }
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * Classify an incoming message to determine which agent profile should handle it.
  */
 export async function classifyMessage(
   message: string
@@ -25,33 +60,33 @@ export async function classifyMessage(
   const agents = await listAgents();
 
   if (agents.length === 0) {
-    return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
-  }
-
-  if (agents.length === 1) {
-    return { agentId: agents[0].id, agentName: agents[0].name, confidence: "high" };
+    return FALLBACK;
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    console.warn("[Classifier] OPENROUTER_API_KEY not set, falling back to default agent");
-    return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
+    console.warn("[Classifier] OPENROUTER_API_KEY not set, falling back to default");
+    return FALLBACK;
   }
 
-  // Build agent descriptions for the classifier
-  const agentList = agents
-    .filter((a) => a.mode !== "triggered") // Don't route to triggered-only agents
-    .map((a) => `- ${a.id}: ${a.name}`)
+  const profiles = buildProfileList(agents);
+  const profileList = profiles
+    .map((p) => `- ${p.agentId}${p.profile ? `:${p.profile}` : ""} — ${p.label} (${p.description})`)
     .join("\n");
 
-  const prompt = `You are a message router. Given a user message, classify which agent should handle it.
+  const prompt = `You are a message router. Given a user message, classify which agent profile should handle it.
 
-Available agents:
-${agentList}
+Available profiles:
+${profileList}
+
+Rules:
+- If the message is about X/Twitter, social media engagement, or posting, route to the xmanager profile.
+- If the message is about writing articles, blog posts, or content creation, route to the writer profile.
+- For general questions, tasks, scheduling, or check-ins, route to the default (no profile).
 
 User message: "${message}"
 
-Respond with ONLY a JSON object: {"agentId": "<id>", "confidence": "high|medium|low"}
+Respond with ONLY a JSON object: {"agentId": "<id>", "profile": "<profile or null>", "confidence": "high|medium|low"}
 No explanation, no markdown, just the JSON.`;
 
   try {
@@ -64,34 +99,36 @@ No explanation, no markdown, just the JSON.`;
       body: JSON.stringify({
         model: "deepseek/deepseek-v3.2",
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 50,
+        max_tokens: 80,
         temperature: 0,
       }),
     });
 
     if (!res.ok) {
       console.error("[Classifier] OpenRouter error:", res.status, await res.text());
-      return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
+      return FALLBACK;
     }
 
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content?.trim() ?? "";
 
-    // Parse JSON response
     const parsed = JSON.parse(content);
     const agentId = parsed.agentId;
+    const profile = parsed.profile === "null" || !parsed.profile ? undefined : parsed.profile;
     const confidence = parsed.confidence ?? "medium";
 
-    // Validate agent exists
-    const agent = agents.find((a) => a.id === agentId);
-    if (!agent) {
-      console.warn(`[Classifier] Unknown agent "${agentId}", falling back`);
-      return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
+    // Validate
+    const match = profiles.find(
+      (p) => p.agentId === agentId && (p.profile ?? undefined) === profile
+    );
+    if (!match) {
+      console.warn(`[Classifier] Unknown profile "${agentId}:${profile}", falling back`);
+      return FALLBACK;
     }
 
-    return { agentId: agent.id, agentName: agent.name, confidence };
+    return { agentId: match.agentId, profile: match.profile, label: match.label, confidence };
   } catch (err) {
     console.error("[Classifier] Failed:", err instanceof Error ? err.message : err);
-    return { agentId: FALLBACK_AGENT_ID, agentName: "Buri", confidence: "low" };
+    return FALLBACK;
   }
 }

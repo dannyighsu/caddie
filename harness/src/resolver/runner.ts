@@ -59,9 +59,10 @@ export async function runResolvers(
       const def = await loadResolverDefinition(resolversDir, name);
       checkRequiredEnv(def);
 
-      // Import the resolver module
+      // Import the resolver module using file:// URL to avoid bundler interference
       const modulePath = resolve(resolversDir, def.module);
-      const mod = (await import(modulePath)) as { default: ResolverModule } | ResolverModule;
+      const moduleUrl = new URL(`file://${modulePath}`).href;
+      const mod = await (Function('url', 'return import(url)') as (url: string) => Promise<{ default: ResolverModule } | ResolverModule>)(moduleUrl);
       const resolver: ResolverModule = "default" in mod ? mod.default : mod;
 
       const result = await resolver.resolve(config);

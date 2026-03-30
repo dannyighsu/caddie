@@ -1,6 +1,6 @@
 {
   "name": "google-calendar",
   "description": "Fetches today's calendar events and injects as {{calendarEvents}}",
-  "module": "./google-calendar.ts",
+  "module": "./google-calendar.mjs",
   "requiredEnv": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
 }
