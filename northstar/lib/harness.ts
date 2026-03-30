@@ -14,6 +14,10 @@ import { readdir, readFile } from "fs/promises";
 const repoRoot = resolve(process.cwd(), "..");
 const harnessRoot = resolve(repoRoot, "harness");
 
+export const workspaceRoot = process.env.WORKSPACE_ROOT
+  ? resolve(process.env.WORKSPACE_ROOT)
+  : resolve(repoRoot, "workspace");
+
 let launcherInstance: ReturnType<typeof createLauncher> | null = null;
 
 export function getLauncher() {

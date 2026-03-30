@@ -1,9 +1,10 @@
 import { readdir, readFile, mkdir } from "fs/promises";
 import { resolve } from "path";
 import { NextResponse } from "next/server";
+import { workspaceRoot } from "@/lib/harness";
 
 function getConfigDir(agentId: string): string {
-  return resolve(process.cwd(), "workspace", agentId, "config");
+  return resolve(workspaceRoot, agentId, "config");
 }
 
 export async function GET(

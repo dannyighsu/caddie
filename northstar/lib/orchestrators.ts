@@ -10,7 +10,7 @@
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { resolve, dirname } from "path";
 import { getLauncher } from "./harness";
-import { isRunActive, setActiveRun, clearActiveRun, scheduleRun } from "./redis";
+import { isRunActive, setActiveRun, clearActiveRun, scheduleOneShot } from "./redis";
 import { sendMessage, isSlackConfigured } from "./slack";
 import {
   createConversation,
@@ -28,7 +28,7 @@ import {
   isTracingEnabled,
 } from "./tracing";
 
-const WORKSPACE_ROOT = resolve(process.cwd(), "workspace");
+import { workspaceRoot as WORKSPACE_ROOT } from "./harness";
 
 // --- Registry ---
 
@@ -159,7 +159,7 @@ async function runCheckin(params: OrchestratorParams): Promise<Record<string, un
     const nextMinutes = (result.output?.nextCheckInTime as number) ?? 120;
     const nextTime = new Date(Date.now() + nextMinutes * 60 * 1000);
     try {
-      await scheduleRun("buri", nextTime);
+      await scheduleOneShot("buri", nextTime, { description: "Next check-in" });
     } catch (err) {
       console.error("[Check-in] Failed to schedule next run:", err);
     }
@@ -323,7 +323,10 @@ async function runXManager(params: OrchestratorParams): Promise<Record<string, u
     // Schedule next run (production only)
     if (process.env.NODE_ENV !== "development") {
       try {
-        await scheduleRun("xmanager", new Date(Date.now() + 60 * 60 * 1000));
+        await scheduleOneShot("buri", new Date(Date.now() + 60 * 60 * 1000), {
+          profile: "xmanager",
+          description: "Next X Manager run",
+        });
       } catch (err) {
         console.error("[XManager] Failed to schedule next run:", err);
       }

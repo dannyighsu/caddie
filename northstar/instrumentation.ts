@@ -14,6 +14,10 @@ export async function register() {
       console.error("[Health] Pre-flight check failed:", err)
     );
 
+    // Start job scheduler
+    const { startScheduler } = await import("./lib/scheduler");
+    startScheduler();
+
     // Start Slack Socket Mode
     const { startSocketMode } = await import("./lib/slack");
     const { handleSlackMessage } = await import("./lib/slack-handler");

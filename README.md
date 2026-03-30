@@ -44,11 +44,22 @@ harness/agents/<id>/
 
 ```json
 {
-  "id": "writer",
-  "name": "Content Writer",
+  "id": "buri",
+  "name": "Buri",
   "persona": "./persona.md",
-  "capabilities": ["notion", "web-search"],
-  "maxTurns": 30
+  "capabilities": ["notion"],
+  "resolvers": ["google-calendar"],
+  "maxTurns": 20,
+  "profiles": {
+    "writer": {
+      "capabilities": ["notion", "web-search"],
+      "maxTurns": 30
+    },
+    "xmanager": {
+      "capabilities": ["chrome"],
+      "mode": "triggered"
+    }
+  }
 }
 ```
 
@@ -63,16 +74,34 @@ harness/agents/<id>/
 | `enableChrome` | no | Enable Chrome browser automation. Can also be set via the `chrome` capability |
 | `outputSchema` | no | JSON Schema for structured output. Omit for conversational mode |
 | `mode` | no | `"conversational"` (default) or `"triggered"` -- controls the UI |
+| `profiles` | no | Named profile overrides. Each profile can override `capabilities`, `resolvers`, `maxTurns`, `mode`, etc. |
+
+### Profiles
+
+Profiles let a single agent serve multiple roles. Each profile overrides the base config for the fields it specifies. Activate a profile by passing `profile` to the launcher or gateway:
+
+```bash
+# Run buri with the writer profile (notion + web-search, maxTurns: 30)
+curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"writer"}'
+
+# Run buri with xmanager profile (chrome, triggered mode)
+curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"xmanager"}'
+
+# Run buri with no profile (default: notion + google-calendar resolver)
+curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri"}'
+```
+
+All profiles share the same workspace at `workspace/buri/`.
 
 ### 3. Write persona.md
 
 The persona is the system prompt. Supports `{{templateVar}}` interpolation -- the caller passes a `context` map and resolvers inject additional variables before launch.
 
 ```markdown
-# Persona: Content Strategist
+# Persona: Buri
 
-You are a skilled content strategist helping the user brainstorm,
-research, draft, and refine articles.
+You are a skilled assistant helping the user brainstorm,
+research, draft, and refine content.
 
 ## Current Context
 Current time: {{currentTime}}
@@ -85,7 +114,8 @@ Unresolved `{{variables}}` are left as-is so you can spot missing context.
 Skills use Claude Code's native SKILL.md format in `.claude/skills/`:
 
 ```
-harness/agents/xmanager/.claude/skills/feed-scan/SKILL.md
+harness/agents/buri/.claude/skills/feed-scan/SKILL.md
+harness/agents/buri/.claude/skills/metrics-check/SKILL.md
 ```
 
 Skills are symlinked into the agent's workspace automatically. The agent invokes them via `/skill-name` in the prompt.
@@ -161,8 +191,8 @@ Reference in agent.json: `"resolvers": ["google-calendar"]`
 │  │ (React)   │  │ API       │  │                  │ │
 │  └──────────┘  └─────┬─────┘  └──────────────────┘ │
 │                       │                              │
-│  Slack Socket Mode    │  Orchestrators               │
-│  (inbound messages)   │  (checkin, xmanager)         │
+│  Slack Socket Mode    │  Scheduler                   │
+│  (inbound messages)   │  (Redis-backed, cron)        │
 └───────────────────────┼──────────────────────────────┘
                         │ imports @agints/harness
 ┌───────────────────────┼──────────────────────────────┐
@@ -170,12 +200,12 @@ Reference in agent.json: `"resolvers": ["google-calendar"]`
 │                       ▼                              │
 │  ┌──────────────────────────────┐                    │
 │  │ Launcher                     │                    │
-│  │ load agent.json               │                    │
-│  │ → symlink skills + hooks      │                    │
-│  │ → run resolvers               │                    │
-│  │ → read + interpolate persona  │                    │
-│  │ → resolve MCP capabilities    │                    │
-│  │ → call runtime.execute()      │                    │
+│  │ load agent.json + profile    │                    │
+│  │ → symlink skills + hooks     │                    │
+│  │ → run resolvers              │                    │
+│  │ → read + interpolate persona │                    │
+│  │ → resolve MCP capabilities   │                    │
+│  │ → call runtime.execute()     │                    │
 │  └──────────────┬───────────────┘                    │
 │                 │                                    │
 │  ┌──────────────▼───────────────┐                    │
@@ -191,13 +221,13 @@ Reference in agent.json: `"resolvers": ["google-calendar"]`
 - `createRuntime()` -- instantiates an `AgentRuntime`
 - `createLauncher(runtime, config)` -- returns `{ launch }` bound to agent and capability directories
 
-**Northstar** imports the harness as a workspace dependency. The gateway API (`/api/gateway`) is the single entry point for running agents and sending notifications. Agents with orchestration logic (checkin, xmanager) have dedicated orchestrators that handle Slack posting, scheduling, and multi-step execution.
+**Northstar** imports the harness as a workspace dependency. The gateway API (`/api/gateway`) is the single entry point for running agents, sending notifications, and managing schedules. Agents with orchestration logic have dedicated orchestrators that handle Slack posting, scheduling, and multi-step execution.
 
 ### Execution flow
 
-1. Gateway receives a request (agent ID + prompt)
-2. If agent has an orchestrator, it handles the full lifecycle (run lock, launch, Slack, scheduling)
-3. Launcher loads `agent.json`, symlinks skills/hooks, runs resolvers, interpolates persona, resolves capabilities
+1. Gateway receives a request (action + agent ID + optional profile)
+2. If agent/profile has an orchestrator, it handles the full lifecycle (run lock, launch, Slack, scheduling)
+3. Launcher loads `agent.json`, applies profile overrides, symlinks skills/hooks, runs resolvers, interpolates persona, resolves capabilities
 4. Runtime spawns `claude` CLI with the prompt + MCP configs
 5. Result (text + session ID + usage) is returned and persisted
 
@@ -205,7 +235,7 @@ Session IDs enable multi-turn conversations. On resumption, resolvers and person
 
 ## Workspace
 
-Agent workspaces live at `workspace/{agentId}/` in the repo root by default. Each agent gets its own directory containing:
+Agent workspaces live at `workspace/{agentId}/` in the repo root by default. All profiles of an agent share the same workspace. Each agent gets its own directory containing:
 
 - `config/` -- persistent config files (editable via the control plane)
 - `.claude/` -- symlinked skills and hooks from the agent definition
@@ -232,8 +262,8 @@ Or directly:
 
 ```bash
 cd northstar && pnpm dev                                      # start Northstar
-cd harness && pnpm smoke                                      # default: writer agent
-cd harness && pnpm smoke -- --agent writer --prompt "..."     # specify agent and prompt
+cd harness && pnpm smoke                                      # default: buri agent
+cd harness && pnpm smoke -- --agent buri --prompt "..."       # specify agent and prompt
 ```
 
 ## Prerequisites

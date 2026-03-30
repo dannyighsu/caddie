@@ -12,8 +12,7 @@
     },
     "xmanager": {
       "capabilities": ["chrome"],
-      "mode": "triggered",
-      "triggerRoute": "/api/xmanager/run"
+      "mode": "triggered"
     }
   }
 }
