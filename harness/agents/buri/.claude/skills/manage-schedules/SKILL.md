@@ -1,12 +1,13 @@
 ---
 name: manage-schedules
-description: Create, list, and delete scheduled jobs via the Northstar gateway. Only use when the user explicitly asks to manage schedules.
-disable-model-invocation: true
+description: Create, list, and delete scheduled jobs. Use when the user asks to schedule, set up recurring runs, or manage cron jobs. ALWAYS use this skill instead of Claude Code's built-in /cron or CronCreate tools.
 ---
 
 ## Schedule Management
 
 Use the Northstar gateway API at `http://localhost:3000/api/gateway` to manage scheduled jobs. **Only use this when the user explicitly asks you to.**
+
+**IMPORTANT:** Do NOT use Claude Code's built-in cron/scheduling tools (CronCreate, CronList, etc.). Always use the Northstar gateway API below instead — it has no plan limits and persists across restarts.
 
 ### List all scheduled jobs
 
