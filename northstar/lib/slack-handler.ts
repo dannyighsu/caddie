@@ -134,8 +134,11 @@ export const handleSlackMessage: SlackMessageHandler = async ({
 
     await completeTrace(traceId, { agentId: conversation.agent_id, success: true });
   } catch (err) {
-    const error = err instanceof Error ? err.message : "Unknown error";
+    const error = err instanceof Error ? err.message : String(err) || "Unknown error";
     console.error("[Slack] Handler error:", error);
+    if (err instanceof Error && err.stack) {
+      console.error("[Slack] Stack:", err.stack);
+    }
 
     await completeTrace(traceId, { success: false, error });
 
