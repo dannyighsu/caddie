@@ -11,6 +11,8 @@
 import { getDueJobs, markJobFired, type ScheduledJob } from "./redis";
 import { getOrchestrator } from "./orchestrators";
 import { getLauncher } from "./harness";
+import { sendMessage, isSlackConfigured } from "./slack";
+import { getSetting } from "./db";
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 let running = false;
@@ -37,8 +39,10 @@ export function startScheduler(): void {
         await markJobFired(job.id);
 
         // Fire async — don't block the poller
-        fireJob(job).catch((err) => {
-          console.error(`[Scheduler] Job ${job.id} failed:`, err);
+        fireJob(job).catch(async (err) => {
+          const error = err instanceof Error ? err.message : String(err);
+          console.error(`[Scheduler] Job ${job.id} failed:`, error);
+          await notifyFailure(job, error);
         });
       }
     } catch (err) {
@@ -53,15 +57,16 @@ export function startScheduler(): void {
 async function fireJob(job: ScheduledJob): Promise<void> {
   const orchestrator = getOrchestrator(job.agentId, job.profile);
 
+  let result: Record<string, unknown> | undefined;
+
   if (orchestrator) {
-    await orchestrator({
+    result = await orchestrator({
       prompt: (job.params?.prompt as string) ?? undefined,
       ...job.params,
     });
   } else {
-    // No orchestrator — launch directly
     const launcher = getLauncher();
-    await launcher.launch({
+    const launchResult = await launcher.launch({
       agentId: job.agentId,
       profile: job.profile,
       prompt: (job.params?.prompt as string) ?? "Run.",
@@ -78,5 +83,32 @@ async function fireJob(job: ScheduledJob): Promise<void> {
         }),
       },
     });
+    result = { success: launchResult.success, error: launchResult.error };
+  }
+
+  // Notify on failure
+  if (result && !result.success && result.error) {
+    await notifyFailure(job, result.error as string);
+  }
+}
+
+/**
+ * Send a failure notification to Slack.
+ */
+async function notifyFailure(job: ScheduledJob, error: string): Promise<void> {
+  if (!isSlackConfigured()) return;
+
+  try {
+    const defaultChannel = await getSetting<{ channelId: string }>("default_slack_channel");
+    const channelId = defaultChannel?.channelId;
+    if (!channelId) return;
+
+    const label = job.description ?? `${job.agentId}${job.profile ? `:${job.profile}` : ""}`;
+    await sendMessage(
+      channelId,
+      `:warning: *Scheduled job failed:* ${label}\n\`\`\`${error.substring(0, 500)}\`\`\``
+    );
+  } catch {
+    // Best effort
   }
 }
