@@ -117,11 +117,217 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Schedules */}
+      <Schedules />
+
       {/* Capabilities Health */}
       <CapabilitiesHealth />
     </div>
   );
 }
+
+// =============================================================================
+// Schedules
+// =============================================================================
+
+interface Job {
+  id: string;
+  agentId: string;
+  profile?: string;
+  cron?: string;
+  nextRun: number;
+  enabled: boolean;
+  description?: string;
+  params?: Record<string, unknown>;
+}
+
+function Schedules() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  // New job form
+  const [agentId, setAgentId] = useState("buri");
+  const [profile, setProfile] = useState("");
+  const [cron, setCron] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [description, setDescription] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  function refreshJobs() {
+    fetch("/api/gateway")
+      .then((r) => r.json())
+      .then((data) => {
+        setJobs(data.jobs ?? []);
+        setLoaded(true);
+      });
+  }
+
+  useEffect(() => {
+    refreshJobs();
+  }, []);
+
+  async function handleCreate() {
+    if (!cron.trim() || !agentId.trim()) return;
+    setCreating(true);
+    try {
+      await fetch("/api/gateway", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "schedule",
+          agentId,
+          profile: profile || undefined,
+          cron,
+          prompt: prompt || undefined,
+          description: description || undefined,
+        }),
+      });
+      setCron("");
+      setPrompt("");
+      setDescription("");
+      refreshJobs();
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleDelete(jobId: string) {
+    await fetch("/api/gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "schedule", jobId }),
+    });
+    refreshJobs();
+  }
+
+  function formatNextRun(epochMs: number): string {
+    const d = new Date(epochMs);
+    const now = new Date();
+    const diffMs = d.getTime() - now.getTime();
+    const diffMin = Math.round(diffMs / 60000);
+
+    if (diffMin < 0) return "overdue";
+    if (diffMin < 1) return "now";
+    if (diffMin < 60) return `in ${diffMin}m`;
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return `in ${diffHr}h`;
+    return d.toLocaleDateString();
+  }
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-lg font-semibold">Schedules</h2>
+
+      {/* Active jobs */}
+      <div className="border border-gray-800 rounded-lg p-4">
+        {!loaded ? (
+          <p className="text-sm text-gray-500">Loading...</p>
+        ) : jobs.length === 0 ? (
+          <p className="text-sm text-gray-500">No scheduled jobs.</p>
+        ) : (
+          <div className="space-y-2">
+            {jobs.map((job) => (
+              <div
+                key={job.id}
+                className="flex items-center justify-between text-sm border-b border-gray-800 pb-2 last:border-0 last:pb-0"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-200">
+                      {job.agentId}{job.profile ? `:${job.profile}` : ""}
+                    </span>
+                    {job.cron && (
+                      <span className="text-xs font-mono text-gray-500">{job.cron}</span>
+                    )}
+                    {!job.cron && (
+                      <span className="text-xs text-gray-500">one-shot</span>
+                    )}
+                  </div>
+                  {job.description && (
+                    <p className="text-xs text-gray-500 mt-0.5">{job.description}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs ${job.enabled ? "text-green-400" : "text-gray-600"}`}>
+                    {job.enabled ? formatNextRun(job.nextRun) : "disabled"}
+                  </span>
+                  <button
+                    onClick={() => handleDelete(job.id)}
+                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                  >
+                    delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* New job form */}
+      <div className="border border-gray-800 rounded-lg p-4 space-y-3">
+        <p className="text-sm text-gray-400">Create a recurring schedule</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Agent</label>
+            <input
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Profile</label>
+            <input
+              value={profile}
+              onChange={(e) => setProfile(e.target.value)}
+              placeholder="e.g. xmanager"
+              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Cron</label>
+            <input
+              value={cron}
+              onChange={(e) => setCron(e.target.value)}
+              placeholder="0,30 * * * *"
+              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-gray-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Prompt</label>
+            <input
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="/feed-scan"
+              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Description</label>
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Feed scan every 30 min"
+            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+          />
+        </div>
+        <button
+          onClick={handleCreate}
+          disabled={creating || !cron.trim()}
+          className="px-4 py-2 bg-white text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          {creating ? "Creating..." : "Create Schedule"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// =============================================================================
+// Capabilities Health
+// =============================================================================
 
 interface HealthResult {
   name: string;
