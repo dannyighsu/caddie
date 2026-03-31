@@ -175,7 +175,7 @@ async function executeSchedule(req: GatewayRequest): Promise<Record<string, unkn
     return { success: false, error: "cron expression is required for schedule action" };
   }
 
-  const jobId = req.jobId ?? `recurring:${req.agentId}:${req.profile ?? "default"}`;
+  const jobId = req.jobId ?? `recurring:${req.agentId}:${req.profile ?? "default"}:${req.cron!.replace(/\s+/g, "_")}`;
   try {
     const job = await scheduleRecurring(jobId, req.agentId, req.cron, {
       profile: req.profile,
