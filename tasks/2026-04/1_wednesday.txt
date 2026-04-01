@@ -4,18 +4,23 @@
 
 Attempted to run the feed-scan skill for the xmanager account.
 
-**Result: Could not execute — skill not registered + missing prerequisites**
+**Result: Could not execute — skill loaded but prerequisites missing**
 
-Same blockers as 2026-03-31:
+The `feed-scan` skill was successfully located at `harness/agents/buri/.claude/skills/feed-scan/SKILL.md`.
+The xmanager profile is defined in `harness/agents/buri/agent.json` and uses the `chrome` capability.
 
-1. **Skill not registered**: `feed-scan` is not a known skill in this environment. The Skill tool returned "Unknown skill: feed-scan".
+Blockers (same as prior days):
 
-2. **No config files**: `config/areas_of_interest.md` and `config/engagement_criteria.md` do not exist. These are required to guide topic focus and engagement filtering.
+1. **Missing config files**:
+   - `config/areas_of_interest.md` — does not exist
+   - `config/engagement_criteria.md` — does not exist
+   These are required by the skill to guide topic focus and engagement filtering.
 
-3. **No browser session**: The xmanager profile uses the `chrome` capability for X (Twitter) access, but no active authenticated Chrome session is available in this environment.
+2. **No Chrome session**: The `chrome` capability requires Claude Code to be launched with the `--chrome` flag, providing an authenticated browser session for X (Twitter). This is not available in the current runtime.
+
+3. **Unresolved template variables**: `{{xUsername}}` and `{{runRecordPath}}` are not substituted — these would normally be injected by the harness when launching via the xmanager profile.
 
 **Action needed (recurring)**:
-- Register the `feed-scan` skill in the Claude Code skill registry
 - Create `config/areas_of_interest.md` with topic focus areas
 - Create `config/engagement_criteria.md` with filtering and engagement style rules
-- Run via the xmanager profile which provisions a Chrome session with X credentials
+- Run this session via the harness using the xmanager profile (`--profile xmanager`), which provisions a `--chrome` session with X credentials and resolves template variables
