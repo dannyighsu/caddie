@@ -77,3 +77,17 @@ Blockers (unchanged):
 4. Template variables `{{xUsername}}` and `{{runRecordPath}}` unresolved
 
 No scan possible. User action required before this skill can run.
+
+---
+
+### feed-scan — xmanager [BLOCKED] (6th attempt today)
+
+Same result. All blockers remain unresolved. **11th consecutive day blocked.**
+
+Blockers (unchanged):
+1. `config/areas_of_interest.md` — missing
+2. `config/engagement_criteria.md` — missing
+3. No Chrome/browser session with X credentials (requires harness xmanager profile)
+4. Template variables `{{xUsername}}` and `{{runRecordPath}}` unresolved
+
+No scan possible. User action required before this skill can run.
