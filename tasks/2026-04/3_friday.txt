@@ -24,3 +24,9 @@ Blockers (unchanged from prior days):
 - Create `config/areas_of_interest.md` with topic focus areas
 - Create `config/engagement_criteria.md` with filtering and engagement style rules
 - Run this session via the harness using the xmanager profile (`--profile xmanager`), which provisions a Chrome session with X credentials and resolves template variables
+
+---
+
+### feed-scan — xmanager [BLOCKED] (2nd attempt today)
+
+Same result. All three blockers remain unresolved. No scan possible.
