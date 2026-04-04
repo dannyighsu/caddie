@@ -3,7 +3,7 @@
   "name": "Buri",
   "persona": "./persona.md",
   "capabilities": ["notion"],
-  "resolvers": ["google-calendar"],
+  "resolvers": [],
   "maxTurns": 20,
   "profiles": {
     "writer": {
