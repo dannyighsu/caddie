@@ -78,6 +78,7 @@ coverage/
 .next/
 out/
 temp/
+*.tsbuildinfo
 
 # IDE and editors #
 ###################
