@@ -4,7 +4,7 @@
  * Single entry point for triggering agent executions and sending notifications.
  *
  * Actions:
- *   notify  — Send a message to Slack (immediately or scheduled)
+ *   notify  — Send a message to Slack or WhatsApp (immediately or scheduled)
  *   run     — Execute an agent (immediately or scheduled)
  *   schedule — Create a recurring job
  *
@@ -13,6 +13,7 @@
  *
  * Examples:
  *   curl -X POST localhost:3000/api/gateway -d '{"action":"notify","channel":"slack","message":"done"}'
+ *   curl -X POST localhost:3000/api/gateway -d '{"action":"notify","channel":"whatsapp","to":"12125551234","message":"done"}'
  *   curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri"}'
  *   curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"xmanager"}'
  *   curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","scheduledFor":"2026-03-28T09:00:00Z"}'
@@ -21,6 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
+import { sendWhatsAppMessage, isWhatsAppConfigured } from "@/lib/whatsapp";
 import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
 import { getOrchestrator, type OrchestratorParams } from "@/lib/orchestrators";
@@ -30,11 +32,13 @@ interface GatewayRequest {
   action: "notify" | "run" | "schedule";
 
   // --- notify fields ---
-  channel?: "slack";
+  channel?: "slack" | "whatsapp";
   message?: string;
   from?: string;
   slackChannel?: string;
   threadTs?: string;
+  /** WhatsApp recipient phone number (international format, no +) */
+  to?: string;
 
   // --- run fields ---
   agentId?: string;
@@ -95,6 +99,28 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
     }
 
     return { success: true, channel: "slack", channelId };
+  }
+
+  if (req.channel === "whatsapp") {
+    if (!isWhatsAppConfigured()) {
+      return { success: false, error: "WhatsApp not configured" };
+    }
+
+    let recipient = req.to;
+    if (!recipient) {
+      const config = await getSetting<{ defaultRecipient?: string }>("whatsapp_config");
+      recipient = config?.defaultRecipient;
+    }
+    if (!recipient) {
+      return { success: false, error: "No WhatsApp recipient specified and no default configured" };
+    }
+
+    const formatted = req.from
+      ? `*[${req.from}]* ${req.message}`
+      : req.message;
+
+    await sendWhatsAppMessage(recipient, formatted);
+    return { success: true, channel: "whatsapp", to: recipient };
   }
 
   return { success: false, error: `Unsupported channel: ${req.channel}` };
