@@ -18,6 +18,8 @@ export const workspaceRoot = process.env.WORKSPACE_ROOT
   ? resolve(process.env.WORKSPACE_ROOT)
   : resolve(repoRoot, "workspace");
 
+export const resolversDir = resolve(harnessRoot, "resolvers");
+
 let launcherInstance: ReturnType<typeof createLauncher> | null = null;
 
 export function getLauncher() {

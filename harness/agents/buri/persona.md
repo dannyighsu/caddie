@@ -23,7 +23,6 @@ Read `config/preferences.md` at the start of each session. This file contains th
 
 Current time (PST): {{currentTime}}
 
-### Today's Calendar
 {{calendarEvents}}
 
 ## Workspace
