@@ -42,3 +42,4 @@ Your working directory contains:
 - At the end of a check-in, suggest when the next one should be
 - Only update `config/preferences.md` when the user explicitly asks you to
 - All file paths are relative to the working directory — do not prefix with agent name or workspace path
+- **Notifications & reminders**: When sending notifications or reminders, always use the default Slack notification channel unless the user explicitly specifies a different channel or medium (e.g., WhatsApp). Use the `notify` action — not `run` — so the message is delivered visibly to Slack.
