@@ -26,7 +26,7 @@ import { sendWhatsAppMessage, isWhatsAppConfigured } from "@/lib/whatsapp";
 import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
 import { getOrchestrator, type OrchestratorParams } from "@/lib/orchestrators";
-import { scheduleOneShot, scheduleRecurring, listJobs, deleteJob } from "@/lib/redis";
+import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, deleteJob } from "@/lib/redis";
 
 interface GatewayRequest {
   action: "notify" | "run" | "schedule";
@@ -72,6 +72,21 @@ async function executeAction(req: GatewayRequest): Promise<Record<string, unknow
 async function executeNotify(req: GatewayRequest): Promise<Record<string, unknown>> {
   if (!req.message) {
     return { success: false, error: "message is required" };
+  }
+
+  // Handle deferred notification
+  if (req.scheduledFor) {
+    const runAt = new Date(req.scheduledFor);
+    if (isNaN(runAt.getTime())) {
+      return { success: false, error: "Invalid scheduledFor timestamp" };
+    }
+    const job = await scheduleNotification(runAt, {
+      message: req.message,
+      from: req.from,
+      slackChannel: req.slackChannel,
+      description: req.description,
+    });
+    return { success: true, scheduled: true, jobId: job.id, nextRun: new Date(job.nextRun).toISOString() };
   }
 
   if (req.channel === "slack" || !req.channel) {

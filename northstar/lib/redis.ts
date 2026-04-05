@@ -58,7 +58,9 @@ export async function clearActiveRun(key: string): Promise<void> {
 export interface ScheduledJob {
   /** Unique job identifier. */
   id: string;
-  /** Agent to run. */
+  /** Job action type: "run" (default) launches an agent, "notify" sends a notification. */
+  action?: "run" | "notify";
+  /** Agent to run (required for "run" jobs). */
   agentId: string;
   /** Profile to use (optional). */
   profile?: string;
@@ -129,6 +131,30 @@ export async function scheduleOneShot(
     enabled: true,
     params: options?.params,
     description: options?.description,
+  };
+  await upsertJob(job);
+  return job;
+}
+
+/**
+ * Schedule a one-shot notification at a specific time.
+ */
+export async function scheduleNotification(
+  runAt: Date,
+  options: { message: string; from?: string; slackChannel?: string; description?: string }
+): Promise<ScheduledJob> {
+  const job: ScheduledJob = {
+    id: `oneshot:notify:${runAt.getTime()}`,
+    action: "notify",
+    agentId: "system",
+    nextRun: runAt.getTime(),
+    enabled: true,
+    params: {
+      message: options.message,
+      from: options.from,
+      slackChannel: options.slackChannel,
+    },
+    description: options.description ?? options.message,
   };
   await upsertJob(job);
   return job;

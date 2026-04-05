@@ -9,6 +9,37 @@ Use the Northstar gateway API at `http://localhost:3000/api/gateway` to manage s
 
 **IMPORTANT:** Do NOT use Claude Code's built-in cron/scheduling tools (CronCreate, CronList, etc.). Always use the Northstar gateway API below instead — it has no plan limits and persists across restarts.
 
+### Notifications
+
+When the user asks you to set a reminder, send a notification, or alert them about something at a specific time, **always use the `notify` action** so a message is delivered to the default Slack notification channel. Do NOT use `action: "run"` for reminders — a `run` launches an agent session but does not guarantee a visible notification.
+
+If the user doesn't specify a channel, omit `slackChannel` — the system will use the default Slack notification channel automatically. Only specify a channel or switch to WhatsApp if the user explicitly requests it.
+
+#### Send a notification immediately
+
+```bash
+curl -s -X POST http://localhost:3000/api/gateway \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "notify",
+    "message": "<notification message>",
+    "from": "Buri"
+  }'
+```
+
+#### Schedule a notification for later (reminder)
+
+```bash
+curl -s -X POST http://localhost:3000/api/gateway \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "notify",
+    "message": "<reminder message>",
+    "from": "Buri",
+    "scheduledFor": "2026-03-30T15:00:00-07:00"
+  }'
+```
+
 ### List all scheduled jobs
 
 ```bash
@@ -38,7 +69,9 @@ Examples:
 - `0,30 * * * *` — every 30 minutes
 - `0 9 * * 2` — Tuesdays at 9AM
 
-### Schedule a one-shot run
+### Schedule a one-shot agent run
+
+Use this when the user wants to **run the agent** at a future time (not just send a notification).
 
 ```bash
 curl -s -X POST http://localhost:3000/api/gateway \
