@@ -55,6 +55,12 @@ export function startScheduler(): void {
  * Execute a scheduled job.
  */
 async function fireJob(job: ScheduledJob): Promise<void> {
+  // Handle notification jobs
+  if (job.action === "notify") {
+    await fireNotifyJob(job);
+    return;
+  }
+
   const orchestrator = getOrchestrator(job.agentId, job.profile);
 
   let result: Record<string, unknown> | undefined;
@@ -90,6 +96,36 @@ async function fireJob(job: ScheduledJob): Promise<void> {
   if (result && !result.success && result.error) {
     await notifyFailure(job, result.error as string);
   }
+}
+
+/**
+ * Execute a scheduled notification job — send a message to Slack.
+ */
+async function fireNotifyJob(job: ScheduledJob): Promise<void> {
+  if (!isSlackConfigured()) {
+    console.error("[Scheduler] Cannot fire notify job: Slack not configured");
+    return;
+  }
+
+  const message = job.params?.message as string;
+  if (!message) {
+    console.error("[Scheduler] Notify job has no message:", job.id);
+    return;
+  }
+
+  let channelId = job.params?.slackChannel as string | undefined;
+  if (!channelId) {
+    const defaultChannel = await getSetting<{ channelId: string }>("default_slack_channel");
+    channelId = defaultChannel?.channelId;
+  }
+  if (!channelId) {
+    console.error("[Scheduler] No Slack channel for notify job:", job.id);
+    return;
+  }
+
+  const from = job.params?.from as string | undefined;
+  const formatted = from ? `*[${from}]* ${message}` : message;
+  await sendMessage(channelId, formatted);
 }
 
 /**
