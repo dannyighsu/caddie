@@ -12,6 +12,7 @@
     "smoke": "tsx scripts/run.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "googleapis": "^144.0.0",
     "uuid": "^11.0.0"
   },

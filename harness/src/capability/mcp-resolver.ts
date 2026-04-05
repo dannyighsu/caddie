@@ -97,7 +97,14 @@ export async function resolveCapabilities(
       const missingVars = new Set<string>();
       servers[def.name] = {
         command: resolveEnvVars(def.server.command, missingVars),
-        args: def.server.args.map((a) => resolveEnvVars(a, missingVars)),
+        args: def.server.args.map((a) => {
+          const resolved = resolveEnvVars(a, missingVars);
+          // Resolve relative paths against the capabilities directory
+          if (resolved.startsWith("./") || resolved.startsWith("../")) {
+            return resolve(capabilitiesDir, resolved);
+          }
+          return resolved;
+        }),
         env: def.server.env ? resolveEnvRecord(def.server.env, missingVars) : undefined,
       };
 

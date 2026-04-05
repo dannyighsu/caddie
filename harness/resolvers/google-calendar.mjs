@@ -42,11 +42,12 @@ async function saveTokens(harnessRoot, tokens) {
 }
 
 function formatEventsForPrompt(events) {
+  const header = "### Today's Calendar";
   if (events.length === 0) {
-    return "No calendar events today.";
+    return `${header}\nNo calendar events today.`;
   }
 
-  return events
+  const lines = events
     .map((event) => {
       const startTime = new Date(event.start).toLocaleTimeString("en-US", {
         hour: "numeric",
@@ -65,6 +66,7 @@ function formatEventsForPrompt(events) {
       return line;
     })
     .join("\n");
+  return `${header}\n${lines}`;
 }
 
 const resolver = {
@@ -75,7 +77,7 @@ const resolver = {
 
       if (!tokens) {
         console.warn("[GCal Resolver] No tokens found. Run harness/scripts/google-auth.ts to authorize.");
-        return { calendarEvents: "Calendar not connected. Run the Google auth setup." };
+        return { calendarEvents: "### Today's Calendar\nCalendar not connected. Run the Google auth setup." };
       }
 
       oauth2Client.setCredentials(tokens);
@@ -117,7 +119,7 @@ const resolver = {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[GCal Resolver] Failed to fetch calendar: ${message}`);
-      return { calendarEvents: "Unable to fetch calendar events." };
+      return { calendarEvents: "### Today's Calendar\nUnable to fetch calendar events." };
     }
   },
 };
