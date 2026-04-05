@@ -9,7 +9,8 @@
 
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { resolve, dirname } from "path";
-import { getLauncher } from "./harness";
+import { getLauncher, resolversDir } from "./harness";
+import { runResolvers } from "@agints/harness";
 import { isRunActive, setActiveRun, clearActiveRun, scheduleOneShot } from "./redis";
 import { sendMessage, isSlackConfigured } from "./slack";
 import {
@@ -119,12 +120,19 @@ async function runCheckin(params: OrchestratorParams): Promise<Record<string, un
     }
 
     const prompt = params.prompt ?? "Conduct a check-in.";
+
+    // Run calendar resolver specifically for check-in workflow
+    const calendarContext = await runResolvers(["google-calendar"], resolversDir, {
+      workingDirectory: resolve(WORKSPACE_ROOT, "buri"),
+      harnessRoot: resolve(resolversDir, ".."),
+    });
+
     const launcher = getLauncher();
     const result = await launcher.launch({
       agentId: "buri",
       prompt,
       sessionId,
-      context: { currentTime: currentTimePST() },
+      context: { currentTime: currentTimePST(), ...calendarContext },
       additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
     });
 

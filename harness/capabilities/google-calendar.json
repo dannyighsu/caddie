@@ -1,0 +1,12 @@
+{
+  "name": "google-calendar",
+  "description": "Google Calendar read/write access via MCP",
+  "server": {
+    "command": "node",
+    "args": ["../mcp-servers/google-calendar.mjs"],
+    "env": {
+      "GOOGLE_CLIENT_ID": "${GOOGLE_CLIENT_ID}",
+      "GOOGLE_CLIENT_SECRET": "${GOOGLE_CLIENT_SECRET}"
+    }
+  }
+}

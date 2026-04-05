@@ -2,12 +2,12 @@
   "id": "buri",
   "name": "Buri",
   "persona": "./persona.md",
-  "capabilities": ["notion"],
-  "resolvers": ["google-calendar"],
+  "capabilities": ["notion", "google-calendar"],
+  "resolvers": [],
   "maxTurns": 20,
   "profiles": {
     "writer": {
-      "capabilities": ["notion", "web-search"],
+      "capabilities": ["notion", "google-calendar", "web-search"],
       "maxTurns": 30
     },
     "xmanager": {
