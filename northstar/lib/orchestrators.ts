@@ -61,6 +61,40 @@ export function getOrchestrator(agentId: string, profile?: string): Orchestrator
   return orchestrators[agentId] ?? null;
 }
 
+// --- Context Enrichers ---
+//
+// Lightweight context providers used by the shared messaging path.
+// Unlike full orchestrators, these only gather additional context
+// for the agent launch — conversation management stays in the caller.
+
+type ContextEnricher = () => Promise<Record<string, string>>;
+
+const contextEnrichers: Record<string, ContextEnricher> = {
+  "buri": async () => {
+    return runResolvers(["google-calendar"], resolversDir, {
+      workingDirectory: resolve(WORKSPACE_ROOT, "buri"),
+      harnessRoot: resolve(resolversDir, ".."),
+    });
+  },
+  "buri:xmanager": async (): Promise<Record<string, string>> => {
+    const xUsername = (await readConfigFile("buri", "x_username.txt")).trim();
+    return xUsername ? { xUsername } : {};
+  },
+};
+
+/**
+ * Get a context enricher for an agent+profile combination.
+ * Returns additional context to merge into the agent launch,
+ * without taking over the full execution lifecycle.
+ */
+export function getContextEnricher(agentId: string, profile?: string): ContextEnricher | null {
+  if (profile) {
+    const specific = contextEnrichers[`${agentId}:${profile}`];
+    if (specific) return specific;
+  }
+  return contextEnrichers[agentId] ?? null;
+}
+
 // --- Helpers ---
 
 async function resolveSlackChannel(explicit?: string): Promise<string | undefined> {
@@ -80,7 +114,7 @@ async function readConfigFile(agentId: string, filename: string): Promise<string
   }
 }
 
-function currentTimePST(): string {
+export function currentTimePST(): string {
   return new Date().toLocaleString("en-US", {
     timeZone: "America/Los_Angeles",
     weekday: "long",
@@ -122,10 +156,7 @@ async function runCheckin(params: OrchestratorParams): Promise<Record<string, un
     const prompt = params.prompt ?? "Conduct a check-in.";
 
     // Run calendar resolver specifically for check-in workflow
-    const calendarContext = await runResolvers(["google-calendar"], resolversDir, {
-      workingDirectory: resolve(WORKSPACE_ROOT, "buri"),
-      harnessRoot: resolve(resolversDir, ".."),
-    });
+    const calendarContext = await contextEnrichers["buri"]();
 
     const launcher = getLauncher();
     const result = await launcher.launch({

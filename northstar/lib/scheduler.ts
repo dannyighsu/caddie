@@ -9,7 +9,7 @@
  */
 
 import { getDueJobs, markJobFired, type ScheduledJob } from "./redis";
-import { getOrchestrator } from "./orchestrators";
+import { getOrchestrator, currentTimePST } from "./orchestrators";
 import { getLauncher } from "./harness";
 import { sendMessage, isSlackConfigured } from "./slack";
 import { getSetting } from "./db";
@@ -77,16 +77,7 @@ async function fireJob(job: ScheduledJob): Promise<void> {
       profile: job.profile,
       prompt: (job.params?.prompt as string) ?? "Run.",
       context: {
-        currentTime: new Date().toLocaleString("en-US", {
-          timeZone: "America/Los_Angeles",
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        }),
+        currentTime: currentTimePST(),
       },
     });
     result = { success: launchResult.success, error: launchResult.error };
