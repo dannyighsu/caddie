@@ -18,7 +18,7 @@ import {
   type Message,
 } from "./db";
 import { classifyMessage } from "./classifier";
-import { getOrchestrator } from "./orchestrators";
+import { getContextEnricher, currentTimePST } from "./orchestrators";
 import {
   createTraceId,
   createTrace,
@@ -57,9 +57,10 @@ export interface InboundMessageResult {
  *
  * 1. Lookup or create conversation by external ID
  * 2. Classify new conversations to route to the right agent/profile
- * 3. Execute via orchestrator or direct launcher
- * 4. Persist messages
- * 5. Reply via the provided replyFn
+ * 3. Gather agent-specific context via context enrichers
+ * 4. Launch agent with session resumption + enriched context
+ * 5. Persist messages
+ * 6. Reply via the provided replyFn
  */
 export async function handleInboundMessage(
   params: InboundMessageParams
@@ -97,46 +98,34 @@ export async function handleInboundMessage(
       }
     }
 
-    // Execute agent — check for orchestrator, then fall back to direct launch
-    const orchestrator = getOrchestrator(conversation.agent_id, profile);
-
-    let rawText: string | undefined;
-    let resultSessionId: string | undefined;
-    let resultTraceUrl: string | undefined;
-
-    if (orchestrator) {
-      const result = await orchestrator({
-        prompt: text,
-        skipSlack: true,
-      });
-      rawText = result.rawText as string | undefined ?? result.digest as string | undefined;
-      resultSessionId = result.sessionId as string | undefined;
-      resultTraceUrl = result.traceUrl as string | undefined;
-    } else {
-      const launcher = getLauncher();
-      const result = await launcher.launch({
-        agentId: conversation.agent_id,
-        profile,
-        prompt: text,
-        sessionId,
-        context: {
-          currentTime: new Date().toLocaleString("en-US", {
-            timeZone: "America/Los_Angeles",
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-          }),
-          ...context,
-        },
-        additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
-      });
-      rawText = result.rawText;
-      resultSessionId = result.sessionId;
+    // Gather any agent-specific context (e.g. calendar for buri)
+    let enrichedContext: Record<string, string> = {};
+    const enricher = getContextEnricher(conversation.agent_id, profile);
+    if (enricher) {
+      try {
+        enrichedContext = await enricher();
+      } catch (err) {
+        console.error(`[Messaging] Context enricher failed:`, err);
+      }
     }
+
+    // Execute agent — single path with session resumption + enriched context
+    const launcher = getLauncher();
+    const result = await launcher.launch({
+      agentId: conversation.agent_id,
+      profile,
+      prompt: text,
+      sessionId,
+      context: {
+        currentTime: currentTimePST(),
+        ...enrichedContext,
+        ...context,
+      },
+      additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
+    });
+
+    const rawText = result.rawText;
+    const resultSessionId = result.sessionId;
 
     // Record messages
     const now = new Date().toISOString();
@@ -158,7 +147,7 @@ export async function handleInboundMessage(
 
     // Reply
     if (rawText) {
-      const traceUrl = resultTraceUrl ?? (isTracingEnabled() ? getTraceUrl(traceId) : null);
+      const traceUrl = isTracingEnabled() ? getTraceUrl(traceId) : null;
       const traceLink = traceUrl ? `\n${traceUrl}` : "";
       await replyFn(rawText + traceLink);
     }
