@@ -87,6 +87,10 @@ temp/
 *.swp
 *.swo
 
+# Browser profiles #
+####################
+harness/.browser-profile/
+
 # Project specific #
 ####################
 .ipynb_checkpoints
