@@ -9,7 +9,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { google } from "googleapis";
 import { readFile, writeFile } from "fs/promises";
-import { resolve, dirname, fileURLToPath } from "path";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { z } from "zod";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

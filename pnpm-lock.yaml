@@ -12,7 +12,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
-        version: 1.29.0(zod@4.3.6)
+        version: 1.29.0(zod@3.25.76)
       '@playwright/mcp':
         specifier: ^0.0.70
         version: 0.0.70
@@ -22,6 +22,9 @@ importers:
       uuid:
         specifier: ^11.0.0
         version: 11.1.0
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^20.19.26
@@ -1778,8 +1781,8 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
 
@@ -2001,7 +2004,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@modelcontextprotocol/sdk@1.29.0(zod@4.3.6)':
+  '@modelcontextprotocol/sdk@1.29.0(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.12(hono@4.12.10)
       ajv: 8.18.0
@@ -2018,8 +2021,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.3.6
-      zod-to-json-schema: 3.25.2(zod@4.3.6)
+      zod: 3.25.76
+      zod-to-json-schema: 3.25.2(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
 
@@ -3288,8 +3291,8 @@ snapshots:
 
   xtend@4.0.2: {}
 
-  zod-to-json-schema@3.25.2(zod@4.3.6):
+  zod-to-json-schema@3.25.2(zod@3.25.76):
     dependencies:
-      zod: 4.3.6
+      zod: 3.25.76
 
-  zod@4.3.6: {}
+  zod@3.25.76: {}

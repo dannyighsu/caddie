@@ -57,7 +57,15 @@ async function checkMcpServer(def: CapabilityDef): Promise<HealthCheckResult> {
 
   // Spawn and give it a moment — if it crashes immediately, that's a problem.
   // If it's still alive after 500ms, it's healthy enough.
-  const args = def.server.args.map(resolveEnvVars);
+  const repoRoot = resolve(process.cwd(), "..");
+  const capabilitiesDir = resolve(repoRoot, "harness", "capabilities");
+  const args = def.server.args.map((a) => {
+    const resolved = resolveEnvVars(a);
+    if (resolved.startsWith("./") || resolved.startsWith("../")) {
+      return resolve(capabilitiesDir, resolved);
+    }
+    return resolved;
+  });
   const env: Record<string, string> = { ...process.env as Record<string, string> };
   if (def.server.env) {
     for (const [key, value] of Object.entries(def.server.env)) {

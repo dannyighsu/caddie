@@ -257,6 +257,7 @@ make run          # start Northstar on http://localhost:3000
 make build        # build harness + northstar
 make install      # install all dependencies
 make smoke        # run a quick smoke test via the harness
+make google-auth  # one-time Google Calendar OAuth setup (opens browser)
 ```
 
 Or directly:
@@ -274,3 +275,4 @@ cd harness && pnpm smoke -- --agent buri --prompt "..."       # specify agent an
 - **Postgres** -- `POSTGRES_URL` in `northstar/.env.local`
 - **Redis** -- `REDIS_URL` in `northstar/.env.local`
 - **Env vars for capabilities** -- e.g., `NOTION_INTERNAL_TOKEN` for Notion. Missing vars produce warnings, not errors.
+- **Google Calendar** (optional) -- set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `northstar/.env.local`, then run `make google-auth` once to authorize. Tokens are saved to `harness/credentials/` (gitignored).
