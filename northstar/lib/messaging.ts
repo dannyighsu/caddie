@@ -18,7 +18,7 @@ import {
   type Message,
 } from "./db";
 import { classifyMessage } from "./classifier";
-import { getContextEnricher, currentTimePST } from "./orchestrators";
+import { currentTimePST } from "./helpers";
 import {
   createTraceId,
   createTrace,
@@ -57,10 +57,9 @@ export interface InboundMessageResult {
  *
  * 1. Lookup or create conversation by external ID
  * 2. Classify new conversations to route to the right agent/profile
- * 3. Gather agent-specific context via context enrichers
- * 4. Launch agent with session resumption + enriched context
- * 5. Persist messages
- * 6. Reply via the provided replyFn
+ * 3. Launch agent with session resumption
+ * 4. Persist messages
+ * 5. Reply via the provided replyFn
  */
 export async function handleInboundMessage(
   params: InboundMessageParams
@@ -98,18 +97,6 @@ export async function handleInboundMessage(
       }
     }
 
-    // Gather any agent-specific context (e.g. calendar for buri)
-    let enrichedContext: Record<string, string> = {};
-    const enricher = getContextEnricher(conversation.agent_id, profile);
-    if (enricher) {
-      try {
-        enrichedContext = await enricher();
-      } catch (err) {
-        console.error(`[Messaging] Context enricher failed:`, err);
-      }
-    }
-
-    // Execute agent — single path with session resumption + enriched context
     const launcher = getLauncher();
     const result = await launcher.launch({
       agentId: conversation.agent_id,
@@ -118,7 +105,6 @@ export async function handleInboundMessage(
       sessionId,
       context: {
         currentTime: currentTimePST(),
-        ...enrichedContext,
         ...context,
       },
       additionalEnv: { NORTHSTAR_TRACE_ID: traceId },

@@ -12,7 +12,7 @@
  */
 
 import { getDueJobs, markJobFired, overrideNextRun, type ScheduledJob } from "./redis";
-import { getOrchestrator, currentTimePST } from "./orchestrators";
+import { currentTimePST } from "./helpers";
 import { getLauncher } from "./harness";
 import { sendMessage, isSlackConfigured } from "./slack";
 import { getSetting } from "./db";
@@ -70,22 +70,6 @@ async function fireJob(job: ScheduledJob): Promise<void> {
     return;
   }
 
-  const orchestrator = getOrchestrator(job.agentId, job.profile);
-
-  if (orchestrator) {
-    const result = await orchestrator({
-      prompt: (job.params?.prompt as string) ?? undefined,
-      ...job.params,
-    });
-
-    // Notify on failure
-    if (result && !result.success && result.error) {
-      await notifyFailure(job, result.error as string);
-    }
-    return;
-  }
-
-  // No orchestrator — launch directly with tracing
   const traceId = createTraceId();
   await createTrace(traceId, job.agentId, {
     trigger: "scheduler",
