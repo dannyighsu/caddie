@@ -7,8 +7,7 @@
  * Agents without an orchestrator just launch directly.
  */
 
-import { readFile, writeFile, mkdir } from "fs/promises";
-import { resolve, dirname } from "path";
+import { resolve } from "path";
 import { getLauncher, resolversDir } from "./harness";
 import { runResolvers } from "@agints/harness";
 import { isRunActive, setActiveRun, clearActiveRun, scheduleOneShot } from "./redis";
@@ -46,7 +45,6 @@ export interface OrchestratorParams {
 
 const orchestrators: Record<string, Orchestrator> = {
   "buri": runCheckin,
-  "buri:xmanager": runXManager,
 };
 
 /**
@@ -76,10 +74,6 @@ const contextEnrichers: Record<string, ContextEnricher> = {
       harnessRoot: resolve(resolversDir, ".."),
     });
   },
-  "buri:xmanager": async (): Promise<Record<string, string>> => {
-    const xUsername = (await readConfigFile("buri", "x_username.txt")).trim();
-    return xUsername ? { xUsername } : {};
-  },
 };
 
 /**
@@ -101,17 +95,6 @@ async function resolveSlackChannel(explicit?: string): Promise<string | undefine
   if (explicit) return explicit;
   const defaultChannel = await getSetting<{ channelId: string }>("default_slack_channel");
   return defaultChannel?.channelId;
-}
-
-async function readConfigFile(agentId: string, filename: string): Promise<string> {
-  try {
-    return await readFile(
-      resolve(WORKSPACE_ROOT, agentId, "config", filename),
-      "utf-8"
-    );
-  } catch {
-    return "";
-  }
 }
 
 export function currentTimePST(): string {
@@ -220,124 +203,3 @@ async function runCheckin(params: OrchestratorParams): Promise<Record<string, un
   }
 }
 
-// --- X Manager Orchestrator ---
-
-function buildRunRecordPath(): string {
-  const now = new Date();
-  const pst = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-  const year = pst.getFullYear();
-  const month = String(pst.getMonth() + 1).padStart(2, "0");
-  const day = String(pst.getDate());
-  const dayName = pst.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
-  const ts = now.toISOString().replace(/:/g, "-").replace(/\..+/, "");
-  return `runs/${year}-${month}/${day}_${dayName}/run-record-${ts}.jsonl`;
-}
-
-interface RunRecordEntry {
-  type: string;
-  [key: string]: unknown;
-}
-
-async function readRunRecord(workspacePath: string, recordPath: string): Promise<RunRecordEntry[]> {
-  try {
-    const content = await readFile(resolve(workspacePath, recordPath), "utf-8");
-    return content
-      .trim()
-      .split("\n")
-      .filter((l) => l.trim())
-      .map((l) => JSON.parse(l) as RunRecordEntry);
-  } catch {
-    return [];
-  }
-}
-
-async function runXManager(params: OrchestratorParams): Promise<Record<string, unknown>> {
-  const traceId = createTraceId();
-  await createTrace(traceId, "xmanager", { trigger: "orchestrator" });
-
-  if (await isRunActive("xmanager")) {
-    return { success: false, error: "An X Manager run is already in progress" };
-  }
-
-  await setActiveRun("xmanager", 1800);
-
-  try {
-    const xUsername = (await readConfigFile("buri", "x_username.txt")).trim();
-    if (!xUsername) {
-      return { success: false, error: "X username not configured. Add workspace/buri/config/x_username.txt" };
-    }
-
-    const runRecordPath = buildRunRecordPath();
-    const buriWorkspace = resolve(WORKSPACE_ROOT, "buri");
-    const fullRecordPath = resolve(buriWorkspace, runRecordPath);
-    await mkdir(dirname(fullRecordPath), { recursive: true });
-    await writeFile(fullRecordPath, "");
-
-    const launcher = getLauncher();
-
-    // Feed scan
-    console.log("[XManager] Running feed scan...");
-    const feedResult = await launcher.launch({
-      agentId: "buri", profile: "xmanager",
-      prompt: "/feed-scan",
-      context: { xUsername, runRecordPath },
-      additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
-    });
-    if (feedResult.error) {
-      console.error("[XManager] Feed scan error:", feedResult.error);
-    }
-
-    // Read results and build Slack message
-    const entries = await readRunRecord(buriWorkspace, runRecordPath);
-    const opportunities = entries.filter((e) => e.type === "opportunity");
-
-    let slackMessage: string;
-    if (opportunities.length > 0) {
-      const parts = [`:bird: *X Manager — ${opportunities.length} engagement ${opportunities.length === 1 ? "opportunity" : "opportunities"} found*\n`];
-      for (const opp of opportunities) {
-        const handle = opp.authorHandle ? `@${opp.authorHandle}` : opp.author;
-        const text = String(opp.text ?? "").substring(0, 120);
-        const link = opp.link ?? "";
-        parts.push(`*${handle}* ${opp.followerCount ? `(${opp.followerCount})` : ""}`);
-        parts.push(`> ${text}`);
-        if (opp.suggestedEngagement) {
-          const suggestions = opp.suggestedEngagement as string[];
-          parts.push(`_Suggested:_ ${suggestions.slice(0, 2).join(" · ")}`);
-        }
-        if (opp.discoveryMethod) {
-          parts.push(`_Found:_ ${opp.discoveryMethod}`);
-        }
-        if (link) parts.push(`<${link}|View post>`);
-        parts.push("");
-      }
-      parts.push("_Reply in this thread to discuss opportunities or approve replies._");
-      slackMessage = parts.join("\n");
-    } else {
-      slackMessage = `:bird: *X Manager — no engagement opportunities found*\n${feedResult.rawText?.substring(0, 300) ?? "Scan completed with no results."}`;
-    }
-
-    // Save summary
-    const summaryPath = runRecordPath.replace(".jsonl", "-summary.json");
-    await writeFile(
-      resolve(buriWorkspace, summaryPath),
-      JSON.stringify({ timestamp: new Date().toISOString(), entries, slackMessage }, null, 2)
-    );
-
-    // NOTE: Slack posting is handled by the feed-scan skill itself.
-    // The orchestrator intentionally does not post to avoid duplicate messages.
-
-    const runResult = {
-      success: true,
-      rawText: feedResult.rawText,
-      digest: slackMessage,
-      opportunitiesFound: opportunities.length,
-      runRecordPath,
-      traceUrl: isTracingEnabled() ? getTraceUrl(traceId) : undefined,
-    };
-
-    await completeTrace(traceId, runResult);
-    return runResult;
-  } finally {
-    await clearActiveRun("xmanager");
-  }
-}
