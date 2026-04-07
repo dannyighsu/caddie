@@ -59,8 +59,9 @@ For each opportunity, provide:
 ## Config
 
 Before starting the scan, read these files from the working directory using the Read tool:
-1. `config/areas_of_interest.md` — defines your topic focus
-2. `config/engagement_criteria.md` — defines filtering and engagement style rules
+1. `config/x_username.txt` — the X account username you are logged in as
+2. `config/areas_of_interest.md` — defines your topic focus
+3. `config/engagement_criteria.md` — defines filtering and engagement style rules
 
 Use the content of these files to guide your scanning and filtering.
 

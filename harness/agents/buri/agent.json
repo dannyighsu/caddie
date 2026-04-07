@@ -2,17 +2,13 @@
   "id": "buri",
   "name": "Buri",
   "persona": "./persona.md",
-  "capabilities": ["notion", "egress", "browser"],
-  "resolvers": ["google-calendar"],
+  "capabilities": ["notion", "egress", "browser", "google-calendar"],
   "profiles": {
     "writer": {
       "capabilities": ["notion", "web-search", "egress", "browser"]
     },
     "xmanager": {
-      "capabilities": ["browser", "egress"],
-      "configFiles": {
-        "xUsername": "config/x_username.txt"
-      }
+      "capabilities": ["browser", "egress"]
     }
   }
 }
