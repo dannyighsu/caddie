@@ -2,16 +2,17 @@
   "id": "buri",
   "name": "Buri",
   "persona": "./persona.md",
-  "capabilities": ["notion", "google-calendar"],
-  "resolvers": [],
-  "maxTurns": 20,
+  "capabilities": ["notion", "egress", "browser"],
+  "resolvers": ["google-calendar"],
   "profiles": {
     "writer": {
-      "capabilities": ["notion", "google-calendar", "web-search"],
-      "maxTurns": 30
+      "capabilities": ["notion", "web-search", "egress", "browser"]
     },
     "xmanager": {
-      "capabilities": ["chrome"]
+      "capabilities": ["browser", "egress"],
+      "configFiles": {
+        "xUsername": "config/x_username.txt"
+      }
     }
   }
 }

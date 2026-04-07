@@ -2,12 +2,12 @@
  * Health Checks
  *
  * Pre-flight verification of MCP capabilities and other dependencies.
- * Spawns each MCP server briefly and sends an initialize handshake.
+ * Verifies each MCP server command is resolvable and starts without crashing.
  */
 
 import { spawn } from "child_process";
 import { resolve } from "path";
-import { readdir, readFile } from "fs/promises";
+import { readdir, readFile, access } from "fs/promises";
 
 interface CapabilityDef {
   name: string;
@@ -24,7 +24,6 @@ export interface HealthCheckResult {
   type: "mcp" | "flag";
   status: "ok" | "error" | "skipped";
   message?: string;
-  durationMs?: number;
 }
 
 const ENV_VAR_PATTERN = /\$\{([^}]+)\}/g;
@@ -36,22 +35,29 @@ function resolveEnvVars(value: string): string {
 }
 
 /**
- * Test an MCP server by spawning it and sending an initialize message.
- * Returns within timeoutMs whether the server responded.
+ * Check an MCP server by verifying its command is resolvable and it starts
+ * without immediately crashing. Does not do a full MCP handshake — that's
+ * too slow/fragile for servers that open browsers or resolve dependencies.
  */
-async function checkMcpServer(
-  def: CapabilityDef,
-  timeoutMs = 30000
-): Promise<HealthCheckResult> {
+async function checkMcpServer(def: CapabilityDef): Promise<HealthCheckResult> {
   if (!def.server) {
-    return { name: def.name, type: "flag", status: "ok", message: "Flag-only (no server to check)" };
+    return { name: def.name, type: "flag", status: "ok", message: "Flag-only" };
   }
 
-  const start = Date.now();
   const command = resolveEnvVars(def.server.command);
-  const args = def.server.args.map(resolveEnvVars);
 
-  // Build env
+  // For absolute paths, verify the file exists
+  if (command.startsWith("/")) {
+    try {
+      await access(command);
+    } catch {
+      return { name: def.name, type: "mcp", status: "error", message: `Command not found: ${command}` };
+    }
+  }
+
+  // Spawn and give it a moment — if it crashes immediately, that's a problem.
+  // If it's still alive after 500ms, it's healthy enough.
+  const args = def.server.args.map(resolveEnvVars);
   const env: Record<string, string> = { ...process.env as Record<string, string> };
   if (def.server.env) {
     for (const [key, value] of Object.entries(def.server.env)) {
@@ -73,35 +79,11 @@ async function checkMcpServer(
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    let stdout = "";
     let stderr = "";
-
-    proc.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-      // Look for a valid JSON-RPC response
-      if (stdout.includes('"jsonrpc"') && stdout.includes('"result"')) {
-        proc.kill();
-        settle({
-          name: def.name,
-          type: "mcp",
-          status: "ok",
-          durationMs: Date.now() - start,
-        });
-      }
-    });
-
-    proc.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
+    proc.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
 
     proc.on("error", (err) => {
-      settle({
-        name: def.name,
-        type: "mcp",
-        status: "error",
-        message: `Failed to spawn: ${err.message}`,
-        durationMs: Date.now() - start,
-      });
+      settle({ name: def.name, type: "mcp", status: "error", message: `Failed to spawn: ${err.message}` });
     });
 
     proc.on("exit", (code) => {
@@ -109,41 +91,19 @@ async function checkMcpServer(
         settle({
           name: def.name,
           type: "mcp",
-          status: code === 0 ? "ok" : "error",
-          message: code !== 0 ? `Exited with code ${code}` : undefined,
-          durationMs: Date.now() - start,
+          status: "error",
+          message: `Exited with code ${code}${stderr ? ` (${stderr.trim().substring(0, 200)})` : ""}`,
         });
       }
     });
 
-    // Send MCP initialize request (raw JSON line — no Content-Length framing)
-    const initMsg = JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "northstar-health-check", version: "1.0" },
-      },
-    });
-
-    proc.stdin.write(initMsg + "\n");
-
-    // Timeout
+    // If still alive after 500ms, it's good — kill it and report ok
     setTimeout(() => {
-      proc.kill();
-      const debug = stderr ? `stderr: ${stderr.trim().substring(0, 150)}` :
-                    stdout ? `stdout: ${stdout.trim().substring(0, 150)}` :
-                    "no output";
-      settle({
-        name: def.name,
-        type: "mcp",
-        status: "error",
-        message: `Timeout after ${timeoutMs}ms (${debug})`,
-        durationMs: timeoutMs,
-      });
-    }, timeoutMs);
+      if (!settled) {
+        proc.kill();
+        settle({ name: def.name, type: "mcp", status: "ok" });
+      }
+    }, 500);
   });
 }
 
@@ -151,9 +111,12 @@ async function checkMcpServer(
  * Run health checks on all capabilities.
  */
 export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
-  // Use same repo root resolution as lib/harness.ts
   const repoRoot = resolve(process.cwd(), "..");
-  const capabilitiesDir = resolve(repoRoot, "harness", "capabilities");
+  const harnessRoot = resolve(repoRoot, "harness");
+  const capabilitiesDir = resolve(harnessRoot, "capabilities");
+
+  // Ensure HARNESS_ROOT is available for env var interpolation in capability server args
+  process.env.HARNESS_ROOT = harnessRoot;
   const results: HealthCheckResult[] = [];
 
   try {
@@ -166,7 +129,7 @@ export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
         const result = await checkMcpServer(def);
         results.push(result);
         console.log(
-          `[Health] ${result.name}: ${result.status}${result.message ? ` — ${result.message}` : ""} (${result.durationMs ?? 0}ms)`
+          `[Health] ${result.name}: ${result.status}${result.message ? ` — ${result.message}` : ""}`
         );
       } catch (err) {
         results.push({

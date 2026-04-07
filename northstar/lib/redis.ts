@@ -70,7 +70,7 @@ export interface ScheduledJob {
   nextRun: number;
   /** Whether the job is active. */
   enabled: boolean;
-  /** Optional params passed to the orchestrator/launcher. */
+  /** Optional params passed to the launcher. */
   params?: Record<string, unknown>;
   /** Human-readable description. */
   description?: string;
@@ -248,6 +248,19 @@ export async function deleteJob(id: string): Promise<void> {
   const r = getRedis();
   await r.hdel(JOBS_HASH, id);
   await r.zrem(JOBS_QUEUE, id);
+}
+
+/**
+ * Override the next run time for a job.
+ * Used when agent output specifies a preferred next run time that takes
+ * priority over the cron-computed schedule.
+ */
+export async function overrideNextRun(id: string, nextRun: Date): Promise<void> {
+  const data = await getRedis().hget(JOBS_HASH, id);
+  if (!data) return;
+  const job = deserializeJob(data);
+  job.nextRun = nextRun.getTime();
+  await upsertJob(job);
 }
 
 /**

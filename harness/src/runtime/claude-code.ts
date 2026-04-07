@@ -16,7 +16,7 @@ import type {
   AgentRuntimeOutput,
 } from "./types.js";
 
-const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 export interface ClaudeCodeRuntimeOptions {
   /** Path to the `claude` binary. Defaults to "claude" (on PATH). */
@@ -135,13 +135,15 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       proc.stdin.end();
 
       let stdout = "";
+      let stderr = "";
       proc.stdout.on("data", (chunk: Buffer) => {
         stdout += chunk.toString();
       });
 
-      // Stream stderr in real-time
       proc.stderr.on("data", (chunk: Buffer) => {
-        process.stderr.write(`[claude] ${chunk.toString()}`);
+        const text = chunk.toString();
+        stderr += text;
+        process.stderr.write(`[claude] ${text}`);
       });
 
       // Timeout
@@ -153,7 +155,8 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       proc.on("close", (code) => {
         clearTimeout(timer);
         if (code !== 0) {
-          settle(reject, new Error(`claude process exited with code ${code}`));
+          const detail = stderr.trim().slice(-500) || stdout.trim().slice(-500) || "no output";
+          settle(reject, new Error(`claude process exited with code ${code}: ${detail}`));
         } else {
           settle(resolve, stdout);
         }

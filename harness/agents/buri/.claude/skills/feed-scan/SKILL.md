@@ -5,7 +5,7 @@ description: Scan X feeds for engagement opportunities. Finds posts worth replyi
 
 ## Feed Scan
 
-You are logged into X (Twitter) as @{{xUsername}} with an authenticated browser session.
+You are logged into X (Twitter) with an authenticated browser session.
 
 Your job is to find engagement opportunities — posts worth replying to. You must find **at least 1** opportunity (and ideally several).
 
@@ -66,11 +66,20 @@ Use the content of these files to guide your scanning and filtering.
 
 ## Recording
 
-Record each opportunity to the run record file at {{runRecordPath}} as JSONL:
+Record each opportunity to the run record file as JSONL. The run record path will be provided by the user. Create the directory if needed.
 
 ```
 {"type":"opportunity","author":"Jane Smith","authorHandle":"janesmith","followerCount":"12.5K","text":"Bold take: most AI agent frameworks are just wrappers around...","link":"https://x.com/janesmith/status/789012","suggestedEngagement":["Challenge the premise with a specific counterexample","Share your experience building production agents","Ask about their framework evaluation criteria"],"discoveryMethod":"Found on Following feed, 3rd scroll"}
 ```
+
+## Posting Results
+
+After completing the scan, post a summary to Slack using the `post_to_slack` tool with `from` set to `"Feed Scan"`.
+
+The message should include:
+- A count of opportunities found
+- For each opportunity: the author handle, follower count, a short snippet of the post, suggested engagement ideas, and a link to the post
+- If no opportunities were found, a brief note explaining what was scanned
 
 ## Engagement Execution
 

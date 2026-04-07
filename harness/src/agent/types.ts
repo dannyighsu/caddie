@@ -27,12 +27,16 @@ export interface AgentConfig {
   maxTurns?: number;
   /** Whether this agent needs Chrome browser automation. */
   enableChrome?: boolean;
+  /** Config files to read and inject as context variables. Maps var name to workspace-relative path. */
+  configFiles?: Record<string, string>;
   /** Named capability profiles. Overrides base capabilities/resolvers/maxTurns/enableChrome when selected. */
   profiles?: Record<string, {
     capabilities?: string[];
     resolvers?: string[];
     maxTurns?: number;
     enableChrome?: boolean;
+    /** Profile-specific config files, merged with base configFiles. */
+    configFiles?: Record<string, string>;
   }>;
 }
 

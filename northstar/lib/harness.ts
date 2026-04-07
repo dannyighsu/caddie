@@ -29,6 +29,9 @@ export function getLauncher() {
       ? resolve(process.env.WORKSPACE_ROOT)
       : resolve(repoRoot, "workspace");
 
+    // Expose harness root for MCP capability env var resolution
+    process.env.HARNESS_ROOT = harnessRoot;
+
     launcherInstance = createLauncher(runtime, {
       agentsDir: resolve(harnessRoot, "agents"),
       capabilitiesDir: resolve(harnessRoot, "capabilities"),

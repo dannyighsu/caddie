@@ -1,0 +1,10 @@
+{
+  "name": "browser",
+  "description": "Headed Playwright browser for web automation. Persistent profile preserves login sessions.",
+  "server": {
+    "command": "${HARNESS_ROOT}/node_modules/.bin/playwright-mcp",
+    "args": [
+      "--user-data-dir", "${HARNESS_ROOT}/.browser-profile"
+    ]
+  }
+}

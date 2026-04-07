@@ -2,7 +2,7 @@
 
 # Start the Northstar control plane + gateway
 # Override workspace: make run WORKSPACE_ROOT=/path/to/workspace
-run:
+run: build
 	cd northstar && WORKSPACE_ROOT=$(or $(WORKSPACE_ROOT),$(CURDIR)/workspace) pnpm dev
 
 # Build both packages

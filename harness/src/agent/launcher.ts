@@ -10,7 +10,7 @@
  * No scheduling, no messaging, no persistence — those are the caller's job.
  */
 
-import { readFile, mkdir, symlink, lstat } from "fs/promises";
+import { readFile, mkdir, symlink, lstat, readdir, copyFile } from "fs/promises";
 import { resolve } from "path";
 import type { AgentRuntime } from "../runtime/types.js";
 import { resolveCapabilities } from "../capability/mcp-resolver.js";
@@ -18,7 +18,7 @@ import { runResolvers } from "../resolver/runner.js";
 import type { AgentConfig, AgentInput, AgentResult } from "./types.js";
 
 const TEMPLATE_VAR_PATTERN = /\{\{(\w+)\}\}/g;
-const DEFAULT_MAX_TURNS = 20;
+const DEFAULT_MAX_TURNS = 100;
 
 export interface LauncherConfig {
   /** Directory containing agent subdirectories. */
@@ -125,6 +125,36 @@ async function ensureHarnessClaudeConfig(
 }
 
 /**
+ * Copy seed config files from the agent definition into the workspace.
+ * Only copies files that don't already exist — never overwrites user edits.
+ */
+async function bootstrapConfig(
+  agentDir: string,
+  workingDirectory: string
+): Promise<void> {
+  const seedDir = resolve(agentDir, "config");
+  try {
+    await lstat(seedDir);
+  } catch {
+    return; // No seed config in agent definition
+  }
+
+  const destDir = resolve(workingDirectory, "config");
+  await mkdir(destDir, { recursive: true });
+
+  const entries = await readdir(seedDir);
+  for (const entry of entries) {
+    const dest = resolve(destDir, entry);
+    try {
+      await lstat(dest);
+      // Already exists — don't overwrite
+    } catch {
+      await copyFile(resolve(seedDir, entry), dest);
+    }
+  }
+}
+
+/**
  * Create an agent launcher bound to specific directories and a runtime.
  */
 export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
@@ -152,13 +182,17 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       resolvers: profile?.resolvers ?? baseAgent.resolvers,
       maxTurns: profile?.maxTurns ?? baseAgent.maxTurns,
       enableChrome: profile?.enableChrome ?? baseAgent.enableChrome,
+      configFiles: { ...baseAgent.configFiles, ...profile?.configFiles },
     };
 
     // 2. Determine working directory and ensure it exists
     const workingDirectory = resolve(workspaceRoot, agent.id);
     await mkdir(workingDirectory, { recursive: true });
 
-    // 3. Symlink skills and hooks into workspace
+    // 3. Bootstrap config (seed files, never overwrites existing)
+    await bootstrapConfig(agentDir, workingDirectory);
+
+    // 4. Symlink skills and hooks into workspace
     await ensureSkillsSymlink(agentDir, workingDirectory);
     const harnessRoot = resolve(agentsDir, "..");
     await ensureHarnessClaudeConfig(harnessRoot, workingDirectory);
@@ -173,15 +207,48 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       });
     }
 
-    // Merge: resolver output is base, caller context overrides
-    const mergedContext = { ...resolverContext, ...(input.context ?? {}) };
-
-    // 5. Load and interpolate persona
+    // 4b. Load and interpolate persona (only resolver context goes here)
+    const personaContext = { ...resolverContext, ...(input.context ?? {}) };
     const persona = await loadPersona(
       agent.persona,
       agentDir,
-      mergedContext
+      personaContext
     );
+
+    // 4c. Build run context preamble (appended to user message, not persona)
+    const contextLines: string[] = [];
+
+    // Generated per-run values
+    const now = new Date();
+    const pst = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    const year = pst.getFullYear();
+    const month = String(pst.getMonth() + 1).padStart(2, "0");
+    const day = String(pst.getDate());
+    const dayName = pst.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+    const ts = now.toISOString().replace(/:/g, "-").replace(/\..+/, "");
+    contextLines.push(`Run record path: runs/${year}-${month}/${day}_${dayName}/run-record-${ts}.jsonl`);
+
+    // Universal config: preferences
+    try {
+      const preferencesPath = resolve(workingDirectory, "config", "preferences.md");
+      const preferences = (await readFile(preferencesPath, "utf-8")).trim();
+      if (preferences) contextLines.push(`User preferences:\n${preferences}`);
+    } catch {
+      // preferences.md doesn't exist yet
+    }
+
+    // Profile/agent config files
+    if (agent.configFiles) {
+      for (const [key, relPath] of Object.entries(agent.configFiles)) {
+        try {
+          const fullPath = resolve(workingDirectory, relPath);
+          const value = (await readFile(fullPath, "utf-8")).trim();
+          if (value) contextLines.push(`${key}: ${value}`);
+        } catch {
+          // Config file doesn't exist — skip
+        }
+      }
+    }
 
     // 6. Resolve MCP capabilities
     const resolved = agent.capabilities.length > 0
@@ -194,10 +261,11 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
 
     const enableChrome = agent.enableChrome || (resolved?.flags.includes("chrome") ?? false);
 
-    // 7. Build full prompt: persona + user prompt
+    // 7. Build full prompt: persona + context preamble + user prompt
+    const contextPreamble = contextLines.length > 0 ? contextLines.join("\n\n") + "\n\n---\n\n" : "";
     const fullPrompt = input.sessionId
       ? input.prompt
-      : `${persona}\n\n---\n\n${input.prompt}`;
+      : `${persona}\n\n---\n\n${contextPreamble}${input.prompt}`;
 
     // 8. Execute via runtime
     const result = await runtime.execute({

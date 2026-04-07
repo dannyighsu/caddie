@@ -1,0 +1,8 @@
+{
+  "name": "egress",
+  "description": "Outbound messaging (Slack, email, etc.) via Northstar gateway",
+  "server": {
+    "command": "node",
+    "args": ["${HARNESS_ROOT}/tools/egress-mcp.mjs"]
+  }
+}

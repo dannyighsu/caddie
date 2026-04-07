@@ -4,15 +4,24 @@
  * In-process polling loop that checks Redis for due jobs and fires them.
  * Starts once via instrumentation.ts when the server boots.
  *
+ * Each job fires through the orchestrator registry when available,
+ * or directly via the launcher with tracing + active-run locking.
+ *
  * Recurring jobs re-schedule automatically after firing.
  * One-shot jobs are removed after firing.
  */
 
-import { getDueJobs, markJobFired, type ScheduledJob } from "./redis";
+import { getDueJobs, markJobFired, overrideNextRun, type ScheduledJob } from "./redis";
 import { getOrchestrator, currentTimePST } from "./orchestrators";
 import { getLauncher } from "./harness";
 import { sendMessage, isSlackConfigured } from "./slack";
 import { getSetting } from "./db";
+import {
+  createTraceId,
+  createTrace,
+  completeTrace,
+  isTracingEnabled,
+} from "./tracing";
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 let running = false;
@@ -63,29 +72,58 @@ async function fireJob(job: ScheduledJob): Promise<void> {
 
   const orchestrator = getOrchestrator(job.agentId, job.profile);
 
-  let result: Record<string, unknown> | undefined;
-
   if (orchestrator) {
-    result = await orchestrator({
+    const result = await orchestrator({
       prompt: (job.params?.prompt as string) ?? undefined,
       ...job.params,
     });
-  } else {
-    const launcher = getLauncher();
-    const launchResult = await launcher.launch({
-      agentId: job.agentId,
-      profile: job.profile,
-      prompt: (job.params?.prompt as string) ?? "Run.",
-      context: {
-        currentTime: currentTimePST(),
-      },
-    });
-    result = { success: launchResult.success, error: launchResult.error };
+
+    // Notify on failure
+    if (result && !result.success && result.error) {
+      await notifyFailure(job, result.error as string);
+    }
+    return;
   }
 
+  // No orchestrator — launch directly with tracing
+  const traceId = createTraceId();
+  await createTrace(traceId, job.agentId, {
+    trigger: "scheduler",
+    jobId: job.id,
+    profile: job.profile,
+  });
+
+  const launcher = getLauncher();
+  const result = await launcher.launch({
+    agentId: job.agentId,
+    profile: job.profile,
+    prompt: (job.params?.prompt as string) ?? "Run.",
+    context: {
+      currentTime: currentTimePST(),
+    },
+    additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
+  });
+
+  // Auto-reschedule: agent output can override the cron-computed next run
+  const nextMinutes = result.output?.nextCheckInTime as number | undefined;
+  if (nextMinutes && job.cron) {
+    const nextTime = new Date(Date.now() + nextMinutes * 60 * 1000);
+    try {
+      await overrideNextRun(job.id, nextTime);
+      console.log(`[Scheduler] Agent requested next run in ${nextMinutes}m — overriding cron for job ${job.id}`);
+    } catch (err) {
+      console.error(`[Scheduler] Failed to override next run for ${job.id}:`, err);
+    }
+  }
+
+  await completeTrace(traceId, {
+    success: result.success,
+    error: result.error,
+  });
+
   // Notify on failure
-  if (result && !result.success && result.error) {
-    await notifyFailure(job, result.error as string);
+  if (!result.success && result.error) {
+    await notifyFailure(job, result.error);
   }
 }
 

@@ -5,8 +5,8 @@
  * Delegates to the shared messaging handler for classification,
  * agent execution, and conversation persistence.
  *
- * This handler owns the Slack reply — orchestrators are told to skip
- * their own Slack posting via skipSlack: true.
+ * This handler owns the Slack reply — the agent is launched directly
+ * and the handler replies in the Slack thread with the result.
  */
 
 import { replyInThread } from "./slack";

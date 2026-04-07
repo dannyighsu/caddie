@@ -1,0 +1,147 @@
+- generic [ref=e2]:
+  - generic:
+    - generic:
+      - heading "To view keyboard shortcuts, press question mark View keyboard shortcuts" [level=2] [ref=e3]:
+        - generic [ref=e4]: To view keyboard shortcuts, press question mark
+        - link "View keyboard shortcuts" [ref=e5] [cursor=pointer]:
+          - /url: /i/keyboard_shortcuts
+      - generic:
+        - generic:
+          - button [ref=e18] [cursor=pointer]:
+            - img [ref=e19]
+          - img [ref=e26] [cursor=pointer]
+      - generic [ref=e6]:
+        - button "Skip to home timeline" [ref=e28] [cursor=pointer]
+        - button "Skip to trending" [ref=e30] [cursor=pointer]
+        - banner [ref=e7]:
+          - generic [ref=e33]:
+            - generic [ref=e34]:
+              - heading "X" [level=1] [ref=e36] [cursor=pointer]:
+                - link "X" [ref=e37]:
+                  - /url: /home
+                  - img [ref=e39]
+              - navigation "Primary" [ref=e43]:
+                - link "Home" [ref=e44] [cursor=pointer]:
+                  - /url: /home
+                  - img [ref=e47]
+                - link "Search and explore" [ref=e50] [cursor=pointer]:
+                  - /url: /explore
+                  - img [ref=e53]
+                - link "Notifications (1 unread notification)" [ref=e56] [cursor=pointer]:
+                  - /url: /notifications
+                  - generic [ref=e58]:
+                    - img [ref=e59]
+                    - generic "1 unread items" [ref=e62]
+                - link "Direct Messages" [ref=e64] [cursor=pointer]:
+                  - /url: /i/chat
+                  - img [ref=e67]
+                - link "Grok" [ref=e70] [cursor=pointer]:
+                  - /url: /i/grok
+                  - generic [ref=e72]:
+                    - img [ref=e73]
+                    - generic "undefined unread items" [ref=e76]
+                - link "Premium" [ref=e77] [cursor=pointer]:
+                  - /url: /i/premium
+                  - img [ref=e80]
+                - link "Articles" [ref=e83] [cursor=pointer]:
+                  - /url: /compose/articles
+                  - img [ref=e86]
+                - link "Profile" [ref=e91] [cursor=pointer]:
+                  - /url: /dannyighsu
+                  - img [ref=e94]
+                - button "More menu items" [ref=e97] [cursor=pointer]:
+                  - img [ref=e100]
+              - link "Post" [ref=e104] [cursor=pointer]:
+                - /url: /compose/post
+                - img [ref=e106]
+            - button "Account menu" [ref=e111] [cursor=pointer]:
+              - generic [ref=e119]:
+                - generic:
+                  - generic:
+                    - generic
+        - main [ref=e8]:
+          - generic [ref=e123]:
+            - generic "Home timeline" [ref=e125]:
+              - generic [ref=e126]:
+                - generic [ref=e132] [cursor=pointer]:
+                  - button "Back" [ref=e134]:
+                    - img [ref=e136]
+                  - generic [ref=e140]:
+                    - heading "Diptanu Choudhury Verified account" [level=2] [ref=e141]
+                    - generic [ref=e153]: 8,225 posts
+                  - button "Follow @diptanu" [ref=e1636]:
+                    - generic [ref=e1639]: Follow
+                - generic:
+                  - generic:
+                    - status
+              - generic [ref=e168]:
+                - generic [ref=e169]:
+                  - link [ref=e170] [cursor=pointer]:
+                    - /url: /diptanu/header_photo
+                  - generic [ref=e176]:
+                    - generic [ref=e177]
+                    - generic [ref=e208]
+                    - generic [ref=e227]
+                    - generic [ref=e244]
+                    - generic [ref=e265]
+                    - link "Followers you know" [ref=e278] [cursor=pointer]:
+                      - /url: /diptanu/followers_you_follow
+                - navigation "Profile timelines" [ref=e315]:
+                  - generic [ref=e316]:
+                    - generic
+                    - tablist [ref=e318]
+                    - generic
+                - region "Diptanu Choudhury’s posts" [ref=e340]:
+                  - heading "Diptanu Choudhury’s posts" [level=1] [ref=e341]
+                  - 'generic "Timeline: Diptanu Choudhury’s posts" [ref=e342]':
+                    - generic [ref=e343]
+            - generic "Trending" [ref=e1354]:
+              - generic [ref=e1355]:
+                - search "Search" [ref=e1360]:
+                  - generic [ref=e1365]:
+                    - img [ref=e1367]
+                    - combobox "Search query" [ref=e1372]
+                - generic [ref=e1374]:
+                  - heading "Live on X" [level=2] [ref=e1376]:
+                    - generic [ref=e1377]: Live on X
+                  - button "Broadcast, Michael is hosting, Hosted by Michael, 🚨 EPISODE 3 OF UNAMED TECH PODCAST, Michael joined" [ref=e1379] [cursor=pointer]:
+                    - generic [ref=e1380]
+                    - generic [ref=e1402]
+                - complementary "Who to follow" [ref=e1417]:
+                  - heading "You might like" [level=2] [ref=e1419]:
+                    - generic [ref=e1420]: You might like
+                  - list [ref=e1421]:
+                    - listitem [ref=e1422] [cursor=pointer]
+                    - listitem [ref=e1455] [cursor=pointer]
+                    - listitem [ref=e1493] [cursor=pointer]
+                  - link "Show more" [ref=e1526] [cursor=pointer]:
+                    - /url: /i/connect_people?user_id=11611512
+                    - generic [ref=e1527]: Show more
+                - region "Trending now" [ref=e1529]:
+                  - heading "Trending now" [level=1] [ref=e1530]
+                  - 'generic "Timeline: Trending now" [ref=e1531]':
+                    - generic [ref=e1532]
+                - navigation "Footer" [ref=e1613]:
+                  - generic [ref=e1614]:
+                    - link "Terms of Service" [ref=e1615] [cursor=pointer]:
+                      - /url: https://x.com/tos
+                    - generic [ref=e1616]: "|"
+                  - generic [ref=e1617]:
+                    - link "Privacy Policy" [ref=e1618] [cursor=pointer]:
+                      - /url: https://x.com/privacy
+                    - generic [ref=e1619]: "|"
+                  - generic [ref=e1620]:
+                    - link "Cookie Policy" [ref=e1621] [cursor=pointer]:
+                      - /url: https://support.x.com/articles/20170514
+                    - generic [ref=e1622]: "|"
+                  - generic [ref=e1623]:
+                    - link "Accessibility" [ref=e1624] [cursor=pointer]:
+                      - /url: https://help.x.com/resources/accessibility
+                    - generic [ref=e1625]: "|"
+                  - generic [ref=e1626]:
+                    - link "Ads info" [ref=e1627] [cursor=pointer]:
+                      - /url: https://business.x.com/en/help/troubleshooting/how-twitter-ads-work.html?ref=web-twc-ao-gbl-adsinfo&utm_source=twc&utm_medium=web&utm_campaign=ao&utm_content=adsinfo
+                    - generic [ref=e1628]: "|"
+                  - button "More" [ref=e1629] [cursor=pointer]:
+                    - generic [ref=e1630]
+                  - generic [ref=e1634]: © 2026 X Corp.

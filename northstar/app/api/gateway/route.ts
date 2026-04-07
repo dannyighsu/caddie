@@ -27,6 +27,7 @@ import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
 import { getOrchestrator, currentTimePST, type OrchestratorParams } from "@/lib/orchestrators";
 import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, deleteJob } from "@/lib/redis";
+import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 
 interface GatewayRequest {
   action: "notify" | "run" | "schedule";
@@ -172,16 +173,29 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
     return orchestrator(params);
   }
 
-  // No orchestrator — launch directly
+  // No orchestrator — launch directly with tracing
+  const traceId = createTraceId();
+  await createTrace(traceId, req.agentId, {
+    trigger: "gateway",
+    profile: req.profile,
+  });
+
   const launcher = getLauncher();
   const result = await launcher.launch({
     agentId: req.agentId,
     profile: req.profile,
     prompt: req.prompt ?? "Run.",
+    sessionId: req.conversationId,
     context: {
       currentTime: currentTimePST(),
       ...req.context,
     },
+    additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
+  });
+
+  await completeTrace(traceId, {
+    success: result.success,
+    error: result.error,
   });
 
   return {
