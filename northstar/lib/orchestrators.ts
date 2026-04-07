@@ -255,8 +255,6 @@ async function runXManager(params: OrchestratorParams): Promise<Record<string, u
   const traceId = createTraceId();
   await createTrace(traceId, "xmanager", { trigger: "orchestrator" });
 
-  const slackChannel = await resolveSlackChannel(params.slackChannel);
-
   if (await isRunActive("xmanager")) {
     return { success: false, error: "An X Manager run is already in progress" };
   }
@@ -325,15 +323,8 @@ async function runXManager(params: OrchestratorParams): Promise<Record<string, u
       JSON.stringify({ timestamp: new Date().toISOString(), entries, slackMessage }, null, 2)
     );
 
-    // Post to Slack
-    if (!params.skipSlack && slackChannel && isSlackConfigured()) {
-      try {
-        const traceLink = isTracingEnabled() ? `\n<${getTraceUrl(traceId)}|View trace>` : "";
-        await sendMessage(slackChannel, slackMessage + traceLink);
-      } catch (err) {
-        console.error("[XManager] Failed to post to Slack:", err);
-      }
-    }
+    // NOTE: Slack posting is handled by the feed-scan skill itself.
+    // The orchestrator intentionally does not post to avoid duplicate messages.
 
     const runResult = {
       success: true,
