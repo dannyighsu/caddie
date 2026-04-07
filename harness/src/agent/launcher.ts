@@ -194,16 +194,21 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
 
     const enableChrome = agent.enableChrome || (resolved?.flags.includes("chrome") ?? false);
 
-    // 7. Build full prompt: persona + user prompt
+    // 7. Resolve effective maxTurns: input override > agent config > default
+    const effectiveMaxTurns = input.maxTurns ?? agent.maxTurns ?? DEFAULT_MAX_TURNS;
+
+    // 8. Build full prompt: persona + turn budget notice + user prompt
+    const turnBudgetNotice = `\n\n<turn-budget>You have a maximum of ${effectiveMaxTurns} turns for this session. Plan your work accordingly — prioritize the most important actions and avoid unnecessary tool calls.</turn-budget>`;
+
     const fullPrompt = input.sessionId
       ? input.prompt
-      : `${persona}\n\n---\n\n${input.prompt}`;
+      : `${persona}${turnBudgetNotice}\n\n---\n\n${input.prompt}`;
 
-    // 8. Execute via runtime
+    // 9. Execute via runtime
     const result = await runtime.execute({
       prompt: fullPrompt,
       outputSchema: agent.outputSchema,
-      maxTurns: agent.maxTurns ?? DEFAULT_MAX_TURNS,
+      maxTurns: effectiveMaxTurns,
       workingDirectory,
       sessionId: input.sessionId,
       mcpServers,

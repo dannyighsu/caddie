@@ -208,4 +208,100 @@ describe("createLauncher", () => {
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.maxTurns).toBe(20);
   });
+
+  it("uses input.maxTurns override when provided", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({ ...baseAgentConfig, maxTurns: 10 });
+      }
+      if (String(path).endsWith("persona.md")) {
+        return "persona";
+      }
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      prompt: "go",
+      maxTurns: 5,
+    });
+
+    const call = (runtime.execute as any).mock.calls[0][0];
+    expect(call.maxTurns).toBe(5);
+  });
+
+  it("input.maxTurns overrides profile maxTurns", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({
+          ...baseAgentConfig,
+          maxTurns: 10,
+          profiles: { heavy: { maxTurns: 50 } },
+        });
+      }
+      if (String(path).endsWith("persona.md")) {
+        return "persona";
+      }
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      prompt: "go",
+      profile: "heavy",
+      maxTurns: 3,
+    });
+
+    const call = (runtime.execute as any).mock.calls[0][0];
+    expect(call.maxTurns).toBe(3);
+  });
+
+  it("injects turn budget notice into the prompt", async () => {
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      prompt: "Do the task",
+      maxTurns: 15,
+    });
+
+    const call = (runtime.execute as any).mock.calls[0][0];
+    expect(call.prompt).toContain("<turn-budget>");
+    expect(call.prompt).toContain("maximum of 15 turns");
+  });
+
+  it("does not inject turn budget notice on session resume", async () => {
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      prompt: "continue",
+      sessionId: "sess-existing",
+      maxTurns: 10,
+    });
+
+    const call = (runtime.execute as any).mock.calls[0][0];
+    expect(call.prompt).not.toContain("<turn-budget>");
+    expect(call.maxTurns).toBe(10);
+  });
 });

@@ -20,10 +20,11 @@ export async function POST(
   }
 
   const body = await request.json().catch(() => ({}));
-  const { prompt, conversationId, context } = body as {
+  const { prompt, conversationId, context, maxTurns } = body as {
     prompt?: string;
     conversationId?: string;
     context?: Record<string, string>;
+    maxTurns?: number;
   };
 
   if (!prompt) {
@@ -68,6 +69,7 @@ export async function POST(
       prompt,
       sessionId,
       context: resolvedContext,
+      maxTurns,
     });
 
     const now = new Date().toISOString();

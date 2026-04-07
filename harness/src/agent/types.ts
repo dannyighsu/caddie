@@ -54,6 +54,8 @@ export interface AgentInput {
   trigger?: TriggerContext;
   /** Additional environment variables passed to the runtime subprocess. */
   additionalEnv?: Record<string, string>;
+  /** Override the agent config's maxTurns. Takes precedence over agent.json and profile. */
+  maxTurns?: number;
 }
 
 /**

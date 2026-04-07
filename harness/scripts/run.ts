@@ -14,27 +14,35 @@ import { createLauncher } from "../src/agent/launcher.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(__dirname, "..");
 
-function parseArgs(): { agentId: string; prompt: string } {
+function parseArgs(): { agentId: string; prompt: string; maxTurns?: number } {
   const args = process.argv.slice(2);
   let agentId = "buri";
   let prompt = "Suggest 3 article ideas about AI agents in production. Keep it brief.";
+  let maxTurns: number | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--agent" && args[i + 1]) {
       agentId = args[++i];
     } else if (args[i] === "--prompt" && args[i + 1]) {
       prompt = args[++i];
+    } else if (args[i] === "--max-turns" && args[i + 1]) {
+      maxTurns = parseInt(args[++i], 10);
+      if (isNaN(maxTurns) || maxTurns < 1) {
+        console.error("[smoke] --max-turns must be a positive integer");
+        process.exit(1);
+      }
     }
   }
 
-  return { agentId, prompt };
+  return { agentId, prompt, maxTurns };
 }
 
 async function main() {
-  const { agentId, prompt } = parseArgs();
+  const { agentId, prompt, maxTurns } = parseArgs();
 
   console.log(`[smoke] Launching agent: ${agentId}`);
   console.log(`[smoke] Prompt: ${prompt.substring(0, 80)}...`);
+  if (maxTurns) console.log(`[smoke] Max turns: ${maxTurns}`);
 
   const runtime = createRuntime();
   const launcher = createLauncher(runtime, {
@@ -47,6 +55,7 @@ async function main() {
   const result = await launcher.launch({
     agentId,
     prompt,
+    maxTurns,
     context: {
       currentTime: new Date().toLocaleString("en-US", {
         timeZone: "America/Los_Angeles",
