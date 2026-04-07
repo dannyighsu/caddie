@@ -206,6 +206,6 @@ describe("createLauncher", () => {
     await launcher.launch({ agentId: "test-agent", prompt: "test" });
 
     const call = (runtime.execute as any).mock.calls[0][0];
-    expect(call.maxTurns).toBe(20);
+    expect(call.maxTurns).toBe(100);
   });
 });

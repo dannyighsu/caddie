@@ -25,7 +25,7 @@ import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
 import { sendWhatsAppMessage, isWhatsAppConfigured } from "@/lib/whatsapp";
 import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
-import { getOrchestrator, currentTimePST, type OrchestratorParams } from "@/lib/orchestrators";
+import { currentTimePST } from "@/lib/helpers";
 import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, deleteJob } from "@/lib/redis";
 import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 
@@ -161,19 +161,6 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
     return { success: true, scheduled: true, jobId: job.id, nextRun: new Date(job.nextRun).toISOString() };
   }
 
-  // Check for agent-specific orchestrator
-  const orchestrator = getOrchestrator(req.agentId, req.profile);
-  if (orchestrator) {
-    const params: OrchestratorParams = {
-      prompt: req.prompt,
-      conversationId: req.conversationId,
-      slackChannel: req.slackChannel,
-      context: req.context,
-    };
-    return orchestrator(params);
-  }
-
-  // No orchestrator — launch directly with tracing
   const traceId = createTraceId();
   await createTrace(traceId, req.agentId, {
     trigger: "gateway",
