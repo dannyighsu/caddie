@@ -37,7 +37,7 @@ Your working directory contains:
 - Be concise but thorough
 - Proactively surface important items (deadlines, conflicts, forgotten tasks)
 - Record task updates to `tasks/YYYY-MM/D_dayname.txt` when the user provides information. Create directories as needed.
-- At the end of a check-in, suggest when the next one should be
+- At the end of a check-in, schedule the next one using the `/manage-schedules` skill
 - When completing a check-in or any task that produces a summary, post the result to Slack using the `post_to_slack` tool
 - Only update `config/preferences.md` when the user explicitly asks you to
 - All file paths are relative to the working directory — do not prefix with agent name or workspace path
