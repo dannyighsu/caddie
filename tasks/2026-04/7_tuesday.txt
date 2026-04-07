@@ -1,0 +1,57 @@
+## 2026-04-07 (Tuesday)
+
+### feed-scan — xmanager [PARTIAL — fallback search completed]
+
+Attempted to run feed-scan for @dannyighsu. Playwright browser MCP not available in this session (no authenticated X session). Conducted fallback web search per skill instructions.
+
+**Run record:** `tasks/2026-04/buri/feed-scan-2026-04-07.jsonl`
+
+**Method:** Fallback web search — searched for current hot topics across Deep Agents' interest areas, then found specific X posts from eligible individual accounts.
+
+---
+
+**3 Engagement Opportunities Found:**
+
+**1. @Fried_rice (Chaofan Shou) — 64.7K followers**
+> "Claude code source code has been leaked via a map file in their npm registry!"
+> https://x.com/Fried_rice/status/2038894956459290963
+> ~April 1, 2026 | AI security, supply chain, Claude Code
+
+Suggested replies:
+- Connect to the Adversa AI deny rules bypass finding: "The real risk isn't the leak itself but what it revealed — agents running without meaningful policy enforcement..."
+- Tie to LiteLLM supply chain attack: two major AI dev tool incidents in the same week suggests systematic supply chain gaps
+- Ask whether he sees any tooling addressing runtime enforcement for enterprise agent deployments
+
+**2. @daniel_mac8 (Dan McAteer) — 21.4K followers**
+> "Harness engineering is as important as model capability scaling. AI Agents are 50% a harness story. 'Natural-Language Agent Harnesses' proposes moving harness logic out of code into the native language of LLMs..."
+> https://x.com/daniel_mac8/status/2037581249100087667
+> ~March 30, 2026 | Agent harnesses, infrastructure
+
+Suggested replies:
+- "The '50% a harness story' framing resonates — the other 50% is usually trust and observability. Does moving to NL harnesses actually improve debuggability when things go sideways?"
+- Ask his biggest unsolved problem in ACE right now
+- Cite Meta-Harness 6x performance gap — curious if NL harnesses beat code-based at scale or just improve DX
+
+**3. @GenAI_is_real (Chayenne Zhao) — 9.1K followers**
+> "do these people have any ideas beyond coining new terms for old ones?" (contrarian take on harness engineering)
+> https://x.com/GenAI_is_real/status/2036266930290696599
+> ~March 27, 2026 | Contrarian, technically credible (SGLang/Tsinghua/CMU)
+
+Suggested replies:
+- Partial agreement but push back with the Meta-Harness 6x result: "The term may be overhyped but the performance gap is real. Where do you draw the line between genuine abstraction and buzzword?"
+- As an LLM serving systems person, ask where harness complexity should actually live (model vs. orchestration side)
+
+---
+
+**Hot topics in the space right now (for context / future posts):**
+- Claude Code deny rules bypass vulnerability (Adversa AI finding — April 2026)
+- AWS DevOps Agent & Security Agent GA (April 6 — generating active discussion)
+- LiteLLM PyPI supply chain attack (March 24) — still trending in security circles
+- Claude Code 512K line source leak (March 30) — disclosure tweet hit 3.1M views
+- Agent Governance Toolkit — Microsoft open-sourced April 2
+- 88% of orgs reporting AI agent security incidents (Gravitee 2026 report)
+- Meta-Harness paper: 6x perf gap from harness changes (same model, Stanford/MIT)
+
+---
+
+**Blocker note:** To run a full feed scan with recency guarantee, need the Playwright browser MCP loaded with an active X session. The xmanager profile (`agent.json`) uses the `browser` capability — ensure this is provisioned when launching the xmanager profile session.
