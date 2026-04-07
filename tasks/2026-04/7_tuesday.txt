@@ -71,3 +71,90 @@ Total: **4 opportunities** recorded to `tasks/2026-04/buri/feed-scan-2026-04-07.
 ---
 
 **Blocker note:** To run a full feed scan with recency guarantee, need the Playwright browser MCP loaded with an active X session. The xmanager profile (`agent.json`) uses the `browser` capability — ensure this is provisioned when launching the xmanager profile session.
+
+---
+
+### Scan runs 2–4 (same session, continued)
+
+Runs 2, 3, and 4 completed via fallback web search. Full detail in JSONL. Summary:
+
+**Run 2 — additional opportunities:**
+
+**5. @gauri__gupta (Gauri Gupta) — 3.9K followers**
+> "Releasing auto-harness: an open source library for self improving agentic systems with auto-evals."
+> https://x.com/gauri__gupta/status/2040251309782409489
+> ~April 6–7, 2026 | Self-improving agent harnesses, auto-evals
+- Engagement: Ask about failure taxonomy for evals; how the 0.56→0.78 Tau3 gain breaks down; production overfitting risk
+
+**6. @HuaxiuYaoML (Huaxiu Yao, UNC) — 6K followers**
+> "Introducing AutoHarness (「Aha」) — automated harness engineering for AI agents."
+> https://x.com/HuaxiuYaoML/status/2039556952707977374
+> ~April 5–6, 2026 | ICLR'26 — AutoHarness+Gemini Flash beats Gemini-2.5-Pro
+- Engagement: Ceiling question before model becomes bottleneck; what harness changes humans miss; adversarial harness/safety angle
+
+**7. @FranklinMatija (Matija Franklin, Google DeepMind) — unverified**
+> "AI Agent Traps — agents inherit LLM vulnerabilities but autonomy/persistence/tooling create an entirely new attack surface."
+> https://x.com/FranklinMatija/status/2039001719007330530
+> ~April 5, 2026 | 6-category attack taxonomy; >80% data exfiltration success rates
+- Note: verify follower count (1K–100K) before engaging
+- Engagement: Defensive patterns for behavioral control traps; systemic multi-agent risk; AppSec control mapping
+
+**8. @michaelzchen5 (Michael Chen) — unverified**
+> "What to Expect When You're Deploying AI in the Enterprise"
+> https://x.com/michaelzchen5/status/2037216797657805251
+> ~April 3–4, 2026 | Data provisioning bottleneck, FDE scope creep, augmentation framing
+- Note: verify follower count before engaging
+- Engagement: Political vs. technical bottleneck in data provisioning; pricing model for expanded FDE scope; framing that reduces internal resistance
+
+---
+
+**Run 3 — additional opportunities:**
+
+**9. @talraviv (Tal Raviv) — est. 5K–40K**
+> "A year ago, 'agent harness' was tools in a loop. In 2026, AI agent harness companies are competing on: how you can call your agent; how it calls itself automatically; context and memory..."
+> https://x.com/talraviv/status/2029898043353620630
+> ~Late March/early April 2026 | Harness competitive landscape
+- Note: verify follower count before engaging
+- Engagement: Privilege management and audit trails as the missing enterprise dim; security surface of heartbeat/autonomous invocation; risk-aware self-invocation (when NOT to act)
+
+**10. @DavidOndrej1 (David Ondrej) — est. 10K–50K**
+> "SaaS is dead. Agents killed it."
+> https://x.com/DavidOndrej1/status/2019126831761572169
+> ~March/April 2026 | High-visibility contrarian take
+- Note: verify follower count before engaging
+- Engagement: SaaS becomes the control plane for agents (IAM, audit, rate-limiting); SaaS as security boundary; what the agent-native replacement looks like for compliance surface
+
+**11. CVE-2026-32211 thread — multiple practitioners**
+> Azure MCP Server critical auth flaw (CVSS 9.1, CWE-306). No patch as of April 7.
+> https://x.com/search?q=CVE-2026-32211
+> Active April 3–7, 2026 | Breaking, unpatched
+- Engagement: Defense-in-depth framing (reverse proxy + tool-surface audit); systemic MCP supply chain risk; interim architecture guidance
+
+---
+
+**Run 4 — additional opportunities:**
+
+**12. @praveenTweets (Praveen Neppalli, Uber CTO) — 4.5K followers**
+> "Agentic software engineering adoption is on fire at Uber. 1,800 code changes per week are now written entirely by Uber's internal background coding agent, and 95% of engineers now use AI every month."
+> https://x.com/praveenTweets/status/2033627282418655711
+> ~Late March/early April 2026 | First-party enterprise production data
+- Engagement: Defect rate and rollback frequency vs. human PRs; governance/audit layer at 1,800 AI PRs/week for regulated infra; what the 5% non-adoption signals
+
+**13. @AstasiaMyers (Astasia Myers, Felicis GP) — 5.5K followers**
+> "This will be a canonical post on Agent Harnesses. 'Agent = Model + Harness' is a powerful mental model. Innovation across: Filesystems, Memory, Browsers, Routing, Orchestration, Sandboxes..."
+> https://x.com/AstasiaMyers/status/2031425984898207768
+> ~Late March/early April 2026 | VC-level harness stack map
+- Engagement: Missing governance/policy enforcement layer in her taxonomy; which layer has highest enterprise switching cost; consolidation vs. modular best-of-breed outcome
+
+**14. @ghadfield (Gillian Hadfield, Johns Hopkins / AI policy) — 5.6K followers**
+> "NIST just launched an AI Agent Standards Initiative for identity, security, and interoperability. AI agents are becoming economic actors with zero legal infrastructure in place."
+> https://x.com/ghadfield/status/2026669518894879084
+> ~February/March 2026, ongoing | NIST AI Agent Standards Initiative
+- Engagement: Identity chain for verifiable agent audit/liability; enterprise contractual structure for agent actions pre-settled-law; compliance floor raising barriers vs. interoperability lowering them
+
+---
+
+**Final totals — 2026-04-07 feed scan:**
+- Opportunities found: **14** (across 4 scan runs)
+- Follower verification needed before engaging: FranklinMatija, michaelzchen5, talraviv, DavidOndrej1, CVE-2026-32211 thread practitioners
+- Full detail: `tasks/2026-04/buri/feed-scan-2026-04-07.jsonl`
