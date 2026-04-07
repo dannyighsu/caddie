@@ -54,4 +54,20 @@ Suggested replies:
 
 ---
 
+---
+
+### Second scan pass (same session, later)
+
+A second fallback web search pass was run. One additional opportunity added:
+
+**4. @rohanpaul_ai — OpenAI Codex Security agent**
+> "OpenAI just released Codex Security, an AI agent that scans software projects to fix vulnerabilities while ignoring harmless bugs. Testing on 1.2mn commits found 792 critical flaws and dropped false alarms by 50%."
+- Link: https://x.com/rohanpaul_ai/status/2029993667243692145
+- Highest status ID in this scan — likely most recent
+- Engagement angle: false-negative rate on novel vulns; meta-irony of the agent itself as attack surface; enterprise air-gapped deployment architecture
+
+Total: **4 opportunities** recorded to `tasks/2026-04/buri/feed-scan-2026-04-07.jsonl`
+
+---
+
 **Blocker note:** To run a full feed scan with recency guarantee, need the Playwright browser MCP loaded with an active X session. The xmanager profile (`agent.json`) uses the `browser` capability — ensure this is provisioned when launching the xmanager profile session.
