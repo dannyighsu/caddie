@@ -169,7 +169,7 @@ describe("createLauncher", () => {
           profiles: {
             heavy: {
               capabilities: ["heavy-cap"],
-              maxTurns: 50,
+              maxTurns: 75,
             },
           },
         });
@@ -193,7 +193,7 @@ describe("createLauncher", () => {
     });
 
     const call = (runtime.execute as any).mock.calls[0][0];
-    expect(call.maxTurns).toBe(50);
+    expect(call.maxTurns).toBe(75);
   });
 
   it("uses default maxTurns when not specified", async () => {
@@ -206,7 +206,7 @@ describe("createLauncher", () => {
     await launcher.launch({ agentId: "test-agent", prompt: "test" });
 
     const call = (runtime.execute as any).mock.calls[0][0];
-    expect(call.maxTurns).toBe(20);
+    expect(call.maxTurns).toBe(50);
   });
 
   it("uses input.maxTurns override when provided", async () => {

@@ -4,11 +4,9 @@
   "persona": "./persona.md",
   "capabilities": ["notion", "google-calendar"],
   "resolvers": [],
-  "maxTurns": 20,
   "profiles": {
     "writer": {
-      "capabilities": ["notion", "google-calendar", "web-search"],
-      "maxTurns": 30
+      "capabilities": ["notion", "google-calendar", "web-search"]
     },
     "xmanager": {
       "capabilities": ["chrome"]

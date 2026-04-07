@@ -18,7 +18,7 @@ import { runResolvers } from "../resolver/runner.js";
 import type { AgentConfig, AgentInput, AgentResult } from "./types.js";
 
 const TEMPLATE_VAR_PATTERN = /\{\{(\w+)\}\}/g;
-const DEFAULT_MAX_TURNS = 20;
+const DEFAULT_MAX_TURNS = 50;
 
 export interface LauncherConfig {
   /** Directory containing agent subdirectories. */
