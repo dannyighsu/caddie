@@ -1,0 +1,66 @@
+## 2026-04-08 (Wednesday)
+
+### feed-scan — xmanager [PARTIAL — fallback search completed]
+
+Attempted to run feed-scan for @dannyighsu. Playwright/Chrome browser MCP not available in this session (no authenticated X session). Conducted fallback web search per skill instructions.
+
+**Run record:** `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
+
+**Method:** Fallback web search — searched for current hot topics across Deep Agents' interest areas, located X posts from eligible individual accounts. Fallback search pool overlaps heavily with yesterday (indexed posts); 3 net-new opportunities identified.
+
+---
+
+**3 Net-New Engagement Opportunities Found (vs. April 7 scan):**
+
+**1. @aboutsecurity (Ismael Valenzuela) — follower count unverified**
+> "Everyone's excited about agentic AI systems like #OpenClaw... most orgs are still trying to govern these agents like a chatbot. Of course that only works until the AI stops answering questions and starts taking actions."
+> https://x.com/aboutsecurity/status/2018375139293831388
+> ~March 2026 | Enterprise AI agent governance gap
+
+Suggested replies:
+- "Chatbot governance doesn't work for autonomous agents — the blast radius is orders of magnitude larger. What's the simplest governance primitive you think orgs need to add first?"
+- Tie to Meta Sev 1 incident: the agent didn't touch a DB — it generated a recipe a human followed, escalating privileges. Standard chatbot governance misses that entirely.
+- Ask about the gap between security-mature orgs (existing non-human identity tooling) vs. orgs hitting agentic AI as their first 'things can take actions' problem.
+
+**2. @dAAAb (Ko Ju-Chun, tech legislator/commentator) — follower count unverified**
+> "RSA 2026 Day 1: Microsoft ships 6 autonomous security agents into production. Not announcements. Not previews. Shipping. [...] 2024: 'AI helps analysts' → 2025: 'AI copilots suggest' → 2026: 'AI agents triage autonomously, humans review escalations'"
+> https://x.com/dAAAb/status/2035620456993276233
+> ~Late March/early April 2026 | AI security, enterprise autonomous triage
+
+Suggested replies:
+- The 'humans review escalations' step risks becoming rubber-stamping at scale unless the agent surfaces genuine uncertainty — ask about the escalation threshold design.
+- The 70 partner-built agents in the Microsoft Security Store is the under-discussed supply chain expansion — who audits partner agents before Defender/Sentinel data access?
+- Ask whether transparent reasoning chains hold quality across novel attack classes vs. training distribution.
+
+**3. @f_fatemi21 (Faraz Fatemi, CEO Profound) — follower count unverified**
+> "Profound is building the marketing stack for the agentic era of the internet, and today's Series C announcement paired with the launch of Profound Agents accelerates the mission..."
+> https://x.com/f_fatemi21/status/2026352016025596019
+> ~February/March 2026 | SaaS → agentic era, vertical AI applications
+
+Suggested replies:
+- "Is Profound's moat the agents themselves, or the data and integrations? Most enterprise buyers care more about the latter once they've seen the first demo."
+- What's the hardest enterprise adoption hurdle (trust in autonomous actions, data access, or change management)?
+- Ask about governance checkpoints: at what point does an autonomous marketing agent need a human approval step, and how is that threshold calibrated?
+
+---
+
+**Elevated Hot Topics (new since April 7):**
+
+- **Meta rogue AI agent — "confused deputy" IAM analysis** (VentureBeat, ~April 7-8): Practitioner-level security analysis now active on X. The agent passed all identity checks but its output was consumed in a way that escalated privileges — a confused deputy problem in IAM. Look for individual IAM engineers and enterprise security architects commenting on this. Excellent engagement surface for Deep Agents' security consultancy positioning.
+
+- **Sycamore $65M seed — "Trusted Agent OS"** (March 30, ongoing): VCs and founders still discussing the "agent operating system" framing. Competitive intelligence: Sycamore is positioning in Deep Agents' space (enterprise agent deployment, security, orchestration). Find individual practitioner reactions for engagement.
+
+---
+
+**Cumulative scan totals — April 2026:**
+- April 7: 14 opportunities
+- April 8: +3 new
+- Cumulative to date: **17 opportunities** recorded
+
+Full detail: `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
+
+---
+
+**Blocker note (recurring):** To run a full feed scan with 6-hour recency guarantee, the xmanager profile must be launched with `--chrome` flag providing an authenticated X browser session. Today's posts not indexed by web search at scan time — fallback method misses fresh content. Accounts requiring follower verification before engagement: aboutsecurity, dAAAb, f_fatemi21.
+
+**Slack post:** `post_to_slack` tool not available in this session — Slack summary skipped.
