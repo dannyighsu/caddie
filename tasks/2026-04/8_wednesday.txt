@@ -54,10 +54,47 @@ Suggested replies:
 
 **Cumulative scan totals — April 2026:**
 - April 7: 14 opportunities
-- April 8: +3 new
-- Cumulative to date: **17 opportunities** recorded
+- April 8 (R1): +3 new
+- April 8 (R2): +3 new (IntuitMachine, doodlestein, aeberman12 — all follower-verified)
+- Cumulative to date: **20 opportunities** recorded
 
 Full detail: `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
+
+---
+
+### feed-scan R2 — xmanager [COMPLETE — fallback search]
+
+Second fallback scan run. Found 3 additional net-new opportunities with verified follower counts.
+
+**1. @IntuitMachine (Carlos E. Perez) — 61K followers**
+> "Researchers gave AI agents real email accounts, Discord access, and shell commands for 2 weeks. They deleted mail servers 'for security.' They leaked secrets. They gaslit each other. Here are 11 vulnerabilities that should terrify anyone deploying autonomous AI: 🧵👇"
+> https://x.com/IntuitMachine/status/2028745472274243604
+> ~Feb 2026 | AI agent security vulnerabilities
+
+Suggested replies:
+- Ask which vulnerability proved hardest to remediate — especially whether authority verification is a structural vs. engineering problem
+- The email + Discord + shell access trifecta is what enterprise security teams underestimate — ask what the most counterintuitive vulnerability was
+- Tie to prompt injection debate: if agents can gaslight each other, the inter-agent trust model needs a first-principles rethink
+
+**2. @doodlestein (Jeffrey Emanuel) — 40.4K followers**
+> "MCP tool overload is real. Too many tools at once give the models 'paradox of choice' analysis paralysis and blows so much of the context window that it's like knocking them on the head with a lead pipe right before asking them to do some knowledge work task. Need to solve this."
+> https://x.com/doodlestein/status/1940527120746484142
+> ~mid-2025 | AI agent orchestration / MCP
+
+Suggested replies:
+- Ask what approaches he's tried — dynamic loading, hierarchical delegation, tool namespacing, or a router/classifier before the main model
+- Is the paralysis about 'what tool' or 'whether to act at all'?
+- Mention tool routing classifier pattern — curious if he's taken a different architectural direction
+
+**3. @aeberman12 (Art Berman) — 49.3K followers**
+> "AI won't replace programmers. It's compressing the stack. Fewer juniors, higher bar, more responsibility. Coders become orchestrators, debuggers, and truth-checkers. Evolution, not extinction"
+> https://x.com/aeberman12/status/2019616753626804277
+> ~March 2026 | Software engineering productivity
+
+Suggested replies:
+- Agree but push back: compression is uneven — orchestrators without deep fundamentals can't debug what agents get wrong
+- Ask what 'truth-checker' skill looks like in practice — is it domain knowledge, code intuition, or something new?
+- 'Evolution not extinction' undersells transition friction — legacy systems, culture, and a pipeline trained on the old stack still need navigating
 
 ---
 
