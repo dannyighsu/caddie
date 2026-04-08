@@ -226,3 +226,61 @@ Suggested replies:
 - **Cumulative total: 24 opportunities recorded**
 
 Full JSONL: `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
+
+---
+
+### feed-scan R5 — xmanager [COMPLETE — fallback search]
+
+Fifth fallback scan run. Targeted angles: AI fluency/hiring standard evolution, context management as bottleneck, AI governance framing, MCP cross-tool hijacking PoC discussion.
+
+**Run record:** `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
+
+**3 Net-New Opportunities + 1 Cluster Found:**
+
+**1. @nurijanian (George Nurijanian, prodmgmt.world) — 30.4K followers (verified)**
+> "Zapier updated their AI fluency rubric. V2 (March 2026) raised the bar: 'Capable' now requires AI embedded in core work and repeatable systems, not one-off prompts. 'Transformative' = re-engineer how work happens."
+> https://x.com/nurijanian/status/2040067307989561829
+> Status ID 2040067307989561829 — estimated April 5-7 2026 (very recent) | AI fluency, hiring standards, software engineering productivity
+
+Suggested replies:
+- The shift from one-off prompts to repeatable systems is where most engineers stall — the gap is process, not skill. What does Zapier's internal measurement of 'repeatable impact' look like beyond self-reporting?
+- The 'Transformative' tier sounds like what an agentic AI consultancy delivers: strip human steps agents can own, redesign around what humans are uniquely good at. Is this tier assessed at hire or only in retrospect post-ship?
+- V2 signals enterprise buyers now expect AI-native workflows as a baseline. Has he seen non-tech-forward enterprises catching up to this floor yet?
+
+**2. @auxten — follower count unverified (verify before engaging)**
+> "Context Management Is the Real Bottleneck for AI Agents"
+> https://x.com/auxten/status/2025957620994199690
+> ~Jan/Feb 2026 | Agent bottleneck, context quality, signal-vs-noise
+
+Suggested replies:
+- Most context noise is self-generated: agents request context in step N that by step N+7 is stale or irrelevant. Ask what his most effective noise-reduction primitive is (retrieval gating, summarization, tool output truncation).
+- If context management is the bottleneck, the harness layer is the highest-leverage investment — does he see this as model responsibility, harness responsibility, or application developer responsibility?
+- In long enterprise workflows, stale context is a silent failure mode. Has he seen memory architecture patterns that actually solve this or is it still mostly heuristic?
+
+**3. @sijlalhussain (Syed Ijlal Hussain) — follower count unverified (verify before engaging)**
+> "AI governance fails when built to control risk instead of drive outcomes. AI governance is shifting from policy-heavy oversight to outcome-driven design."
+> https://x.com/sijlalhussain/status/2009550742839779688
+> ~Jan/Feb 2026 | AI governance, enterprise AI policy
+
+Suggested replies:
+- 'Policy-heavy oversight' failure is most acute in agentic systems: shadow AI agents emerge because sanctioned governance was designed to prevent harm, not accelerate legitimate use. What does governance look like that actually speeds up safe agent deployment?
+- Outcome-oriented governance without audit trails is a liability in regulated industries. How does he see governance frameworks balancing outcome-focus with auditability?
+- Ask for his leading indicator that enterprise AI governance is driving outcomes vs. just controlling risk.
+
+**4. Opportunity cluster: MCP cross-tool hijacking PoC discussion**
+Individual security practitioners discussing April 2026 findings: 3 distinct MCP PoC vulnerabilities published with working cross-tool hijacking exploit; mcp-sec-audit toolkit (100% MCPTox detection); Cursor still vulnerable to all 4 tested attack vectors.
+Search: x.com for 'MCP cross-tool hijacking' OR 'mcp-sec-audit' OR 'MCPTox' — target individual security engineers and red-teamers. Vet followers before engaging.
+
+---
+
+**Disqualified in R5:**
+- @heynavtoor (Nav Toor) — 104.1K followers, just over cap. Very high-recency post (status ID 2041572825698615583, ~April 7-8). Monitor for future scans if cap parameters change.
+- @Timothy_Hughes — 167.6K followers, well over cap.
+- @wadefoster (Zapier CEO) — original source of AI Fluency Rubric V2; likely >100K.
+
+**Cumulative April 2026 totals (after R5):**
+- April 7: 14 opportunities
+- April 8 R1: +3 | R2: +3 | R3: +4 | R4: +5 | R5: +3
+- **Today: 18 new | Cumulative to date: 32 opportunities recorded**
+
+Full JSONL: `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
