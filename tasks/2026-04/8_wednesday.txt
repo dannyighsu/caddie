@@ -361,3 +361,71 @@ Search: x.com for 'MCP cross-tool hijacking' OR 'mcp-sec-audit' OR 'MCPTox' — 
 - **Today: 18 new | Cumulative to date: 32 opportunities recorded**
 
 Full JSONL: `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
+
+---
+
+### feed-scan R7 — xmanager [COMPLETE — fallback search]
+
+Seventh fallback scan run. Targeted new angles: agent harness optimizer ecosystem, behavior-first AI agent red-teaming (SuperClaw), MCP rug-pull mechanics, external doc links as supply chain attack surface.
+
+**Run record:** `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
+
+**4 Net-New Opportunities Found (1 follower-verified, 2 requiring verification):**
+
+**1. @affaanmustafa (Affaan Mustafa, cogsec) — 22.3K followers** ⭐ STANDOUT FIND
+> "another supply chain attack... Skills and rules that point at external docs are supply chain liabilities. If a link can change without your approval, it can change what your agent does."
+> https://x.com/affaanmustafa/status/2038836134701363477
+> Status ID: 2038836134701363477 — estimated April 4-6, 2026 | Supply chain, harness security
+
+Suggested replies:
+- "External doc links in rule files are the underappreciated supply chain surface — most teams think supply chain = packages and servers, not documentation. The harness-level fix is to pin and hash rule content at approval time. Does ECC/AgentShield have tooling for that yet?"
+- Ask whether AgentShield scans for live external references in rule files, not just static config vulns.
+- "The 'only so much you can do' framing is the wrong enterprise posture — what does a risk-tiered policy look like: which external references are acceptable, which require attestation, which are blocked?"
+
+**2. @affaanmustafa (Affaan Mustafa, cogsec) — 22.3K followers** ⭐ HIGHEST RECENCY R7
+> "this is why it's a lot safer and time efficient to build harness optimizers ∨ orchestration systems (conductor, superset, ECC, etc.) than the harness itself — there's hundreds of harnesses now"
+> https://x.com/affaanmustafa/status/2040241587381469239
+> Status ID: 2040241587381469239 — estimated April 6-7, 2026 (one of highest IDs found today) | Harness optimizer ecosystem
+
+Suggested replies:
+- "Hundreds of harnesses = commodity layer. The optimizer/orchestration layer is where the moat forms. How does the optimizer inherit or add to the underlying harness's security posture?"
+- Ask whether harness optimizers will converge on a harness-agnostic interface or stay tool-specific (ECC for Claude Code, etc.).
+- Ask what the failure mode looks like for teams that skip the optimizer layer and maintain a custom harness.
+
+**3. @Shashikant86 (Shashi Jagtap, Superagentic AI) — follower count unverified**
+> "OpenClaw is a powerful open-source project but it was not designed with security in mind. Security is largely pushed onto the user."
+> https://x.com/Shashikant86/status/2018278815139508725
+> ~March 2026 | OpenClaw security defaults, behavior-first red-teaming, SuperClaw
+
+Suggested replies:
+- "Security pushed onto the user doesn't scale to enterprise. What's the minimum viable security-by-default config for OpenClaw from Superagentic AI's perspective?"
+- "What behavior categories produce the most surprising SuperClaw failures when teams first run it against their agents?"
+- Ask whether SuperClaw has scenarios for inter-tool trust chain vulnerabilities (A trusts B trusts malicious C).
+
+**4. @_avichawla (Avi Chawla) — follower count unverified**
+> "MCP security is completely broken! 3 ways they can hack Agents: Tool Poisoning, Tool Hijacking, Rug Pull."
+> https://x.com/_avichawla/status/2009875785293963756
+> ~January/February 2026 | MCP threat taxonomy (active discussion ongoing)
+
+Suggested replies:
+- "Rug pull is the hardest to defend — the approval is still valid after the description changes. The harness-layer fix is hashing tool descriptions at approval and alerting on any diff before the next call. Anyone doing this in production?"
+- Ask whether cross-server tool hijacking converges toward registry + attestation or stays OPSEC-first.
+- "At millions-of-requests/day, low-percentage poisoning = significant enterprise incident rate. What does minimum viable MCP security look like for 10+ simultaneous servers?"
+
+---
+
+**New Hot Topics (R7):**
+- **Harness optimizer ecosystem** — ECC, conductor, superset signal harness layer commoditizing; value moving to optimization/governance layer above
+- **External doc links as supply chain attack surface** — agent rule files linking to third-party docs are underappreciated injection vectors
+- **Behavior-first agent red-teaming (SuperClaw)** — scenario-driven security testing as the emerging enterprise validation primitive
+
+**Follower verification needed:** @Shashikant86, @_avichawla — confirm 1K-100K before engaging.
+
+---
+
+**Cumulative April 2026 totals:**
+- April 7: 14 opportunities
+- April 8 R1: +3 | R2: +3 | R3: +4 | R4: +5 | R5: +3 | R6: +5 | R7: +4
+- **Today: 27 new | Cumulative to date: 41 opportunities recorded**
+
+Full JSONL: `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
