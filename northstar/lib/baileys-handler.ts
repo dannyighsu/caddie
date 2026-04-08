@@ -16,10 +16,14 @@ import {
   storeWhatsAppMessage,
   getRecentWhatsAppMessages,
 } from "./db";
-import { isBotMentioned, stripBotMention, getBotName } from "./whatsapp";
 import { handleInboundMessage } from "./messaging";
-import type { BaileysMessageHandler } from "./baileys";
-import { getBotJid } from "./baileys";
+import {
+  isBotMentioned,
+  stripBotMention,
+  getBotName,
+  getBotJid,
+  type BaileysMessageHandler,
+} from "./baileys";
 
 const MESSAGE_LOOKBACK = 20;
 

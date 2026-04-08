@@ -169,3 +169,40 @@ export async function sendBaileysMessage(
 export function getBotJid(): string | undefined {
   return sock?.user?.id;
 }
+
+/**
+ * Check if Baileys is currently connected.
+ */
+export function isBaileysConnected(): boolean {
+  return sock !== null;
+}
+
+// --- Bot mention utilities ---
+
+export function getBotName(): string {
+  return process.env.WHATSAPP_BOT_NAME ?? "";
+}
+
+/**
+ * Check if a message text contains an @mention of our bot.
+ */
+export function isBotMentioned(text: string): boolean {
+  const botName = getBotName();
+  if (!botName) return false;
+  const pattern = new RegExp(`@${escapeRegex(botName)}\\b`, "i");
+  return pattern.test(text);
+}
+
+/**
+ * Strip the @BotName mention from the message text.
+ */
+export function stripBotMention(text: string): string {
+  const botName = getBotName();
+  if (!botName) return text;
+  const pattern = new RegExp(`@${escapeRegex(botName)}\\b\\s*`, "gi");
+  return text.replace(pattern, "").trim();
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
