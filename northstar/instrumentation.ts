@@ -22,5 +22,14 @@ export async function register() {
     const { startSocketMode } = await import("./lib/slack");
     const { handleSlackMessage } = await import("./lib/slack-handler");
     startSocketMode(handleSlackMessage);
+
+    // Start Baileys WhatsApp (if enabled)
+    const { startBaileys, isBaileysEnabled } = await import("./lib/baileys");
+    if (isBaileysEnabled()) {
+      const { handleBaileysMessage } = await import("./lib/baileys-handler");
+      startBaileys(handleBaileysMessage).catch((err) =>
+        console.error("[Baileys] Failed to start:", err)
+      );
+    }
   }
 }

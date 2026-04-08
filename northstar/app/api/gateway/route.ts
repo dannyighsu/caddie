@@ -22,7 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
-import { sendWhatsAppMessage, isWhatsAppConfigured } from "@/lib/whatsapp";
+import { sendBaileysMessage, isBaileysConnected } from "@/lib/baileys";
 import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
 import { currentTimePST } from "@/lib/helpers";
@@ -118,8 +118,8 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
   }
 
   if (req.channel === "whatsapp") {
-    if (!isWhatsAppConfigured()) {
-      return { success: false, error: "WhatsApp not configured" };
+    if (!isBaileysConnected()) {
+      return { success: false, error: "WhatsApp (Baileys) not connected — is WHATSAPP_BAILEYS=true?" };
     }
 
     let recipient = req.to;
@@ -131,11 +131,14 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
       return { success: false, error: "No WhatsApp recipient specified and no default configured" };
     }
 
+    // Convert phone number to WhatsApp JID format if needed
+    const jid = recipient.includes("@") ? recipient : `${recipient}@s.whatsapp.net`;
+
     const formatted = req.from
       ? `*[${req.from}]* ${req.message}`
       : req.message;
 
-    await sendWhatsAppMessage(recipient, formatted);
+    await sendBaileysMessage(jid, formatted);
     return { success: true, channel: "whatsapp", to: recipient };
   }
 
