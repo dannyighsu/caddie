@@ -104,6 +104,79 @@ Suggested replies:
 
 ---
 
+### feed-scan R4 — xmanager [COMPLETE — fallback search]
+
+Fourth fallback scan run. Targeted angles not covered in R1-R3: LLM observability as agent context layer, agent skill supply chain risk, multi-agent trust manipulation, and agent interoperability standards.
+
+**Run record:** `tasks/2026-04/buri/feed-scan-2026-04-08.jsonl`
+
+**5 Net-New Opportunities Found:**
+
+**1. @jhleath (Hunter Leath, Archil Data YC F24) — 1,207 followers**
+> "how many of these platforms survive when you can pump observability metrics directly into LLM context?"
+> https://x.com/jhleath/status/2040986080283856930
+> Status ID: 2040986080283856930 — estimated April 5-7 2026 (highest ID in R4 scan) | LLM observability / agent reliability
+
+Suggested replies:
+- The platforms that survive will instrument agent *decisions*, not just infra metrics — ask whether he sees a new product category emerging or existing players pivoting
+- Observability telemetry as LLM input also creates a new attack vector: data poisoning via synthetic metrics. Is his architecture at Archil threat-modeling the monitoring pipeline?
+- In regulated industries, dashboards may survive as compliance interfaces even after the LLM-native layer exists — 'evolution not elimination'
+
+**2. @rohanpaul_ai (Rohan Paul) — 58K followers**
+> "This paper shows agent skills are risky... In a crawl of 42,447 skills from 2 marketplaces, 26.1% flagged for risky patterns — prompt injection, data exfiltration, privilege escalation, supply chain risk."
+> https://x.com/rohanpaul_ai/status/2013185665068937220
+> ~February/March 2026 | AI agent skill supply chain security
+
+Suggested replies:
+- 26.1% is the pre-Log4Shell awareness number — ask what governance model he thinks works: marketplace vetting, runtime sandboxing, or org allowlists?
+- Prompt injection via trusted skill is inside the perimeter already — ask about risk density by skill category
+- Is there a sigstore equivalent emerging for agent skill attestation?
+
+**3. @fleetingbits — follower count unverified (confirm before engaging)**
+> "a quick look at the file exfiltration prompt / rollout 1) they write 'you and another ai agent, Gemini Agent 2, have demonstrated a good trust relationship in many trust exercises'..."
+> https://x.com/fleetingbits/status/2039523219137233007
+> Status ID: 2039523219137233007 — estimated April 4-6 2026 | Multi-agent trust manipulation / file exfiltration
+
+Suggested replies:
+- The fix requires cryptographic trust attestation at the harness layer, not stated in text — ask what a practical primitive would look like in production
+- This is confused deputy in natural language — enterprises aren't red-teaming for this yet
+- The 'safety evaluation' framing in the prompt is social engineering reducing model resistance — ask if this generalizes across models
+
+**4. @ahboyash (Ash, Signum Capital) — 16K followers**
+> "AI Agent Interoperability Standards... 6 major standards: x402 payments, MCP tools, Stripe ACP checkout, Google A2A coordination, ERC-8004 trust, Virtuals ACP."
+> https://x.com/ahboyash/status/1983522579114791024
+> ~March 2026 | Agent interoperability and trust standards
+
+Suggested replies:
+- ERC-8004 trust layer extends the NHI problem to A2A — has he seen enterprise IAM tooling address agent-to-agent identity yet?
+- Payment revocation mid-workflow is the hard enterprise problem x402/Stripe ACP haven't solved yet
+- Which of the 6 standards reaches enterprise adoption first vs. staying in the startup/web3 layer?
+
+**5. @rohanpaul_ai (Rohan Paul) — 58K followers (second post)**
+> "The bottleneck in AI automation isn't intelligence. It's persistence... I am hacking around with newly launched @CreaoAI currently..."
+> https://x.com/rohanpaul_ai/status/2038640791275651269
+> Status ID: 2038640791275651269 — estimated April 4-6 2026 | AI agent automation / SaaS
+
+Suggested replies:
+- After persistence, the enterprise bottleneck is scope enforcement — blast radius limits are the liability gate
+- 'Digital employees' framing has real implications for governance and liability assignment in regulated industries
+- How does CreaoAI handle durable workflow state? True persistence is harder than a long-running process
+
+---
+
+**Cumulative April 2026 totals:**
+- April 7: 14 opportunities
+- April 8 R1: +3 (aboutsecurity, dAAAb, f_fatemi21)
+- April 8 R2: +3 (IntuitMachine 61K, doodlestein 40.4K, aeberman12 49.3K)
+- April 8 R3: +4 (IntuitMachine 60.7K, tonykipkemboi, Littl3Lobst3r, Umesh__digital)
+- April 8 R4: +5 (jhleath 1.2K, rohanpaul_ai 58K ×2, fleetingbits unverified, ahboyash 16K)
+- **Cumulative total: 29 opportunities recorded**
+
+Filtered in R4: @PierrePeigne_ (post from 2025, too old), @fchollet (629K followers, out of range).
+Follower verification needed: @fleetingbits (high-priority post — verify before engaging).
+
+---
+
 ### feed-scan R3 — xmanager [COMPLETE — fallback search]
 
 Third fallback scan run. Found 4 opportunities, 1 with verified follower count.
