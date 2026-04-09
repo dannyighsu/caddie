@@ -59,32 +59,47 @@ describe("turn-limit-warning.sh", () => {
     expect(output).toBe("");
   });
 
-  it("emits no output at exactly 89% of max turns", () => {
-    // 89% of 100 = 89, warn threshold is 90
-    const tp = tracked(makeTranscript(89));
-    const output = runHook(tp, 100);
+  it("emits no output at 21 turns remaining", () => {
+    const tp = tracked(makeTranscript(129));
+    const output = runHook(tp, 150);
     expect(output).toBe("");
   });
 
-  it("emits warning at 90% of max turns", () => {
-    // 90% of 100 = 90
-    const tp = tracked(makeTranscript(90));
-    const output = runHook(tp, 100);
+  it("emits NOTICE at 20 turns remaining", () => {
+    const tp = tracked(makeTranscript(130));
+    const output = runHook(tp, 150);
     expect(output).not.toBe("");
     const parsed = JSON.parse(output);
     expect(parsed.hookSpecificOutput.hookEventName).toBe("PostToolUse");
-    expect(parsed.hookSpecificOutput.additionalContext).toContain("TURN LIMIT WARNING");
-    expect(parsed.hookSpecificOutput.additionalContext).toContain("90");
-    expect(parsed.hookSpecificOutput.additionalContext).toContain("100");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("TURN LIMIT NOTICE");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("20 turns left");
   });
 
-  it("emits warning above 90% threshold", () => {
-    // 140 of 150 = 93%
+  it("emits WARNING at 10 turns remaining", () => {
     const tp = tracked(makeTranscript(140));
     const output = runHook(tp, 150);
     expect(output).not.toBe("");
     const parsed = JSON.parse(output);
-    expect(parsed.hookSpecificOutput.additionalContext).toContain("~10 remaining");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("TURN LIMIT WARNING");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("10 turns left");
+  });
+
+  it("emits CRITICAL at 5 turns remaining", () => {
+    const tp = tracked(makeTranscript(145));
+    const output = runHook(tp, 150);
+    expect(output).not.toBe("");
+    const parsed = JSON.parse(output);
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("CRITICAL");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("5 turns left");
+  });
+
+  it("emits CRITICAL at 0 turns remaining", () => {
+    const tp = tracked(makeTranscript(150));
+    const output = runHook(tp, 150);
+    expect(output).not.toBe("");
+    const parsed = JSON.parse(output);
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("CRITICAL");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("0 turns left");
   });
 
   it("clamps remaining to 0 when over max", () => {
@@ -92,11 +107,10 @@ describe("turn-limit-warning.sh", () => {
     const output = runHook(tp, 150);
     expect(output).not.toBe("");
     const parsed = JSON.parse(output);
-    expect(parsed.hookSpecificOutput.additionalContext).toContain("~0 remaining");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("0 turns left");
   });
 
   it("uses default max turns of 150 when env var is not set", () => {
-    // 135 = 90% of 150
     const tp = tracked(makeTranscript(135));
     const input = JSON.stringify({ transcript_path: tp });
     const output = execSync(`echo '${input}' | bash "${SCRIPT}"`, {
