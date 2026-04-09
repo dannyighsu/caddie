@@ -6,7 +6,6 @@
  * Meta Business account required. Just scan the QR code with your phone.
  *
  * Env vars:
- *   WHATSAPP_BAILEYS           — set to "true" to enable Baileys mode
  *   WHATSAPP_BAILEYS_AUTH_DIR  — path to persist auth state (default: .baileys-auth)
  *   WHATSAPP_BOT_NAME          — display name for @mention detection (optional)
  */
@@ -14,14 +13,30 @@
 import makeWASocket, {
   useMultiFileAuthState,
   makeCacheableSignalKeyStore,
+  fetchLatestBaileysVersion,
   DisconnectReason,
   type WASocket,
   type BaileysEventMap,
 } from "@whiskeysockets/baileys";
 import { join } from "path";
+import qrcode from "qrcode-terminal";
+
+const noop = () => {};
+const silentLogger = {
+  level: "silent",
+  trace: noop,
+  debug: noop,
+  info: noop,
+  warn: noop,
+  error: noop,
+  fatal: noop,
+  child() { return silentLogger; },
+};
 
 let sock: WASocket | null = null;
 let started = false;
+let showQR = false;
+let qrHintShown = false;
 
 export type BaileysMessageHandler = (event: {
   text: string;
@@ -36,38 +51,39 @@ export type BaileysMessageHandler = (event: {
 }) => Promise<void>;
 
 /**
- * Check if Baileys mode is enabled via env vars.
+ * Enable QR code display. Call before startBaileys() to show QR codes
+ * in the terminal during the pairing flow (used by `make whatsapp-link`).
  */
-export function isBaileysEnabled(): boolean {
-  return process.env.WHATSAPP_BAILEYS === "true";
+export function enableQR(): void {
+  showQR = true;
 }
 
 /**
  * Start the Baileys WhatsApp connection.
  * Safe to call multiple times — only starts once.
  *
- * On first run, a QR code is printed to the terminal. Scan it with
- * WhatsApp > Settings > Linked Devices > Link a Device.
+ * QR codes are suppressed by default to keep logs clean.
+ * Call enableQR() first, or use `make whatsapp-link` for initial pairing.
  */
 export async function startBaileys(onMessage: BaileysMessageHandler): Promise<void> {
   if (started) return;
-  if (!isBaileysEnabled()) {
-    console.warn("[Baileys] WHATSAPP_BAILEYS is not set to 'true', skipping");
-    return;
-  }
 
   started = true;
 
   const authDir = process.env.WHATSAPP_BAILEYS_AUTH_DIR || join(process.cwd(), ".baileys-auth");
-  const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
   const connect = async () => {
+    const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    const { version } = await fetchLatestBaileysVersion();
+    console.log(`[Baileys] Using WA Web version ${version.join(".")}`);
+
     sock = makeWASocket({
+      version,
       auth: {
         creds: state.creds,
         keys: makeCacheableSignalKeyStore(state.keys, undefined as never),
       },
-      printQRInTerminal: true,
+      logger: silentLogger as never,
     });
 
     // Persist auth credentials whenever they change
@@ -78,7 +94,13 @@ export async function startBaileys(onMessage: BaileysMessageHandler): Promise<vo
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        console.log("[Baileys] QR code printed above — scan with WhatsApp to link this device");
+        if (showQR) {
+          qrcode.generate(qr, { small: true });
+          console.log("[Baileys] Scan the QR code above with WhatsApp to link this device");
+        } else if (!qrHintShown) {
+          console.log("[Baileys] Not paired — run `make whatsapp-link` to scan QR code");
+          qrHintShown = true;
+        }
       }
 
       if (connection === "close") {
@@ -91,7 +113,6 @@ export async function startBaileys(onMessage: BaileysMessageHandler): Promise<vo
           started = false;
         } else {
           console.warn(`[Baileys] Disconnected (status ${statusCode}), reconnecting...`);
-          // Reconnect after a short delay
           setTimeout(() => connect(), 3000);
         }
       } else if (connection === "open") {

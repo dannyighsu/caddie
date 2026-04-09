@@ -52,6 +52,11 @@ After processing all targets, provide a summary via Slack:
 
 ## Error Handling
 
+- **Login challenge / verification screen**: LinkedIn may present a device verification, CAPTCHA, or SMS challenge that requires human intervention. When this happens:
+  1. Send a Slack message to the user explaining the challenge and what action is needed (e.g., "LinkedIn is asking for device verification — please check the browser and approve it").
+  2. **Do NOT end the run.** Ending the run closes the browser window, which makes it impossible to complete the verification.
+  3. Poll every 15 seconds (up to 5 minutes total) by re-reading the page to check if the challenge has been resolved. If the page changes to a normal LinkedIn page, resume the workflow.
+  4. If still blocked after 5 minutes, send a follow-up Slack message and then end the run.
 - **"Connect" button not visible**: The person may already be a connection, have a pending request, or require "Follow" first. Check for "Pending", "Message", or "Following" indicators. Report the status and skip.
 - **"Add a note" not available**: LinkedIn sometimes restricts personalized notes. If this happens, ask the user whether to send without a note or skip.
 - **Profile not found**: If searching by name yields multiple results or no results, report back and ask the user to clarify.

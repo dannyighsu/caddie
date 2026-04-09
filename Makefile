@@ -1,8 +1,12 @@
-.PHONY: run build install smoke google-auth
+.PHONY: run build install smoke google-auth whatsapp-link
 
 # Start the Northstar control plane + gateway
 # Override workspace: make run WORKSPACE_ROOT=/path/to/workspace
 run: build
+	@if command -v tailscale >/dev/null 2>&1; then \
+		tailscale funnel 3000 &\
+		echo "[Funnel] Exposing localhost:3000 via Tailscale Funnel"; \
+	fi
 	cd northstar && WORKSPACE_ROOT=$(or $(WORKSPACE_ROOT),$(CURDIR)/workspace) pnpm dev
 
 # Build both packages
@@ -17,6 +21,10 @@ install:
 # Run a quick smoke test via the harness directly
 smoke:
 	cd harness && pnpm smoke
+
+# One-time WhatsApp device pairing (scan QR code)
+whatsapp-link:
+	cd northstar && npx tsx scripts/whatsapp-link.ts
 
 # One-time Google Calendar OAuth setup (pulls env from northstar/.env.local)
 google-auth:

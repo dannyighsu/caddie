@@ -23,6 +23,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
 import { sendBaileysMessage, isBaileysConnected } from "@/lib/baileys";
+import { sendCloudAPIMessage, isCloudAPIConfigured } from "@/lib/whatsapp-api";
+import { sendEmail, isEmailConfigured } from "@/lib/email";
 import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
 import { currentTimePST } from "@/lib/helpers";
@@ -33,13 +35,15 @@ interface GatewayRequest {
   action: "notify" | "run" | "schedule";
 
   // --- notify fields ---
-  channel?: "slack" | "whatsapp";
+  channel?: "slack" | "whatsapp" | "email";
   message?: string;
   from?: string;
   slackChannel?: string;
   threadTs?: string;
-  /** WhatsApp recipient phone number (international format, no +) */
+  /** WhatsApp recipient phone number (international format, no +) or email address */
   to?: string;
+  /** Email subject line */
+  subject?: string;
 
   // --- run fields ---
   agentId?: string;
@@ -118,8 +122,11 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
   }
 
   if (req.channel === "whatsapp") {
-    if (!isBaileysConnected()) {
-      return { success: false, error: "WhatsApp (Baileys) not connected — is WHATSAPP_BAILEYS=true?" };
+    const cloudConfigured = isCloudAPIConfigured();
+    const baileysConnected = isBaileysConnected();
+
+    if (!cloudConfigured && !baileysConnected) {
+      return { success: false, error: "WhatsApp not available (neither Cloud API nor Baileys connected)" };
     }
 
     let recipient = req.to;
@@ -131,15 +138,37 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
       return { success: false, error: "No WhatsApp recipient specified and no default configured" };
     }
 
-    // Convert phone number to WhatsApp JID format if needed
-    const jid = recipient.includes("@") ? recipient : `${recipient}@s.whatsapp.net`;
-
     const formatted = req.from
       ? `*[${req.from}]* ${req.message}`
       : req.message;
 
+    // Prefer Cloud API (dedicated bot number), fall back to Baileys
+    if (cloudConfigured) {
+      await sendCloudAPIMessage(recipient, formatted);
+      return { success: true, channel: "whatsapp", via: "cloud-api", to: recipient };
+    }
+
+    const jid = recipient.includes("@") ? recipient : `${recipient}@s.whatsapp.net`;
     await sendBaileysMessage(jid, formatted);
-    return { success: true, channel: "whatsapp", to: recipient };
+    return { success: true, channel: "whatsapp", via: "baileys", to: recipient };
+  }
+
+  if (req.channel === "email") {
+    if (!isEmailConfigured()) {
+      return { success: false, error: "Email not configured (missing RESEND_API_KEY or EMAIL_FROM)" };
+    }
+
+    if (!req.to) {
+      return { success: false, error: "Email recipient (to) is required" };
+    }
+
+    const subject = req.subject ?? "Notification";
+    const formatted = req.from
+      ? `[${req.from}] ${req.message}`
+      : req.message;
+
+    await sendEmail(req.to, subject, formatted);
+    return { success: true, channel: "email", to: req.to };
   }
 
   return { success: false, error: `Unsupported channel: ${req.channel}` };

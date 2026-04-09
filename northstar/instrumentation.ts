@@ -23,13 +23,13 @@ export async function register() {
     const { handleSlackMessage } = await import("./lib/slack-handler");
     startSocketMode(handleSlackMessage);
 
-    // Start Baileys WhatsApp (if enabled)
-    const { startBaileys, isBaileysEnabled } = await import("./lib/baileys");
-    if (isBaileysEnabled()) {
-      const { handleBaileysMessage } = await import("./lib/baileys-handler");
-      startBaileys(handleBaileysMessage).catch((err) =>
-        console.error("[Baileys] Failed to start:", err)
-      );
-    }
+    // Start Baileys WhatsApp
+    const { startBaileys } = await import("./lib/baileys");
+    const { handleBaileysMessage } = await import("./lib/baileys-handler");
+    startBaileys(handleBaileysMessage).catch((err) =>
+      console.error("[Baileys] Failed to start:", err)
+    );
+
+    // Email is webhook-based (Resend) — no startup needed
   }
 }

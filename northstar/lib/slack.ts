@@ -82,30 +82,7 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
   socketStarted = true;
   socketClient = new SocketModeClient({ appToken });
 
-  // Handle message events
-  socketClient.on("message", async ({ event, ack }) => {
-    await ack();
-
-    // Skip bot messages, edits, subtypes
-    if (event.bot_id || event.subtype) return;
-
-    const text = (event.text as string ?? "").replace(/<@[A-Z0-9]+>/g, "").trim();
-    if (!text) return;
-
-    try {
-      await onMessage({
-        text,
-        channel: event.channel as string,
-        ts: event.ts as string,
-        threadTs: event.thread_ts as string | undefined,
-        user: event.user as string,
-      });
-    } catch (err) {
-      console.error("[Slack Socket] Message handler error:", err);
-    }
-  });
-
-  // Handle app_mention events
+  // Handle @mentions only — all bot interactions require an @mention
   socketClient.on("app_mention", async ({ event, ack }) => {
     await ack();
 
