@@ -27,6 +27,8 @@ export interface AgentRuntimeInput {
   mcpServers?: Record<string, MCPServerConfig>;
   /** Whether to enable Chrome browser automation. */
   enableChrome?: boolean;
+  /** Absolute path to the harness root directory (for hook scripts). */
+  harnessRoot?: string;
   /** Runtime-specific additional arguments (escape hatch). */
   additionalArgs?: string[];
   /** Additional environment variables for the subprocess. */

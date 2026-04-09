@@ -18,7 +18,7 @@ import { runResolvers } from "../resolver/runner.js";
 import type { AgentConfig, AgentInput, AgentResult } from "./types.js";
 
 const TEMPLATE_VAR_PATTERN = /\{\{(\w+)\}\}/g;
-const DEFAULT_MAX_TURNS = 100;
+const DEFAULT_MAX_TURNS = 150;
 
 export interface LauncherConfig {
   /** Directory containing agent subdirectories. */
@@ -276,6 +276,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       sessionId: input.sessionId,
       mcpServers,
       enableChrome,
+      harnessRoot,
       additionalEnv: input.additionalEnv,
     });
 

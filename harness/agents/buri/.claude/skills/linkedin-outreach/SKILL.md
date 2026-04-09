@@ -39,7 +39,8 @@ Read `config/preferences.md` from the working directory to understand the user's
    b. If a modal appears asking "How do you know [name]?", click "Other". If the request requires email or some other verification that we don't have info for, skip.
    c. Click "Add a note"
    d. Write the customized blurb into the personalization text box (max 300 characters — truncate gracefully if needed)
-   e. Click "Send"
+   e. After filling the note, **wait 2 seconds** before checking the Send button state. LinkedIn's JS needs time to validate the input and enable the button. Do not re-snapshot or retry immediately if "Send invitation" appears disabled right after filling — just wait and check again.
+   f. Click "Send"
 7. Click back to search history and find the next profile, going back to step 4. Do this until you're done.
 
 ### Step 3: Report results
@@ -55,6 +56,10 @@ After processing all targets, provide a summary via Slack:
 - **"Add a note" not available**: LinkedIn sometimes restricts personalized notes. If this happens, ask the user whether to send without a note or skip.
 - **Profile not found**: If searching by name yields multiple results or no results, report back and ask the user to clarify.
 - **Rate limiting**: If LinkedIn shows a warning or blocks connection requests, stop immediately and report to the user. Do NOT retry.
+
+## Browser Snapshots
+
+When reading LinkedIn page data, **never use the `depth` parameter** on browser snapshots — LinkedIn's DOM depth varies unpredictably and explicit depth values are unreliable. Instead, always save the snapshot to a file using the `filename` parameter (e.g., `snapshot(filename="profile.md")`) and then use Grep to extract the specific data you need (connections, followers, About, Connect button, menu items, etc.). This is faster and more reliable than trial-and-error with depth values.
 
 ## Guidelines
 

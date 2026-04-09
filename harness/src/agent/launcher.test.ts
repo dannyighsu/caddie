@@ -206,6 +206,19 @@ describe("createLauncher", () => {
     await launcher.launch({ agentId: "test-agent", prompt: "test" });
 
     const call = (runtime.execute as any).mock.calls[0][0];
-    expect(call.maxTurns).toBe(100);
+    expect(call.maxTurns).toBe(150);
+  });
+
+  it("passes harnessRoot to runtime", async () => {
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({ agentId: "test-agent", prompt: "test" });
+
+    const call = (runtime.execute as any).mock.calls[0][0];
+    expect(call.harnessRoot).toBe("/");
   });
 });

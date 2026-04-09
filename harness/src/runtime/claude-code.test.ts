@@ -43,6 +43,17 @@ describe("ClaudeCodeRuntime", () => {
       expect(args).toContain("opus");
     });
 
+    it("includes maxTurns as string in args", () => {
+      const args: string[] = buildArgs({
+        prompt: "test",
+        maxTurns: 150,
+        workingDirectory: "/tmp",
+      });
+      const idx = args.indexOf("--max-turns");
+      expect(idx).toBeGreaterThan(-1);
+      expect(args[idx + 1]).toBe("150");
+    });
+
     it("adds --resume when sessionId is provided", () => {
       const args: string[] = buildArgs({
         prompt: "continue",
@@ -85,6 +96,50 @@ describe("ClaudeCodeRuntime", () => {
       });
       expect(args).toContain("--verbose");
       expect(args).toContain("--debug");
+    });
+  });
+
+  describe("buildEnv", () => {
+    const rt = new ClaudeCodeRuntime();
+    const buildEnv = (rt as any).buildEnv.bind(rt);
+
+    it("sets HARNESS_MAX_TURNS from input maxTurns", () => {
+      const env = buildEnv({
+        prompt: "test",
+        maxTurns: 150,
+        workingDirectory: "/tmp",
+      });
+      expect(env.HARNESS_MAX_TURNS).toBe("150");
+    });
+
+    it("sets HARNESS_ROOT from input harnessRoot", () => {
+      const env = buildEnv({
+        prompt: "test",
+        maxTurns: 100,
+        workingDirectory: "/tmp",
+        harnessRoot: "/path/to/harness",
+      });
+      expect(env.HARNESS_ROOT).toBe("/path/to/harness");
+    });
+
+    it("defaults HARNESS_ROOT to empty string when not provided", () => {
+      const env = buildEnv({
+        prompt: "test",
+        maxTurns: 100,
+        workingDirectory: "/tmp",
+      });
+      expect(env.HARNESS_ROOT).toBe("");
+    });
+
+    it("merges additionalEnv with harness vars", () => {
+      const env = buildEnv({
+        prompt: "test",
+        maxTurns: 50,
+        workingDirectory: "/tmp",
+        additionalEnv: { CUSTOM_VAR: "hello" },
+      });
+      expect(env.CUSTOM_VAR).toBe("hello");
+      expect(env.HARNESS_MAX_TURNS).toBe("50");
     });
   });
 

@@ -59,7 +59,8 @@ export class ClaudeCodeRuntime implements AgentRuntime {
         args.push("--mcp-config", mcpConfigPath);
       }
 
-      const stdout = await this.spawn(args, input.workingDirectory, input.additionalEnv);
+      const env = this.buildEnv(input);
+      const stdout = await this.spawn(args, input.workingDirectory, env);
       return this.parseOutput(stdout);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -106,6 +107,14 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     }
 
     return args;
+  }
+
+  private buildEnv(input: AgentRuntimeInput): Record<string, string> {
+    return {
+      ...input.additionalEnv,
+      HARNESS_MAX_TURNS: String(input.maxTurns),
+      HARNESS_ROOT: input.harnessRoot ?? "",
+    };
   }
 
   private spawn(args: string[], cwd: string, additionalEnv?: Record<string, string>): Promise<string> {
