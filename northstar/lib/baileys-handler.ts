@@ -100,6 +100,7 @@ export const handleBaileysMessage: BaileysMessageHandler = async ({
       externalId,
       traceName: "whatsapp-message",
       traceMetadata: { chatId, from: senderId, senderName, via: "baileys" },
+      context: { originChannel: "whatsapp" },
       replyFn: async (replyText) => {
         // Strip trace URL for WhatsApp (not useful in chat)
         const cleaned = replyText.replace(/\nhttps?:\/\/[^\s]+$/, "").trim();

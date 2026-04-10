@@ -25,6 +25,7 @@ import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
 import { sendBaileysMessage, isBaileysConnected } from "@/lib/baileys";
 import { sendCloudAPIMessage, isCloudAPIConfigured } from "@/lib/whatsapp-api";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
+import type { NotificationChannel } from "@/lib/notification-channels";
 import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
 import { currentTimePST } from "@/lib/helpers";
@@ -35,7 +36,7 @@ interface GatewayRequest {
   action: "notify" | "run" | "schedule";
 
   // --- notify fields ---
-  channel?: "slack" | "whatsapp" | "email";
+  channel?: NotificationChannel;
   message?: string;
   from?: string;
   slackChannel?: string;
@@ -57,6 +58,16 @@ interface GatewayRequest {
   cron?: string;            // Cron expression for recurring jobs
   jobId?: string;           // For deleting a job
   description?: string;
+  /**
+   * For scheduled run/notify jobs: the channel to deliver the result/notification on.
+   * Defaults to "slack". Set to "whatsapp" or "email" to override.
+   */
+  notificationChannel?: NotificationChannel;
+  /**
+   * For scheduled jobs: channel-specific recipient override (Slack channel ID,
+   * phone number, or email). If omitted, uses the channel's configured default.
+   */
+  notificationRecipient?: string;
 }
 
 // --- Action execution ---
@@ -85,11 +96,22 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
     if (isNaN(runAt.getTime())) {
       return { success: false, error: "Invalid scheduledFor timestamp" };
     }
+    // Channel for scheduled notify: prefer notificationChannel, fall back to channel, default slack
+    const notificationChannel = req.notificationChannel ?? req.channel;
+    // Recipient resolution: notificationRecipient > channel-specific (slackChannel/to) > none
+    const notificationRecipient =
+      req.notificationRecipient ??
+      (notificationChannel === "slack" ? req.slackChannel : undefined) ??
+      (notificationChannel === "whatsapp" || notificationChannel === "email"
+        ? req.to
+        : undefined);
+
     const job = await scheduleNotification(runAt, {
       message: req.message,
       from: req.from,
-      slackChannel: req.slackChannel,
       description: req.description,
+      notificationChannel,
+      notificationRecipient,
     });
     return { success: true, scheduled: true, jobId: job.id, nextRun: new Date(job.nextRun).toISOString() };
   }
@@ -189,6 +211,8 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
       profile: req.profile,
       params: { prompt: req.prompt, ...req.context },
       description: req.description,
+      notificationChannel: req.notificationChannel,
+      notificationRecipient: req.notificationRecipient,
     });
     return { success: true, scheduled: true, jobId: job.id, nextRun: new Date(job.nextRun).toISOString() };
   }
@@ -246,6 +270,8 @@ async function executeSchedule(req: GatewayRequest): Promise<Record<string, unkn
       profile: req.profile,
       params: { prompt: req.prompt, ...req.context },
       description: req.description,
+      notificationChannel: req.notificationChannel,
+      notificationRecipient: req.notificationRecipient,
     });
     return {
       success: true,

@@ -52,6 +52,7 @@ export async function handleEmailMessage(
         subject,
         messageId,
       },
+      context: { originChannel: "email" },
       replyFn: async (replyText) => {
         const cleaned = replyText.replace(/\nhttps?:\/\/[^\s]+$/, "").trim();
         const reSubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;

@@ -6,6 +6,7 @@
  */
 
 import Redis from "ioredis";
+import type { NotificationChannel } from "./notification-channels";
 
 let redis: Redis | null = null;
 
@@ -74,6 +75,16 @@ export interface ScheduledJob {
   params?: Record<string, unknown>;
   /** Human-readable description. */
   description?: string;
+  /**
+   * Channel to send notifications/results to. Defaults to "slack".
+   * Applies to both "notify" jobs and failure notifications from "run" jobs.
+   */
+  notificationChannel?: NotificationChannel;
+  /**
+   * Channel-specific recipient override (Slack channel ID, phone number, email).
+   * If omitted, the channel's configured default is used.
+   */
+  notificationRecipient?: string;
 }
 
 const JOBS_HASH = "northstar:jobs";
@@ -121,7 +132,13 @@ export async function upsertJob(job: ScheduledJob): Promise<void> {
 export async function scheduleOneShot(
   agentId: string,
   runAt: Date,
-  options?: { profile?: string; params?: Record<string, unknown>; description?: string }
+  options?: {
+    profile?: string;
+    params?: Record<string, unknown>;
+    description?: string;
+    notificationChannel?: NotificationChannel;
+    notificationRecipient?: string;
+  }
 ): Promise<ScheduledJob> {
   const job: ScheduledJob = {
     id: `oneshot:${agentId}:${runAt.getTime()}`,
@@ -131,6 +148,8 @@ export async function scheduleOneShot(
     enabled: true,
     params: options?.params,
     description: options?.description,
+    notificationChannel: options?.notificationChannel,
+    notificationRecipient: options?.notificationRecipient,
   };
   await upsertJob(job);
   return job;
@@ -141,7 +160,13 @@ export async function scheduleOneShot(
  */
 export async function scheduleNotification(
   runAt: Date,
-  options: { message: string; from?: string; slackChannel?: string; description?: string }
+  options: {
+    message: string;
+    from?: string;
+    description?: string;
+    notificationChannel?: NotificationChannel;
+    notificationRecipient?: string;
+  }
 ): Promise<ScheduledJob> {
   const job: ScheduledJob = {
     id: `oneshot:notify:${runAt.getTime()}`,
@@ -152,9 +177,10 @@ export async function scheduleNotification(
     params: {
       message: options.message,
       from: options.from,
-      slackChannel: options.slackChannel,
     },
     description: options.description ?? options.message,
+    notificationChannel: options.notificationChannel,
+    notificationRecipient: options.notificationRecipient,
   };
   await upsertJob(job);
   return job;
@@ -167,7 +193,13 @@ export async function scheduleRecurring(
   id: string,
   agentId: string,
   cronExpr: string,
-  options?: { profile?: string; params?: Record<string, unknown>; description?: string }
+  options?: {
+    profile?: string;
+    params?: Record<string, unknown>;
+    description?: string;
+    notificationChannel?: NotificationChannel;
+    notificationRecipient?: string;
+  }
 ): Promise<ScheduledJob> {
   const nextRun = await computeNextRun(cronExpr);
   const job: ScheduledJob = {
@@ -179,6 +211,8 @@ export async function scheduleRecurring(
     enabled: true,
     params: options?.params,
     description: options?.description,
+    notificationChannel: options?.notificationChannel,
+    notificationRecipient: options?.notificationRecipient,
   };
   await upsertJob(job);
   return job;

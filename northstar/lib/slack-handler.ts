@@ -26,6 +26,7 @@ export const handleSlackMessage: SlackMessageHandler = async ({
     externalId: `slack:${channel}:${conversationThreadTs}`,
     traceName: "slack-message",
     traceMetadata: { channel, text: text.substring(0, 100) },
+    context: { originChannel: "slack" },
     replyFn: async (replyText) => {
       // Format trace links as Slack mrkdwn
       const formatted = replyText.replace(

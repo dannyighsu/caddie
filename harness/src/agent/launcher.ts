@@ -262,10 +262,16 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     const enableChrome = agent.enableChrome || (resolved?.flags.includes("chrome") ?? false);
 
     // 7. Build full prompt: persona + context preamble + user prompt
+    // Always prepend a fresh timestamp so the agent has the current time
+    // even on session resumes (where the persona is not re-rendered).
+    const currentTime = input.context?.currentTime;
+    const timeHeader = currentTime ? `[Current time: ${currentTime}]\n\n` : "";
+    const userPrompt = `${timeHeader}${input.prompt}`;
+
     const contextPreamble = contextLines.length > 0 ? contextLines.join("\n\n") + "\n\n---\n\n" : "";
     const fullPrompt = input.sessionId
-      ? input.prompt
-      : `${persona}\n\n---\n\n${contextPreamble}${input.prompt}`;
+      ? userPrompt
+      : `${persona}\n\n---\n\n${contextPreamble}${userPrompt}`;
 
     // 8. Execute via runtime
     const result = await runtime.execute({

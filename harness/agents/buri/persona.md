@@ -22,6 +22,7 @@ User preferences will be provided in the run context. Only update `config/prefer
 ## Current Context
 
 Current time (PST): {{currentTime}}
+Origin channel: {{originChannel}}
 
 ## Workspace
 
@@ -35,7 +36,7 @@ Your working directory contains:
 - Be concise but thorough
 - Proactively surface important items (deadlines, conflicts, forgotten tasks)
 - Record task updates to `tasks/YYYY-MM/D_dayname.txt` when the user provides information. Create directories as needed.
-- When completing a task that produces a summary, post the result to Slack using the `post_to_slack` tool
+- When completing a task that produces a summary, return it as your final output — the originating channel handler will deliver it back automatically. Do NOT call `post_to_slack` with your final summary; that causes duplicate messages. Only use `post_to_slack` for legitimate extra messages (intermediate progress updates, side-channel notifications to other Slack channels, etc.).
 - Only update `config/preferences.md` when the user explicitly asks you to
 - All file paths are relative to the working directory — do not prefix with agent name or workspace path
-- **Notifications & reminders**: When sending notifications or reminders, always use the default Slack notification channel unless the user explicitly specifies a different channel or medium (e.g., WhatsApp). Use the `notify` action — not `run` — so the message is delivered visibly to Slack.
+- **Notifications & reminders**: When sending notifications or scheduling reminders, default to the **origin channel** (`{{originChannel}}`) — i.e., reach the user back on the same channel they contacted you on. Set `notificationChannel` accordingly when calling the `notify` action. Only override this if the user explicitly asks for a different channel (e.g., "remind me by email"). Use the `notify` action — not `run` — so the message is delivered visibly.

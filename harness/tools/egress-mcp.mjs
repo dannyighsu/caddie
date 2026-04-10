@@ -27,7 +27,11 @@ const tools = [
   {
     name: "post_to_slack",
     description:
-      "Post a message to Slack. Messages support Slack mrkdwn formatting (*bold*, _italic_, `code`, >quotes, <url|text> links).",
+      "Post an EXTRA message to Slack — for intermediate updates, side-channel notifications, or surfacing something to a Slack channel that is NOT the user's reply. " +
+      "DO NOT use this for your final response or summary: the system automatically delivers your final output to the originating channel (which may not even be Slack). " +
+      "Calling this with your final summary will cause duplicate messages. " +
+      "Legitimate uses: posting a long-running task progress update, alerting a different Slack channel about an event, or proactively raising an issue in Slack while the user is interacting via another channel. " +
+      "Messages support Slack mrkdwn formatting (*bold*, _italic_, `code`, >quotes, <url|text> links).",
     inputSchema: {
       type: "object",
       properties: {

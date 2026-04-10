@@ -72,6 +72,7 @@ export async function handleCloudAPIMessage(
       externalId,
       traceName: "whatsapp-message",
       traceMetadata: { chatId, from, senderName, via: "cloud-api" },
+      context: { originChannel: "whatsapp" },
       replyFn: async (replyText) => {
         const cleaned = replyText.replace(/\nhttps?:\/\/[^\s]+$/, "").trim();
         await sendCloudAPIMessage(from, cleaned);

@@ -14,13 +14,14 @@
 import { getDueJobs, markJobFired, overrideNextRun, type ScheduledJob } from "./redis";
 import { currentTimePST } from "./helpers";
 import { getLauncher } from "./harness";
-import { sendMessage, isSlackConfigured } from "./slack";
-import { getSetting } from "./db";
+import {
+  sendNotification,
+  DEFAULT_NOTIFICATION_CHANNEL,
+} from "./notification-channels";
 import {
   createTraceId,
   createTrace,
   completeTrace,
-  isTracingEnabled,
 } from "./tracing";
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
@@ -112,51 +113,43 @@ async function fireJob(job: ScheduledJob): Promise<void> {
 }
 
 /**
- * Execute a scheduled notification job — send a message to Slack.
+ * Execute a scheduled notification job — send a message to the configured channel.
  */
 async function fireNotifyJob(job: ScheduledJob): Promise<void> {
-  if (!isSlackConfigured()) {
-    console.error("[Scheduler] Cannot fire notify job: Slack not configured");
-    return;
-  }
-
   const message = job.params?.message as string;
   if (!message) {
     console.error("[Scheduler] Notify job has no message:", job.id);
     return;
   }
 
-  let channelId = job.params?.slackChannel as string | undefined;
-  if (!channelId) {
-    const defaultChannel = await getSetting<{ channelId: string }>("default_slack_channel");
-    channelId = defaultChannel?.channelId;
-  }
-  if (!channelId) {
-    console.error("[Scheduler] No Slack channel for notify job:", job.id);
-    return;
-  }
-
+  const channel = job.notificationChannel ?? DEFAULT_NOTIFICATION_CHANNEL;
   const from = job.params?.from as string | undefined;
-  const formatted = from ? `*[${from}]* ${message}` : message;
-  await sendMessage(channelId, formatted);
+
+  try {
+    await sendNotification(channel, {
+      message,
+      from,
+      recipient: job.notificationRecipient,
+    });
+  } catch (err) {
+    console.error(`[Scheduler] Failed to send notify job ${job.id} via ${channel}:`, err);
+  }
 }
 
 /**
- * Send a failure notification to Slack.
+ * Send a failure notification on the job's configured channel.
  */
 async function notifyFailure(job: ScheduledJob, error: string): Promise<void> {
-  if (!isSlackConfigured()) return;
+  const channel = job.notificationChannel ?? DEFAULT_NOTIFICATION_CHANNEL;
+  const label = job.description ?? `${job.agentId}${job.profile ? `:${job.profile}` : ""}`;
+  const message = `:warning: *Scheduled job failed:* ${label}\n\`\`\`${error.substring(0, 500)}\`\`\``;
 
   try {
-    const defaultChannel = await getSetting<{ channelId: string }>("default_slack_channel");
-    const channelId = defaultChannel?.channelId;
-    if (!channelId) return;
-
-    const label = job.description ?? `${job.agentId}${job.profile ? `:${job.profile}` : ""}`;
-    await sendMessage(
-      channelId,
-      `:warning: *Scheduled job failed:* ${label}\n\`\`\`${error.substring(0, 500)}\`\`\``
-    );
+    await sendNotification(channel, {
+      message,
+      recipient: job.notificationRecipient,
+      subject: `Job failed: ${label}`,
+    });
   } catch {
     // Best effort
   }
