@@ -5,121 +5,47 @@ description: Create, list, and delete scheduled jobs. Use when the user asks to 
 
 ## Schedule Management
 
-Use the Northstar gateway API at `http://localhost:3000/api/gateway` to manage scheduled jobs. **Only use this when the user explicitly asks you to.**
+Use the **egress MCP scheduling tools** to create and manage scheduled jobs. These are native tools that you call with structured arguments — do NOT write curl commands.
 
-**IMPORTANT:** Do NOT use Claude Code's built-in cron/scheduling tools (CronCreate, CronList, etc.). Always use the Northstar gateway API below instead — it has no plan limits and persists across restarts.
+**CRITICAL:** Do NOT use Claude Code's built-in cron/scheduling tools (`CronCreate`, `CronList`, `CronUpdate`, `CronDelete`, `RemoteTrigger`, etc.). They are blocked at the hook level and will be denied. Always use the tools below instead.
 
-### Notifications
+## Available Tools
 
-When the user asks you to set a reminder, send a notification, or alert them about something at a specific time, **always use the `notify` action** so a message is delivered to the default Slack notification channel. Do NOT use `action: "run"` for reminders — a `run` launches an agent session but does not guarantee a visible notification.
+| Tool | When to use |
+|---|---|
+| `schedule_reminder` | User wants a one-time reminder/notification at a specific time ("remind me at 3pm", "ping me tomorrow") |
+| `schedule_recurring` | User wants something to run on a recurring schedule ("every weekday at 9am", "every 30 minutes") |
+| `schedule_oneshot_run` | User wants the agent to actually do work at a future time (not just send a reminder) |
+| `list_schedules` | User asks "what's scheduled?" or you need to find a job ID |
+| `delete_schedule` | User asks to cancel a scheduled job |
 
-If the user doesn't specify a channel, omit channel-related parameters — the system will use the default Slack notification channel automatically.
+### Choosing between `schedule_reminder` and `schedule_oneshot_run`
 
-### Notification channel override
+- **`schedule_reminder`** — fire-and-forget notification. Use this for "remind me to call mom at 8pm". The system just sends the message at the specified time. **Most reminder requests should use this.**
+- **`schedule_oneshot_run`** — launches a full agent run at a future time. Use this only when the user wants the agent to actually do work (e.g., "at 5pm, run the metrics check and tell me what you find").
 
-By default, all scheduled notifications and run results go to **Slack**. The user can override this by explicitly asking (e.g., "remind me on WhatsApp", "email me the result", "send the daily summary to email"). When they do, set `notificationChannel` on the scheduled action.
+When in doubt for a reminder request, use `schedule_reminder`.
 
-Supported channels:
-- `"slack"` (default)
-- `"whatsapp"`
-- `"email"`
+## Time handling
 
-You may also set `notificationRecipient` to override the channel-specific destination (Slack channel ID, WhatsApp phone number, or email address). Omit it to use the channel's configured default.
+The user often gives times in natural language ("at 8pm", "tomorrow morning", "in 30 minutes"). Convert these to ISO 8601 timestamps with the user's timezone offset (typically `-07:00` for PDT or `-08:00` for PST). The current time and timezone are provided in your run context — use them to compute absolute times.
 
-**Only set these parameters if the user explicitly requests a non-Slack channel.** Do not switch channels on your own initiative.
+Examples:
+- "at 8pm" today → `2026-04-09T20:00:00-07:00` (using current date and PDT offset)
+- "tomorrow at 9am" → next day at 09:00 in user's timezone
+- "in 30 minutes" → current time + 30 minutes, formatted as ISO
 
-#### Send a notification immediately
+**Always include the timezone offset.** Never send a bare local time.
 
-```bash
-curl -s -X POST http://localhost:3000/api/gateway \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "notify",
-    "message": "<notification message>",
-    "from": "Buri"
-  }'
-```
+## Notification channel
 
-#### Schedule a notification for later (reminder)
+By default, all reminders and scheduled run results are delivered on **Slack**. The user can override this by explicitly asking (e.g., "remind me on WhatsApp", "email me the result").
 
-```bash
-curl -s -X POST http://localhost:3000/api/gateway \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "notify",
-    "message": "<reminder message>",
-    "from": "Buri",
-    "scheduledFor": "2026-03-30T15:00:00-07:00"
-  }'
-```
+When the user does NOT specify a channel, set `notificationChannel` to match the **`originChannel`** from your run context — i.e., reach the user back on the same channel they contacted you on. This ensures someone who emailed you gets reminded by email, not Slack.
 
-#### Schedule a notification on a non-default channel
+Override only when the user explicitly asks for a different channel.
 
-Only use this if the user explicitly asked to receive the reminder on WhatsApp or email.
-
-```bash
-# WhatsApp reminder
-curl -s -X POST http://localhost:3000/api/gateway \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "notify",
-    "message": "<reminder message>",
-    "from": "Buri",
-    "scheduledFor": "2026-03-30T15:00:00-07:00",
-    "notificationChannel": "whatsapp"
-  }'
-
-# Email reminder with explicit recipient
-curl -s -X POST http://localhost:3000/api/gateway \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "notify",
-    "message": "<reminder message>",
-    "from": "Buri",
-    "scheduledFor": "2026-03-30T15:00:00-07:00",
-    "notificationChannel": "email",
-    "notificationRecipient": "user@example.com",
-    "subject": "Reminder from Buri"
-  }'
-```
-
-### List all scheduled jobs
-
-```bash
-curl -s http://localhost:3000/api/gateway | python3 -m json.tool
-```
-
-### Create a recurring schedule
-
-```bash
-curl -s -X POST http://localhost:3000/api/gateway \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "schedule",
-    "agentId": "buri",
-    "profile": "<profile>",
-    "cron": "<cron expression>",
-    "prompt": "<prompt to run>",
-    "description": "<human-readable description>"
-  }'
-```
-
-To deliver the result/failure notifications on a non-default channel, add `notificationChannel` (and optionally `notificationRecipient`):
-
-```bash
-curl -s -X POST http://localhost:3000/api/gateway \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "schedule",
-    "agentId": "buri",
-    "profile": "feed-scan",
-    "cron": "0 9 * * *",
-    "prompt": "Daily feed scan",
-    "description": "Daily feed scan with email summary",
-    "notificationChannel": "email",
-    "notificationRecipient": "user@example.com"
-  }'
-```
+## Cron expressions (for `schedule_recurring`)
 
 Cron format: `minute hour day-of-month month day-of-week`
 
@@ -128,29 +54,4 @@ Examples:
 - `0 9,12,15,18,21 * * 0,6` — every 3 hours 9AM-9PM weekends
 - `0,30 * * * *` — every 30 minutes
 - `0 9 * * 2` — Tuesdays at 9AM
-
-### Schedule a one-shot agent run
-
-Use this when the user wants to **run the agent** at a future time (not just send a notification).
-
-```bash
-curl -s -X POST http://localhost:3000/api/gateway \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "run",
-    "agentId": "buri",
-    "profile": "<profile>",
-    "prompt": "<prompt>",
-    "scheduledFor": "2026-03-30T15:00:00Z"
-  }'
-```
-
-### Delete a job
-
-```bash
-curl -s -X POST http://localhost:3000/api/gateway \
-  -H "Content-Type: application/json" \
-  -d '{"action": "schedule", "jobId": "<job-id>"}'
-```
-
-Get the job ID from the list output.
+- `0 9 * * *` — every day at 9AM

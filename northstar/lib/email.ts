@@ -66,6 +66,7 @@ export interface ReceivedEmail {
   text: string;
   html: string;
   messageId: string;
+  headers: Record<string, string> | null;
   createdAt: string;
 }
 
@@ -88,6 +89,7 @@ export async function fetchReceivedEmail(
     text: data.text ?? "",
     html: data.html ?? "",
     messageId: data.message_id ?? emailId,
+    headers: data.headers ?? null,
     createdAt: data.created_at,
   };
 }

@@ -32,7 +32,7 @@ Read `config/preferences.md` from the working directory to understand the user's
 1. Open the browser and navigate to linkedin.com
 2. Select the search bar and type in a search query.
 3. Submit the search and filter to `people`.
-4. Review results — note their name, headline, company, and other applicable details. For 3rd+ degree connections, click into the profile and send an automated outreach. For 2nd degree connections, note them down to report back to the user for manual outreach once you're done. If you can't find suitable targets, try paging to next profile or using a new search query. 
+4. Review results — note their name, headline, company, and other applicable details. For 3rd+ degree connections, click into the profile and send an automated outreach. For 2nd degree connections, note them down (including the profile URL) to report back to the user for manual outreach once you're done. If you can't find suitable targets, try paging to next profile or using a new search query. 
 5. Click into a profile and determine whether they're worth reaching out to: They should have at least a few hundred connections/followers to indicate they're active on LinkedIn. Their profile info should be consistent with what we're looking for. If you determine they sholud be contacted, write out the full blurb to be used; replace any placeholders with real values from their profile.
 6. Send the connection request:
    a. Click the "Connect" button on their profile. This is usually a top-level button but can sometimes be under the "More" section.
@@ -48,7 +48,7 @@ Read `config/preferences.md` from the working directory to understand the user's
 After processing all targets, provide a summary via Slack:
 - Total requests sent
 - For each target: name, profile URL, the customized blurb used, and status (sent / already connected / failed)
-- Any 2nd degree connections for manual outreach
+- Any 2nd degree connections for manual outreach — **always include the profile URL** so the user can click through directly
 
 ## Error Handling
 
