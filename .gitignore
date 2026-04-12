@@ -117,3 +117,4 @@ Secrets.swift
 .DS_Store
 .workspace
 workspace/
+tasks/
