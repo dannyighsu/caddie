@@ -19,6 +19,7 @@ export const workspaceRoot = process.env.WORKSPACE_ROOT
   : resolve(repoRoot, "workspace");
 
 export const resolversDir = resolve(harnessRoot, "resolvers");
+export const agentsDir = resolve(harnessRoot, "agents");
 
 let launcherInstance: ReturnType<typeof createLauncher> | null = null;
 

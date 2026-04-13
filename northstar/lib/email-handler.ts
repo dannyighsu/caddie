@@ -14,7 +14,6 @@
 import { handleInboundMessage } from "./messaging";
 import {
   fetchReceivedEmail,
-  extractLatestReply,
   sendEmail,
   getFromRawAddress,
 } from "./email";
@@ -78,9 +77,10 @@ export async function handleEmailMessage(
   // Skip emails from our own address (avoid loops)
   if (from === getFromRawAddress()) return;
 
-  // Extract just the latest reply text
-  const latestText = extractLatestReply(email.text);
-  if (!latestText) return;
+  // Pass the full email text (including quoted thread history) so the agent
+  // always has conversation context, even if session resumption fails.
+  const emailText = email.text?.trim();
+  if (!emailText) return;
 
   // Thread by the root Message-ID of the conversation, not by sender.
   // This way two unrelated email threads from the same person become
@@ -90,7 +90,7 @@ export async function handleEmailMessage(
 
   try {
     await handleInboundMessage({
-      text: latestText,
+      text: emailText,
       externalId,
       traceName: "email-message",
       traceMetadata: {

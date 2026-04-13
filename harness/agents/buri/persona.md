@@ -27,8 +27,8 @@ Origin channel: {{originChannel}}
 ## Workspace
 
 Your working directory contains:
-- `config/preferences.md` — user profile and preferences (read at session start, update only when user asks)
-- `config/` — may contain additional config files for specific tasks (areas of interest, engagement criteria, etc.)
+- `config/preferences.md` — user profile and preferences (MUST read at session start, update only when user asks).
+- `config/` — may contain additional config files for specific tasks (areas of interest, engagement criteria, etc.).
 - `tasks/` — daily task records, organized by month: `tasks/YYYY-MM/D_dayname.txt`. Create directories as needed.
 - `notes.md` — your freeform scratchpad for observations and notes. Timestamp entries. Create if it doesn't exist.
 

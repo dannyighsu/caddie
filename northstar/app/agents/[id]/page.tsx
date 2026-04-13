@@ -3,16 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 
-interface AgentProfile {
-  capabilities?: string[];
-}
-
 interface Agent {
   id: string;
   name: string;
   capabilities: string[];
   maxTurns?: number;
-  profiles?: Record<string, AgentProfile>;
 }
 
 interface Message {
@@ -34,6 +29,7 @@ interface Conversation {
 interface ConfigFile {
   name: string;
   content: string;
+  category: "persona" | "skill" | "config";
 }
 
 type Tab = "main" | "config";
@@ -54,10 +50,6 @@ export default function AgentPage() {
   if (!agent) {
     return <p className="text-gray-500">Loading...</p>;
   }
-
-  // All profiles are available for quick-run
-  const profileNames = Object.keys(agent.profiles ?? {});
-  const hasProfiles = profileNames.length > 0;
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
@@ -93,74 +85,11 @@ export default function AgentPage() {
 
       <div className="flex-1 min-h-0">
         {tab === "main" ? (
-          <div className="h-full flex flex-col gap-6">
-            {hasProfiles && (
-              <div className="flex gap-3">
-                {profileNames.map((p) => (
-                  <TriggeredButton key={p} agent={agent} profile={p} />
-                ))}
-              </div>
-            )}
-            <div className="flex-1 min-h-0">
-              <ConversationsView agentId={agentId} />
-            </div>
-          </div>
+          <ConversationsView agentId={agentId} />
         ) : (
           <ConfigView agentId={agentId} />
         )}
       </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// Triggered Profile Button
-// =============================================================================
-
-function TriggeredButton({ agent, profile }: { agent: Agent; profile: string }) {
-  const [running, setRunning] = useState(false);
-  const [lastResult, setLastResult] = useState<Record<string, unknown> | null>(null);
-
-  async function handleTrigger() {
-    if (running) return;
-    setRunning(true);
-    setLastResult(null);
-
-    try {
-      const res = await fetch("/api/gateway", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "run", agentId: agent.id, profile }),
-      });
-      const text = await res.text();
-      try {
-        setLastResult(JSON.parse(text));
-      } catch {
-        setLastResult({ success: false, error: `Server returned: ${res.status} ${text.substring(0, 200) || "(empty)"}` });
-      }
-    } catch (err) {
-      setLastResult({ success: false, error: err instanceof Error ? err.message : "Request failed" });
-    } finally {
-      setRunning(false);
-    }
-  }
-
-  return (
-    <div>
-      <button
-        onClick={handleTrigger}
-        disabled={running}
-        className="px-4 py-2 bg-gray-800 text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
-        {running ? `Running ${profile}...` : `Run ${profile}`}
-      </button>
-      {lastResult && (
-        <pre className={`mt-2 text-xs p-2 rounded max-h-32 overflow-y-auto ${
-          lastResult.success ? "text-green-400 bg-green-950/20" : "text-red-400 bg-red-950/20"
-        }`}>
-          {JSON.stringify(lastResult, null, 2)}
-        </pre>
-      )}
     </div>
   );
 }
@@ -391,7 +320,7 @@ function ConfigView({ agentId }: { agentId: string }) {
       await fetch(`/api/agents/${agentId}/config/${activeFile.name}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: editContent }),
+        body: JSON.stringify({ content: editContent, category: activeFile.category }),
       });
       refreshFiles();
     } finally {
@@ -405,7 +334,7 @@ function ConfigView({ agentId }: { agentId: string }) {
     await fetch(`/api/agents/${agentId}/config/${name}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "" }),
+      body: JSON.stringify({ content: "", category: "config" }),
     });
     setNewFileName("");
     refreshFiles();
@@ -422,42 +351,72 @@ function ConfigView({ agentId }: { agentId: string }) {
 
   const hasChanges = activeFile && editContent !== activeFile.content;
 
+  const personaFiles = files.filter((f) => f.category === "persona");
+  const skillFiles = files.filter((f) => f.category === "skill");
+  const configFiles = files.filter((f) => f.category === "config");
+
+  function FileEntry({ file, deletable }: { file: ConfigFile; deletable?: boolean }) {
+    return (
+      <div className="flex items-center group">
+        <button
+          onClick={() => selectFile(file)}
+          className={`flex-1 text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+            activeFile?.name === file.name
+              ? "bg-gray-800 text-white"
+              : "text-gray-400 hover:bg-gray-900 hover:text-gray-200"
+          }`}
+        >
+          {file.category === "skill" ? file.name.split("/")[1] : file.name}
+        </button>
+        {deletable && (
+          <button
+            onClick={() => handleDelete(file.name)}
+            className="px-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+          >
+            x
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex gap-6 h-full">
       <div className="w-64 flex-shrink-0 flex flex-col">
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">
-          Config Files
-        </h2>
-        <div className="flex-1 overflow-y-auto space-y-1">
-          {files.map((file) => (
-            <div key={file.name} className="flex items-center group">
-              <button
-                onClick={() => selectFile(file)}
-                className={`flex-1 text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                  activeFile?.name === file.name
-                    ? "bg-gray-800 text-white"
-                    : "text-gray-400 hover:bg-gray-900 hover:text-gray-200"
-                }`}
-              >
-                {file.name}
-              </button>
-              <button
-                onClick={() => handleDelete(file.name)}
-                className="px-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-              >
-                x
-              </button>
+        <div className="flex-1 overflow-y-auto space-y-4">
+          {personaFiles.length > 0 && (
+            <div>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 px-3">
+                Persona
+              </h2>
+              {personaFiles.map((f) => <FileEntry key={f.name} file={f} />)}
             </div>
-          ))}
-          {files.length === 0 && (
-            <p className="text-xs text-gray-600 px-3 py-2">No config files yet</p>
           )}
+
+          {skillFiles.length > 0 && (
+            <div>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 px-3">
+                Skills
+              </h2>
+              {skillFiles.map((f) => <FileEntry key={f.name} file={f} />)}
+            </div>
+          )}
+
+          <div>
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 px-3">
+              Config
+            </h2>
+            {configFiles.map((f) => <FileEntry key={f.name} file={f} deletable />)}
+            {configFiles.length === 0 && (
+              <p className="text-xs text-gray-600 px-3 py-2">No config files yet</p>
+            )}
+          </div>
         </div>
         <div className="mt-3 flex gap-1">
           <input
             value={newFileName}
             onChange={(e) => setNewFileName(e.target.value)}
-            placeholder="new_file.md"
+            placeholder="new_config_file.md"
             className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-gray-500"
             onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
           />
@@ -495,7 +454,7 @@ function ConfigView({ agentId }: { agentId: string }) {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
-            Select a config file to edit, or create a new one.
+            Select a file to edit.
           </div>
         )}
       </div>

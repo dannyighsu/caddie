@@ -1,9 +1,31 @@
 import { readFile, writeFile, unlink, mkdir } from "fs/promises";
 import { resolve, basename } from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { workspaceRoot } from "@/lib/harness";
+import { workspaceRoot, agentsDir } from "@/lib/harness";
 
-function getConfigPath(agentId: string, filename: string): string {
+/**
+ * Resolve the actual filesystem path for a file based on its category.
+ *
+ * - persona: harness/agents/{id}/persona.md
+ * - skill:   harness/agents/{id}/.claude/skills/{skillName}/SKILL.md
+ * - config:  workspace/{id}/config/{filename}
+ */
+function resolveFilePath(
+  agentId: string,
+  filename: string,
+  category?: string
+): string {
+  if (category === "persona") {
+    return resolve(agentsDir, agentId, "persona.md");
+  }
+  if (category === "skill" && filename.startsWith("skills/")) {
+    // filename is like "skills/feed-scan/SKILL.md"
+    const parts = filename.split("/");
+    if (parts.length === 3) {
+      return resolve(agentsDir, agentId, ".claude", "skills", parts[1], parts[2]);
+    }
+  }
+  // Default: config file
   const safe = basename(filename);
   return resolve(workspaceRoot, agentId, "config", safe);
 }
@@ -13,7 +35,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string; filename: string }> }
 ) {
   const { id, filename } = await params;
-  const filePath = getConfigPath(id, filename);
+  const filePath = resolveFilePath(id, filename);
 
   try {
     const content = await readFile(filePath, "utf-8");
@@ -28,16 +50,20 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; filename: string }> }
 ) {
   const { id, filename } = await params;
-  const filePath = getConfigPath(id, filename);
   const body = await request.json();
-  const { content } = body as { content: string };
+  const { content, category } = body as { content: string; category?: string };
 
   if (typeof content !== "string") {
     return NextResponse.json({ error: "content is required" }, { status: 400 });
   }
 
-  const configDir = resolve(workspaceRoot, id, "config");
-  await mkdir(configDir, { recursive: true });
+  const filePath = resolveFilePath(id, filename, category);
+
+  // Ensure parent directory exists for config files
+  if (!category || category === "config") {
+    const configDir = resolve(workspaceRoot, id, "config");
+    await mkdir(configDir, { recursive: true });
+  }
 
   await writeFile(filePath, content, "utf-8");
   return NextResponse.json({ success: true, name: filename });
@@ -48,7 +74,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; filename: string }> }
 ) {
   const { id, filename } = await params;
-  const filePath = getConfigPath(id, filename);
+  const filePath = resolveFilePath(id, filename);
 
   try {
     await unlink(filePath);

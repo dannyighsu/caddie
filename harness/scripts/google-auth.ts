@@ -1,12 +1,12 @@
 /**
- * Google Calendar OAuth Setup
+ * Google OAuth Setup (Calendar + Gmail)
  *
- * One-time script to authorize the harness with Google Calendar.
+ * One-time script to authorize the harness with Google Calendar and Gmail.
  * Opens a browser for OAuth consent and saves tokens to credentials/.
  *
  * Prerequisites:
  *   - GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in env or .env
- *   - Google Cloud project with Calendar API enabled
+ *   - Google Cloud project with Calendar API and Gmail API enabled
  *   - OAuth 2.0 credentials (Desktop app type)
  *
  * Usage:
@@ -39,7 +39,10 @@ async function main() {
 
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: "offline",
-    scope: ["https://www.googleapis.com/auth/calendar"],
+    scope: [
+      "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/gmail.readonly",
+    ],
     prompt: "consent",
   });
 
@@ -89,7 +92,7 @@ async function main() {
         res.end("<h1>Authorization successful!</h1><p>You can close this tab.</p>");
 
         console.log("Tokens saved to credentials/google-calendar-tokens.json");
-        console.log("Google Calendar resolver is now configured.");
+        console.log("Google Calendar + Gmail are now configured.");
 
         server.close();
         resolvePromise();
