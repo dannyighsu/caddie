@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "if [ -n \"$HARNESS_ROOT\" ]; then bash \"$HARNESS_ROOT/scripts/block-cron-tools.sh\"; fi"
+          },
+          {
+            "type": "command",
+            "command": "if [ -n \"$HARNESS_ROOT\" ]; then bash \"$HARNESS_ROOT/scripts/block-git.sh\"; fi"
           }
         ]
       }

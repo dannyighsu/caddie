@@ -64,7 +64,7 @@ After processing all targets, provide a summary via Slack:
 
 ## Browser Snapshots
 
-When reading LinkedIn page data, **never use the `depth` parameter** on browser snapshots — LinkedIn's DOM depth varies unpredictably and explicit depth values are unreliable. Instead, always save the snapshot to a file using the `filename` parameter (e.g., `snapshot(filename="profile.md")`) and then use Grep to extract the specific data you need (connections, followers, About, Connect button, menu items, etc.). This is faster and more reliable than trial-and-error with depth values.
+When reading LinkedIn page data, **never use the `depth` parameter** on browser snapshots — LinkedIn's DOM depth varies unpredictably and explicit depth values are unreliable. Instead, always save the snapshot to a file in the `artifacts/` directory alongside the run record (e.g., `runs/YYYY-MM/D_dayname/artifacts/profile.md`) and then use Grep to extract the specific data you need (connections, followers, About, Connect button, menu items, etc.). This is faster and more reliable than trial-and-error with depth values. **Never write snapshot files outside the working directory.**
 
 ## Guidelines
 

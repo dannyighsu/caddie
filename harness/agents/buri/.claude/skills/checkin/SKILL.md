@@ -11,7 +11,7 @@ Conduct a check-in with the user. This is a structured workflow — follow each 
 
 1. Read `config/preferences.md` for user preferences and priorities
 2. Use the `list_events` tool to fetch today's and tomorrow's calendar events
-3. Read the current task file (`tasks/YYYY-MM/D_dayname.txt`) if it exists, to see what's already tracked
+3. Check today's run directory (`runs/YYYY-MM/D_dayname/`) for any existing run records from earlier in the day
 
 ### Step 2: Review and surface
 

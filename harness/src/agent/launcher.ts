@@ -226,7 +226,9 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     const day = String(pst.getDate());
     const dayName = pst.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
     const ts = now.toISOString().replace(/:/g, "-").replace(/\..+/, "");
-    contextLines.push(`Run record path: runs/${year}-${month}/${day}_${dayName}/run-record-${ts}.jsonl`);
+    const runDir = `runs/${year}-${month}/${day}_${dayName}`;
+    contextLines.push(`Run record path: ${runDir}/run-record-${ts}.jsonl`);
+    contextLines.push(`Artifacts directory: ${runDir}/artifacts/`);
 
     // Universal config: preferences
     try {
