@@ -1,8 +1,0 @@
-- generic [active] [ref=e1]:
-  - generic [ref=e2]:
-    - generic:
-      - generic
-  - generic:
-    - img
-  - generic:
-    - img

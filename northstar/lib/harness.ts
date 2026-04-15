@@ -25,7 +25,9 @@ let launcherInstance: ReturnType<typeof createLauncher> | null = null;
 
 export function getLauncher() {
   if (!launcherInstance) {
-    const runtime = createRuntime();
+    const runtime = createRuntime({
+      options: { model: process.env.CLAUDE_MODEL ?? "claude-sonnet-4-6" },
+    });
     const workspaceRoot = process.env.WORKSPACE_ROOT
       ? resolve(process.env.WORKSPACE_ROOT)
       : resolve(repoRoot, "workspace");
