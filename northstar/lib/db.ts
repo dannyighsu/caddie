@@ -99,19 +99,20 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS whatsapp_messages (
+CREATE TABLE IF NOT EXISTS telegram_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   chat_id TEXT NOT NULL,
   sender_id TEXT NOT NULL,
   sender_name TEXT,
-  wa_message_id TEXT UNIQUE NOT NULL,
+  tg_message_id TEXT NOT NULL,
   content TEXT NOT NULL,
   timestamp TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (chat_id, tg_message_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_chat
-  ON whatsapp_messages(chat_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_telegram_messages_chat
+  ON telegram_messages(chat_id, timestamp DESC);
 `;
 
 let schemaEnsured = false;
@@ -241,60 +242,60 @@ export async function deleteSetting(key: string): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
-// --- WhatsApp Messages ---
+// --- Telegram Messages ---
 
-export interface WhatsAppMessage {
+export interface TelegramMessageRecord {
   id: string;
   chat_id: string;
   sender_id: string;
   sender_name: string | null;
-  wa_message_id: string;
+  tg_message_id: string;
   content: string;
   timestamp: string;
 }
 
-export async function storeWhatsAppMessage(
+export async function storeTelegramMessage(
   chatId: string,
   senderId: string,
   senderName: string | null,
-  waMessageId: string,
+  tgMessageId: string,
   content: string,
   timestamp: Date
 ): Promise<void> {
   await ensureSchema();
   await getPool().query(
-    `INSERT INTO whatsapp_messages (chat_id, sender_id, sender_name, wa_message_id, content, timestamp)
+    `INSERT INTO telegram_messages (chat_id, sender_id, sender_name, tg_message_id, content, timestamp)
      VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (wa_message_id) DO NOTHING`,
-    [chatId, senderId, senderName, waMessageId, content, timestamp]
+     ON CONFLICT (chat_id, tg_message_id) DO NOTHING`,
+    [chatId, senderId, senderName, tgMessageId, content, timestamp]
   );
 }
 
-export async function getRecentWhatsAppMessages(
+export async function getRecentTelegramMessages(
   chatId: string,
   limit = 20
-): Promise<WhatsAppMessage[]> {
+): Promise<TelegramMessageRecord[]> {
   await ensureSchema();
   const result = await getPool().query(
-    `SELECT * FROM whatsapp_messages
+    `SELECT * FROM telegram_messages
      WHERE chat_id = $1
      ORDER BY timestamp DESC
      LIMIT $2`,
     [chatId, limit]
   );
   // Reverse so oldest is first (chronological order)
-  return result.rows.map(rowToWhatsAppMessage).reverse();
+  return result.rows.map(rowToTelegramMessage).reverse();
 }
 
 // --- Helpers ---
 
-function rowToWhatsAppMessage(row: Record<string, unknown>): WhatsAppMessage {
+function rowToTelegramMessage(row: Record<string, unknown>): TelegramMessageRecord {
   return {
     id: row.id as string,
     chat_id: row.chat_id as string,
     sender_id: row.sender_id as string,
     sender_name: (row.sender_name as string | null) ?? null,
-    wa_message_id: row.wa_message_id as string,
+    tg_message_id: row.tg_message_id as string,
     content: row.content as string,
     timestamp: (row.timestamp as Date).toISOString(),
   };

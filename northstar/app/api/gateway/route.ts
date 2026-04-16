@@ -4,7 +4,7 @@
  * Single entry point for triggering agent executions and sending notifications.
  *
  * Actions:
- *   notify  — Send a message to Slack or WhatsApp (immediately or scheduled)
+ *   notify  — Send a message to Slack, Telegram, or email (immediately or scheduled)
  *   run     — Execute an agent (immediately or scheduled)
  *   schedule — Create a recurring job
  *
@@ -13,7 +13,7 @@
  *
  * Examples:
  *   curl -X POST localhost:3000/api/gateway -d '{"action":"notify","channel":"slack","message":"done"}'
- *   curl -X POST localhost:3000/api/gateway -d '{"action":"notify","channel":"whatsapp","to":"12125551234","message":"done"}'
+ *   curl -X POST localhost:3000/api/gateway -d '{"action":"notify","channel":"telegram","to":"123456789","message":"done"}'
  *   curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri"}'
  *   curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"xmanager"}'
  *   curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","scheduledFor":"2026-03-28T09:00:00Z"}'
@@ -22,8 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
-import { sendBaileysMessage, isBaileysConnected } from "@/lib/baileys";
-import { sendCloudAPIMessage, isCloudAPIConfigured } from "@/lib/whatsapp-api";
+import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
 import { getLauncher } from "@/lib/harness";
@@ -41,7 +40,7 @@ interface GatewayRequest {
   from?: string;
   slackChannel?: string;
   threadTs?: string;
-  /** WhatsApp recipient phone number (international format, no +) or email address */
+  /** Telegram chat ID (numeric string) or email address */
   to?: string;
   /** Email subject line */
   subject?: string;
@@ -60,12 +59,12 @@ interface GatewayRequest {
   description?: string;
   /**
    * For scheduled run/notify jobs: the channel to deliver the result/notification on.
-   * Defaults to "slack". Set to "whatsapp" or "email" to override.
+   * Defaults to "slack". Set to "telegram" or "email" to override.
    */
   notificationChannel?: NotificationChannel;
   /**
    * For scheduled jobs: channel-specific recipient override (Slack channel ID,
-   * phone number, or email). If omitted, uses the channel's configured default.
+   * Telegram chat ID, or email). If omitted, uses the channel's configured default.
    */
   notificationRecipient?: string;
 }
@@ -102,7 +101,7 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
     const notificationRecipient =
       req.notificationRecipient ??
       (notificationChannel === "slack" ? req.slackChannel : undefined) ??
-      (notificationChannel === "whatsapp" || notificationChannel === "email"
+      (notificationChannel === "telegram" || notificationChannel === "email"
         ? req.to
         : undefined);
 
@@ -143,36 +142,26 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
     return { success: true, channel: "slack", channelId };
   }
 
-  if (req.channel === "whatsapp") {
-    const cloudConfigured = isCloudAPIConfigured();
-    const baileysConnected = isBaileysConnected();
-
-    if (!cloudConfigured && !baileysConnected) {
-      return { success: false, error: "WhatsApp not available (neither Cloud API nor Baileys connected)" };
+  if (req.channel === "telegram") {
+    if (!isTelegramConfigured()) {
+      return { success: false, error: "Telegram not configured (TELEGRAM_BOT_TOKEN missing)" };
     }
 
     let recipient = req.to;
     if (!recipient) {
-      const config = await getSetting<{ defaultRecipient?: string }>("whatsapp_config");
+      const config = await getSetting<{ defaultRecipient?: string }>("telegram_config");
       recipient = config?.defaultRecipient;
     }
     if (!recipient) {
-      return { success: false, error: "No WhatsApp recipient specified and no default configured" };
+      return { success: false, error: "No Telegram recipient specified and no default configured" };
     }
 
     const formatted = req.from
       ? `*[${req.from}]* ${req.message}`
       : req.message;
 
-    // Prefer Cloud API (dedicated bot number), fall back to Baileys
-    if (cloudConfigured) {
-      await sendCloudAPIMessage(recipient, formatted);
-      return { success: true, channel: "whatsapp", via: "cloud-api", to: recipient };
-    }
-
-    const jid = recipient.includes("@") ? recipient : `${recipient}@s.whatsapp.net`;
-    await sendBaileysMessage(jid, formatted);
-    return { success: true, channel: "whatsapp", via: "baileys", to: recipient };
+    await sendTelegramMessage(recipient, formatted);
+    return { success: true, channel: "telegram", to: recipient };
   }
 
   if (req.channel === "email") {

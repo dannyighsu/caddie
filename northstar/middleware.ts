@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const ALLOWED_PUBLIC_PATHS = [
   "/api/email/webhook",
-  "/api/whatsapp/webhook",
+  "/api/telegram/webhook",
 ];
 
 export function middleware(request: NextRequest) {

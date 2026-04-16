@@ -39,7 +39,7 @@ Examples:
 
 ## Notification channel
 
-By default, all reminders and scheduled run results are delivered on **Slack**. The user can override this by explicitly asking (e.g., "remind me on WhatsApp", "email me the result").
+By default, all reminders and scheduled run results are delivered on **Slack**. The user can override this by explicitly asking (e.g., "remind me on Telegram", "email me the result").
 
 When the user does NOT specify a channel, set `notificationChannel` to match the **`originChannel`** from your run context — i.e., reach the user back on the same channel they contacted you on. This ensures someone who emailed you gets reminded by email, not Slack.
 

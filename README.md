@@ -276,4 +276,5 @@ cd harness && pnpm smoke -- --agent buri --prompt "..."       # specify agent an
 - **Redis** -- `REDIS_URL` in `northstar/.env.local`
 - **Env vars for capabilities** -- e.g., `NOTION_INTERNAL_TOKEN` for Notion. Missing vars produce warnings, not errors.
 - **Google Calendar** (optional) -- set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `northstar/.env.local`, then run `make google-auth` once to authorize. Tokens are saved to `harness/credentials/` (gitignored).
-- **WhatsApp** (optional) -- connect your agent to WhatsApp via Baileys. See [WHATSAPP.md](WHATSAPP.md) for setup instructions.
+- **Telegram** (optional) -- connect your agent to Telegram via the Bot API. See [TELEGRAM.md](docs/TELEGRAM.md) for setup instructions.
+- **Email** (optional) -- See [EMAIL.md](docs/EMAIL.md) for setup instructions.

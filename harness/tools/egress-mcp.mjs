@@ -83,14 +83,14 @@ const tools = [
         },
         notificationChannel: {
           type: "string",
-          enum: ["slack", "whatsapp", "email"],
+          enum: ["slack", "telegram", "email"],
           description:
             "Channel to deliver the reminder on. Default is 'slack'. Set to match the originChannel from your run context, or override only if the user explicitly asked for a different channel.",
         },
         notificationRecipient: {
           type: "string",
           description:
-            "Optional channel-specific recipient override (Slack channel ID, WhatsApp phone number, or email address). Omit to use the configured default for the channel.",
+            "Optional channel-specific recipient override (Slack channel ID, Telegram chat ID, or email address). Omit to use the configured default for the channel.",
         },
         subject: {
           type: "string",
@@ -135,7 +135,7 @@ const tools = [
         },
         notificationChannel: {
           type: "string",
-          enum: ["slack", "whatsapp", "email"],
+          enum: ["slack", "telegram", "email"],
           description: "Channel to deliver results/failure notifications on. Defaults to 'slack'.",
         },
         notificationRecipient: {
@@ -177,7 +177,7 @@ const tools = [
         },
         notificationChannel: {
           type: "string",
-          enum: ["slack", "whatsapp", "email"],
+          enum: ["slack", "telegram", "email"],
           description: "Channel for results/failure notifications.",
         },
         notificationRecipient: {

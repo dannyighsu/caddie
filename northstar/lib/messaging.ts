@@ -2,7 +2,7 @@
  * Shared Messaging Handler
  *
  * Channel-agnostic logic for processing inbound messages from any platform
- * (Slack, WhatsApp, etc.). Handles classification, agent execution,
+ * (Slack, Telegram, email, etc.). Handles classification, agent execution,
  * conversation persistence, and tracing.
  *
  * Channel-specific adapters call handleInboundMessage() with a reply function
@@ -30,9 +30,9 @@ import {
 export interface InboundMessageParams {
   /** The message text (already cleaned of mention markup, etc.) */
   text: string;
-  /** Channel-specific external ID, e.g. "slack:C123:ts" or "whatsapp:chatId" */
+  /** Channel-specific external ID, e.g. "slack:C123:ts" or "telegram:chatId" */
   externalId: string;
-  /** Channel name for tracing, e.g. "slack-message" or "whatsapp-message" */
+  /** Channel name for tracing, e.g. "slack-message" or "telegram-message" */
   traceName: string;
   /** Trace metadata (channel-specific context) */
   traceMetadata?: Record<string, string>;

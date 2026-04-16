@@ -2,16 +2,15 @@
  * Notification Channels
  *
  * Shared type and dispatcher for sending notifications across channels.
- * Used by the scheduler and gateway to route messages to Slack, WhatsApp, or email.
+ * Used by the scheduler and gateway to route messages to Slack, Telegram, or email.
  */
 
 import { sendMessage, isSlackConfigured } from "./slack";
-import { sendCloudAPIMessage, isCloudAPIConfigured } from "./whatsapp-api";
-import { sendBaileysMessage, isBaileysConnected } from "./baileys";
+import { sendTelegramMessage, isTelegramConfigured } from "./telegram";
 import { sendEmail, isEmailConfigured } from "./email";
 import { getSetting } from "./db";
 
-export const NOTIFICATION_CHANNELS = ["slack", "whatsapp", "email"] as const;
+export const NOTIFICATION_CHANNELS = ["slack", "telegram", "email"] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
 export const DEFAULT_NOTIFICATION_CHANNEL: NotificationChannel = "slack";
@@ -25,7 +24,7 @@ export interface NotificationOptions {
   message: string;
   /** Optional sender label, prepended to the message */
   from?: string;
-  /** Channel-specific recipient override (Slack channel ID, phone number, or email) */
+  /** Channel-specific recipient override (Slack channel ID, Telegram chat ID, or email) */
   recipient?: string;
   /** Email subject (only used for email channel) */
   subject?: string;
@@ -58,26 +57,20 @@ export async function sendNotification(
     return;
   }
 
-  if (channel === "whatsapp") {
+  if (channel === "telegram") {
+    if (!isTelegramConfigured()) {
+      throw new Error("Telegram is not configured");
+    }
     let recipient = options.recipient;
     if (!recipient) {
-      const config = await getSetting<{ defaultRecipient?: string }>("whatsapp_config");
+      const config = await getSetting<{ defaultRecipient?: string }>("telegram_config");
       recipient = config?.defaultRecipient;
     }
     if (!recipient) {
-      throw new Error("No WhatsApp recipient specified and no default configured");
+      throw new Error("No Telegram recipient specified and no default configured");
     }
-
-    if (isCloudAPIConfigured()) {
-      await sendCloudAPIMessage(recipient, formatted);
-      return;
-    }
-    if (isBaileysConnected()) {
-      const jid = recipient.includes("@") ? recipient : `${recipient}@s.whatsapp.net`;
-      await sendBaileysMessage(jid, formatted);
-      return;
-    }
-    throw new Error("WhatsApp not available (neither Cloud API nor Baileys connected)");
+    await sendTelegramMessage(recipient, formatted);
+    return;
   }
 
   if (channel === "email") {

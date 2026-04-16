@@ -12,7 +12,6 @@
     "@agints/harness": "workspace:*",
     "@slack/socket-mode": "^2.0.6",
     "@slack/web-api": "^7.8.0",
-    "@whiskeysockets/baileys": "7.0.0-rc.9",
     "cron-parser": "^5.5.0",
     "ioredis": "^5.4.0",
     "next": "16.0.10",
