@@ -107,8 +107,8 @@ async function fireJob(job: ScheduledJob): Promise<void> {
   });
 
   // Notify on failure
-  if (!result.success && result.error) {
-    await notifyFailure(job, result.error);
+  if (!result.success) {
+    await notifyFailure(job, result.error || "Unknown error");
   }
 }
 
@@ -150,7 +150,7 @@ async function notifyFailure(job: ScheduledJob, error: string): Promise<void> {
       recipient: job.notificationRecipient,
       subject: `Job failed: ${label}`,
     });
-  } catch {
-    // Best effort
+  } catch (err) {
+    console.error(`[Scheduler] Failed to deliver failure notification for ${job.id} via ${channel}:`, err);
   }
 }

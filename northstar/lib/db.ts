@@ -133,9 +133,14 @@ export async function createConversation(
 ): Promise<Conversation> {
   await ensureSchema();
   const id = uuid();
+
+  // If external_id collides (race between concurrent inbound messages on the
+  // same thread), return the existing row instead of throwing.
   const result = await getPool().query(
     `INSERT INTO conversations (id, agent_id, profile, title, external_id, messages)
      VALUES ($1, $2, $3, $4, $5, '[]'::jsonb)
+     ON CONFLICT (external_id) WHERE external_id IS NOT NULL DO UPDATE
+       SET updated_at = conversations.updated_at
      RETURNING *`,
     [id, agentId, profile ?? null, title, externalId ?? null]
   );
