@@ -104,9 +104,6 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
           replyToMessageId: msg.message_id,
         });
       },
-      routingConfirmFn: async (label) => {
-        await sendTelegramMessage(chatId, `Routed to ${label}`);
-      },
     });
   } catch (err) {
     console.error("[Telegram Handler] Error:", err);

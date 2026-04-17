@@ -104,9 +104,6 @@ export async function handleEmailMessage(
         const reSubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
         await sendEmail(from, reSubject, cleaned, messageId);
       },
-      routingConfirmFn: async (_label) => {
-        // Don't send routing confirmations for email
-      },
     });
   } catch (err) {
     console.error("[Email Handler] Error:", err);

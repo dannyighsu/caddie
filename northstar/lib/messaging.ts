@@ -38,8 +38,6 @@ export interface InboundMessageParams {
   traceMetadata?: Record<string, string>;
   /** Send a reply back to the originating channel */
   replyFn: (text: string) => Promise<void>;
-  /** Optional: send a routing confirmation (e.g. "_Routed to Buri_") */
-  routingConfirmFn?: (label: string) => Promise<void>;
   /** Optional: additional context to pass to the agent prompt */
   context?: Record<string, string>;
 }
@@ -64,7 +62,7 @@ export interface InboundMessageResult {
 export async function handleInboundMessage(
   params: InboundMessageParams
 ): Promise<InboundMessageResult> {
-  const { text, externalId, traceName, traceMetadata, replyFn, routingConfirmFn, context } = params;
+  const { text, externalId, traceName, traceMetadata, replyFn, context } = params;
 
   const traceId = createTraceId();
   await createTrace(traceId, traceName, traceMetadata);
@@ -92,9 +90,7 @@ export async function handleInboundMessage(
         profile
       );
 
-      if (routingConfirmFn) {
-        await routingConfirmFn(classification.label);
-      }
+      console.log(`[Messaging] Routed to ${classification.label}`);
     }
 
     const launcher = getLauncher();

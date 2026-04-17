@@ -35,8 +35,5 @@ export const handleSlackMessage: SlackMessageHandler = async ({
       );
       await replyInThread(channel, conversationThreadTs, formatted);
     },
-    routingConfirmFn: async (label) => {
-      await replyInThread(channel, conversationThreadTs, `_Routed to ${label}_`);
-    },
   });
 };
