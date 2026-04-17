@@ -14,7 +14,6 @@ import {
   createConversation,
   getConversationByExternalId,
   appendMessages,
-  updateSessionId,
   type Message,
 } from "./db";
 import { classifyMessage } from "./classifier";
@@ -44,7 +43,6 @@ export interface InboundMessageParams {
 
 export interface InboundMessageResult {
   rawText?: string;
-  sessionId?: string;
   conversationId: string;
   agentId: string;
   profile?: string;
@@ -55,7 +53,7 @@ export interface InboundMessageResult {
  *
  * 1. Lookup or create conversation by external ID
  * 2. Classify new conversations to route to the right agent/profile
- * 3. Launch agent with session resumption
+ * 3. Launch agent with conversation history as context (fresh session each time)
  * 4. Persist messages
  * 5. Reply via the provided replyFn
  */
@@ -69,11 +67,9 @@ export async function handleInboundMessage(
 
   try {
     let conversation = await getConversationByExternalId(externalId);
-    let sessionId: string | undefined;
     let profile: string | undefined;
 
     if (conversation) {
-      sessionId = conversation.session_id ?? undefined;
       profile = conversation.profile ?? undefined;
     } else {
       const classification = await classifyMessage(text);
@@ -93,12 +89,16 @@ export async function handleInboundMessage(
       console.log(`[Messaging] Routed to ${classification.label}`);
     }
 
+    // Build prompt with conversation history for continuity.
+    // Each run is a fresh session — no --resume — so we prepend prior
+    // messages so the agent has context from previous exchanges.
+    const fullPrompt = buildPromptWithHistory(conversation.messages, text);
+
     const launcher = getLauncher();
     const result = await launcher.launch({
       agentId: conversation.agent_id,
       profile,
-      prompt: text,
-      sessionId,
+      prompt: fullPrompt,
       context: {
         currentTime: currentTimePST(),
         ...context,
@@ -107,7 +107,6 @@ export async function handleInboundMessage(
     });
 
     const rawText = result.rawText;
-    const resultSessionId = result.sessionId;
 
     // Record messages
     const now = new Date().toISOString();
@@ -123,10 +122,6 @@ export async function handleInboundMessage(
     }
     await appendMessages(conversation.id, newMessages);
 
-    if (resultSessionId) {
-      await updateSessionId(conversation.id, resultSessionId);
-    }
-
     // Reply
     if (rawText) {
       const traceUrl = isTracingEnabled() ? getTraceUrl(traceId) : null;
@@ -138,7 +133,6 @@ export async function handleInboundMessage(
 
     return {
       rawText,
-      sessionId: resultSessionId,
       conversationId: conversation.id,
       agentId: conversation.agent_id,
       profile,
@@ -160,4 +154,31 @@ export async function handleInboundMessage(
 
     throw err;
   }
+}
+
+/**
+ * Build a prompt that includes conversation history for context.
+ * Keeps recent messages (last N exchanges) to avoid blowing up the prompt.
+ */
+function buildPromptWithHistory(messages: Message[], currentText: string): string {
+  if (messages.length === 0) return currentText;
+
+  // Keep the last 20 messages for context (10 exchanges)
+  const recent = messages.slice(-20);
+  const historyLines = recent.map((m) => {
+    const role = m.role === "user" ? "User" : "Assistant";
+    // Truncate very long messages in history to save tokens
+    const content = m.content.length > 1000
+      ? m.content.substring(0, 1000) + "..."
+      : m.content;
+    return `[${role}]: ${content}`;
+  });
+
+  return (
+    "Conversation history (for context — this is a continuing conversation):\n" +
+    historyLines.join("\n\n") +
+    "\n\n---\n\n" +
+    "New message:\n" +
+    currentText
+  );
 }

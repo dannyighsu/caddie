@@ -1,7 +1,11 @@
 #!/bin/bash
 # Turn limit warning hook for PostToolUse.
-# Counts assistant turns in the transcript and emits escalating warnings
-# as the agent approaches HARNESS_MAX_TURNS (default 150).
+# Counts assistant turns in the transcript *since the current run started*
+# and emits escalating warnings as the agent approaches HARNESS_MAX_TURNS.
+#
+# On session resume, the transcript contains the full history. We use
+# HARNESS_RUN_START (ISO timestamp set by the runtime at launch) to only
+# count turns from the current invocation, not previous runs.
 
 INPUT=$(cat)
 TRANSCRIPT_PATH=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('transcript_path',''))" 2>/dev/null)
@@ -11,9 +15,25 @@ if [ -z "$TRANSCRIPT_PATH" ] || [ ! -f "$TRANSCRIPT_PATH" ]; then
 fi
 
 MAX_TURNS="${HARNESS_MAX_TURNS:-150}"
+RUN_START="${HARNESS_RUN_START:-}"
 
-# Count assistant turns from the JSONL transcript
-TURNS=$(grep -c '"role":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null || echo 0)
+# Count assistant turns — only from current run if RUN_START is set
+if [ -n "$RUN_START" ]; then
+  TURNS=$(python3 -c "
+import json, sys
+start = '$RUN_START'
+count = 0
+for line in open('$TRANSCRIPT_PATH'):
+    try:
+        d = json.loads(line)
+        if d.get('type') == 'assistant' and d.get('timestamp', '') >= start:
+            count += 1
+    except: pass
+print(count)
+" 2>/dev/null || echo 0)
+else
+  TURNS=$(grep -c '"role":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null || echo 0)
+fi
 
 REMAINING=$(( MAX_TURNS - TURNS ))
 if [ "$REMAINING" -lt 0 ]; then

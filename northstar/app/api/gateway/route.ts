@@ -49,7 +49,6 @@ interface GatewayRequest {
   agentId?: string;
   profile?: string;
   prompt?: string;
-  conversationId?: string;
   context?: Record<string, string>;
 
   // --- scheduling ---
@@ -217,7 +216,6 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
     agentId: req.agentId,
     profile: req.profile,
     prompt: req.prompt ?? "Run.",
-    sessionId: req.conversationId,
     context: {
       currentTime: currentTimePST(),
       ...req.context,
@@ -233,7 +231,6 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
   return {
     success: result.success,
     rawText: result.rawText,
-    sessionId: result.sessionId,
     error: result.error,
   };
 }

@@ -114,6 +114,9 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       ...input.additionalEnv,
       HARNESS_MAX_TURNS: String(input.maxTurns),
       HARNESS_ROOT: input.harnessRoot ?? "",
+      // Timestamp used by turn-limit-warning hook to count only turns from
+      // the current run, not the entire session history on resume.
+      HARNESS_RUN_START: new Date().toISOString(),
     };
   }
 
