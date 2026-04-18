@@ -26,6 +26,18 @@ import {
   isTracingEnabled,
 } from "./tracing";
 
+/** A file attachment from any channel, already downloaded to the workspace. */
+export interface Attachment {
+  /** Absolute path to the downloaded file in the workspace artifacts directory */
+  filePath: string;
+  /** Original filename */
+  fileName: string;
+  /** MIME type */
+  mimeType: string;
+  /** Whether this is an image that should be included in prompt context */
+  isImage: boolean;
+}
+
 export interface InboundMessageParams {
   /** The message text (already cleaned of mention markup, etc.) */
   text: string;
@@ -39,6 +51,8 @@ export interface InboundMessageParams {
   replyFn: (text: string) => Promise<void>;
   /** Optional: additional context to pass to the agent prompt */
   context?: Record<string, string>;
+  /** Optional: file attachments, already downloaded to the workspace */
+  attachments?: Attachment[];
 }
 
 export interface InboundMessageResult {
@@ -60,7 +74,7 @@ export interface InboundMessageResult {
 export async function handleInboundMessage(
   params: InboundMessageParams
 ): Promise<InboundMessageResult> {
-  const { text, externalId, traceName, traceMetadata, replyFn, context } = params;
+  const { text, externalId, traceName, traceMetadata, replyFn, context, attachments } = params;
 
   const traceId = createTraceId();
   await createTrace(traceId, traceName, traceMetadata);
@@ -92,7 +106,7 @@ export async function handleInboundMessage(
     // Build prompt with conversation history for continuity.
     // Each run is a fresh session — no --resume — so we prepend prior
     // messages so the agent has context from previous exchanges.
-    const fullPrompt = buildPromptWithHistory(conversation.messages, text);
+    const fullPrompt = buildPromptWithHistory(conversation.messages, text, attachments);
 
     const launcher = getLauncher();
     const result = await launcher.launch({
@@ -159,26 +173,48 @@ export async function handleInboundMessage(
 /**
  * Build a prompt that includes conversation history for context.
  * Keeps recent messages (last N exchanges) to avoid blowing up the prompt.
+ *
+ * Attachments are handled as follows:
+ * - Images: referenced by path so the agent can read them (Claude Code is multimodal)
+ * - Non-images: referenced by path so the agent knows where the file is
  */
-function buildPromptWithHistory(messages: Message[], currentText: string): string {
-  if (messages.length === 0) return currentText;
+function buildPromptWithHistory(
+  messages: Message[],
+  currentText: string,
+  attachments?: Attachment[],
+): string {
+  const parts: string[] = [];
 
-  // Keep the last 20 messages for context (10 exchanges)
-  const recent = messages.slice(-20);
-  const historyLines = recent.map((m) => {
-    const role = m.role === "user" ? "User" : "Assistant";
-    // Truncate very long messages in history to save tokens
-    const content = m.content.length > 1000
-      ? m.content.substring(0, 1000) + "..."
-      : m.content;
-    return `[${role}]: ${content}`;
-  });
+  // Conversation history
+  if (messages.length > 0) {
+    const recent = messages.slice(-20);
+    const historyLines = recent.map((m) => {
+      const role = m.role === "user" ? "User" : "Assistant";
+      const content = m.content.length > 1000
+        ? m.content.substring(0, 1000) + "..."
+        : m.content;
+      return `[${role}]: ${content}`;
+    });
 
-  return (
-    "Conversation history (for context — this is a continuing conversation):\n" +
-    historyLines.join("\n\n") +
-    "\n\n---\n\n" +
-    "New message:\n" +
-    currentText
-  );
+    parts.push(
+      "Conversation history (for context — this is a continuing conversation):\n" +
+      historyLines.join("\n\n")
+    );
+  }
+
+  // Current message
+  parts.push("New message:\n" + currentText);
+
+  // Attachments
+  if (attachments && attachments.length > 0) {
+    const attachmentLines = attachments.map((a) => {
+      if (a.isImage) {
+        return `Attached image: ${a.fileName} — saved to ${a.filePath} (read this file to view the image)`;
+      }
+      return `Attached file: ${a.fileName} (${a.mimeType}) — saved to ${a.filePath}`;
+    });
+    parts.push("Attachments:\n" + attachmentLines.join("\n"));
+  }
+
+  return parts.join("\n\n---\n\n");
 }
