@@ -197,6 +197,47 @@ const tools = [
     },
   },
   {
+    name: "update_schedule",
+    description:
+      "Update an existing scheduled job. Only the fields you provide will be changed; everything else stays the same. " +
+      "Use list_schedules first to find the job ID.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        jobId: {
+          type: "string",
+          description: "The job ID to update.",
+        },
+        cron: {
+          type: "string",
+          description: "New cron expression. Omit to keep the current schedule.",
+        },
+        prompt: {
+          type: "string",
+          description: "New prompt/instruction. Omit to keep the current prompt.",
+        },
+        description: {
+          type: "string",
+          description: "New human-readable description.",
+        },
+        profile: {
+          type: "string",
+          description: "New profile/skill variant.",
+        },
+        notificationChannel: {
+          type: "string",
+          enum: ["slack", "telegram", "email"],
+          description: "New notification channel.",
+        },
+        notificationRecipient: {
+          type: "string",
+          description: "New channel-specific recipient override.",
+        },
+      },
+      required: ["jobId"],
+    },
+  },
+  {
     name: "delete_schedule",
     description: "Delete a scheduled job by its job ID. Use list_schedules first to find the right ID.",
     inputSchema: {
@@ -328,6 +369,20 @@ async function handleListSchedules() {
   };
 }
 
+async function handleUpdateSchedule(args) {
+  const result = await callGateway({
+    action: "update_schedule",
+    jobId: args.jobId,
+    ...(args.cron && { cron: args.cron }),
+    ...(args.prompt && { prompt: args.prompt }),
+    ...(args.description && { description: args.description }),
+    ...(args.profile && { profile: args.profile }),
+    ...(args.notificationChannel && { notificationChannel: args.notificationChannel }),
+    ...(args.notificationRecipient && { notificationRecipient: args.notificationRecipient }),
+  });
+  return formatGatewayResponse(result, `Updated job ${args.jobId}.`);
+}
+
 async function handleDeleteSchedule(args) {
   const result = await callGateway({
     action: "schedule",
@@ -342,6 +397,7 @@ const handlers = {
   schedule_recurring: handleScheduleRecurring,
   schedule_oneshot_run: handleScheduleOneshotRun,
   list_schedules: handleListSchedules,
+  update_schedule: handleUpdateSchedule,
   delete_schedule: handleDeleteSchedule,
 };
 

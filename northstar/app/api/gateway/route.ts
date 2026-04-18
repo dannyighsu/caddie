@@ -28,11 +28,11 @@ import type { NotificationChannel } from "@/lib/notification-channels";
 import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
 import { currentTimePST } from "@/lib/helpers";
-import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, deleteJob } from "@/lib/redis";
+import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, deleteJob, getJob, upsertJob } from "@/lib/redis";
 import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 
 interface GatewayRequest {
-  action: "notify" | "run" | "schedule";
+  action: "notify" | "run" | "schedule" | "update_schedule";
 
   // --- notify fields ---
   channel?: NotificationChannel;
@@ -78,6 +78,8 @@ async function executeAction(req: GatewayRequest): Promise<Record<string, unknow
       return executeRun(req);
     case "schedule":
       return executeSchedule(req);
+    case "update_schedule":
+      return executeUpdateSchedule(req);
     default:
       return { success: false, error: `Unknown action: ${req.action}` };
   }
@@ -269,6 +271,54 @@ async function executeSchedule(req: GatewayRequest): Promise<Record<string, unkn
   } catch (err) {
     return { success: false, error: `Invalid cron expression: ${err instanceof Error ? err.message : err}` };
   }
+}
+
+async function executeUpdateSchedule(req: GatewayRequest): Promise<Record<string, unknown>> {
+  if (!req.jobId) {
+    return { success: false, error: "jobId is required for update_schedule" };
+  }
+
+  const existing = await getJob(req.jobId);
+  if (!existing) {
+    return { success: false, error: `Job not found: ${req.jobId}` };
+  }
+
+  // Merge provided fields into the existing job
+  if (req.cron !== undefined) {
+    const { CronExpressionParser } = await import("cron-parser");
+    try {
+      const interval = CronExpressionParser.parse(req.cron, { currentDate: new Date() });
+      existing.cron = req.cron;
+      existing.nextRun = interval.next().getTime();
+    } catch (err) {
+      return { success: false, error: `Invalid cron expression: ${err instanceof Error ? err.message : err}` };
+    }
+  }
+  if (req.prompt !== undefined) {
+    existing.params = { ...existing.params, prompt: req.prompt };
+  }
+  if (req.description !== undefined) {
+    existing.description = req.description;
+  }
+  if (req.profile !== undefined) {
+    existing.profile = req.profile;
+  }
+  if (req.notificationChannel !== undefined) {
+    existing.notificationChannel = req.notificationChannel;
+  }
+  if (req.notificationRecipient !== undefined) {
+    existing.notificationRecipient = req.notificationRecipient;
+  }
+
+  await upsertJob(existing);
+
+  return {
+    success: true,
+    jobId: existing.id,
+    cron: existing.cron,
+    nextRun: new Date(existing.nextRun).toISOString(),
+    description: existing.description,
+  };
 }
 
 // --- Route handler ---

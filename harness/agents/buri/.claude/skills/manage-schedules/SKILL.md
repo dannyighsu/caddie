@@ -17,6 +17,7 @@ Use the **egress MCP scheduling tools** to create and manage scheduled jobs. The
 | `schedule_recurring` | User wants something to run on a recurring schedule ("every weekday at 9am", "every 30 minutes") |
 | `schedule_oneshot_run` | User wants the agent to actually do work at a future time (not just send a reminder) |
 | `list_schedules` | User asks "what's scheduled?" or you need to find a job ID |
+| `update_schedule` | User asks to change something about an existing schedule (cron, prompt, description, notification channel) |
 | `delete_schedule` | User asks to cancel a scheduled job |
 
 ### Choosing between `schedule_reminder` and `schedule_oneshot_run`
