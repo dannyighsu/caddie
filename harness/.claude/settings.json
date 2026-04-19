@@ -40,6 +40,17 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$HARNESS_ROOT\" ]; then bash \"$HARNESS_ROOT/scripts/sweep-mounts.sh\"; fi"
+          }
+        ]
+      }
     ]
   }
 }
