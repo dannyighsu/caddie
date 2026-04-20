@@ -42,10 +42,10 @@ function isImageMime(mimeType: string): boolean {
 }
 
 /**
- * Get the artifacts directory for today's runs.
- * Creates the directory if it doesn't exist.
+ * Get the artifacts directory for Telegram attachments, scoped to a specific chat.
+ * Keeps Telegram files separate from other agent artifacts (feed-scan snapshots, etc.).
  */
-async function getArtifactsDir(agentId: string): Promise<string> {
+async function getTelegramAttachmentsDir(agentId: string, chatId: string): Promise<string> {
   const now = new Date();
   const pst = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
   const year = pst.getFullYear();
@@ -53,7 +53,7 @@ async function getArtifactsDir(agentId: string): Promise<string> {
   const day = String(pst.getDate());
   const dayName = pst.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
 
-  const dir = resolve(workspaceRoot, agentId, "runs", `${year}-${month}`, `${day}_${dayName}`, "artifacts");
+  const dir = resolve(workspaceRoot, agentId, "runs", `${year}-${month}`, `${day}_${dayName}`, "artifacts", `telegram-${chatId}`);
   await mkdir(dir, { recursive: true });
   return dir;
 }
@@ -65,14 +65,15 @@ async function getArtifactsDir(agentId: string): Promise<string> {
 async function downloadAndSaveAttachment(
   msg: TelegramMessage,
   agentId: string,
+  chatId: string,
 ): Promise<Attachment | null> {
   const info = extractAttachment(msg);
   if (!info) return null;
 
   try {
     const { buffer } = await downloadTelegramFile(info.fileId);
-    const artifactsDir = await getArtifactsDir(agentId);
-    const savedPath = resolve(artifactsDir, info.fileName);
+    const attachDir = await getTelegramAttachmentsDir(agentId, chatId);
+    const savedPath = resolve(attachDir, info.fileName);
     await writeFile(savedPath, buffer);
 
     console.log(`[Telegram] Saved attachment: ${info.fileName} (${info.mimeType}) → ${savedPath}`);
@@ -90,16 +91,16 @@ async function downloadAndSaveAttachment(
 }
 
 /**
- * Scan the artifacts directory for recently saved files.
- * Returns Attachment objects for all files found, so the agent can
- * reference attachments that were saved before it was @mentioned.
+ * Scan the chat-scoped attachments directory for saved files.
+ * Returns Attachment objects for all files from this chat, so the agent
+ * can reference attachments that were saved before it was @mentioned.
  */
-async function collectRecentAttachments(agentId: string): Promise<Attachment[]> {
+async function collectChatAttachments(agentId: string, chatId: string): Promise<Attachment[]> {
   try {
-    const artifactsDir = await getArtifactsDir(agentId);
-    const files = await readdir(artifactsDir);
+    const attachDir = await getTelegramAttachmentsDir(agentId, chatId);
+    const files = await readdir(attachDir);
     return files.map((fileName) => {
-      const filePath = resolve(artifactsDir, fileName);
+      const filePath = resolve(attachDir, fileName);
       const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
       const mimeType = extToMime(ext);
       return { filePath, fileName, mimeType, isImage: isImageMime(mimeType) };
@@ -155,14 +156,20 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
 
   // Download attachments eagerly in active conversations — even without
   // @mention — so they're available when the bot is next triggered.
+  let savedAttachment: Attachment | null = null;
   if (hasAttachment) {
-    await downloadAndSaveAttachment(msg, agentId);
+    savedAttachment = await downloadAndSaveAttachment(msg, agentId, chatId);
   }
 
-  // Store the message text for context
-  const storedContent = hasAttachment && !textContent
-    ? "[attachment]"
-    : textContent;
+  // Store the message text for context. Include the filename in the marker
+  // so we can match attachments to messages when building the prompt.
+  let storedContent = textContent;
+  if (savedAttachment) {
+    const marker = `[attachment:${savedAttachment.fileName}]`;
+    storedContent = storedContent ? `${storedContent}\n${marker}` : marker;
+  } else if (hasAttachment && !textContent) {
+    storedContent = "[attachment]";
+  }
   await storeTelegramMessage(
     chatId, senderId, senderName, messageId, storedContent, timestamp,
   );
@@ -174,13 +181,13 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
   // Clean up the mention from the text
   const cleanedText = isGroup ? stripBotMention(textContent) : textContent;
 
-  // Collect ALL recent attachments from the artifacts directory — this
-  // includes files saved from earlier messages that weren't @mentions.
-  const attachments = await collectRecentAttachments(agentId);
+  // Collect all downloaded attachments for this chat. The messaging layer
+  // will filter to only those referenced in the conversation window.
+  const allChatAttachments = await collectChatAttachments(agentId, chatId);
 
   // Determine prompt text
   let promptText = cleanedText;
-  if (!promptText && attachments.length > 0) {
+  if (!promptText && allChatAttachments.length > 0) {
     promptText = "[User sent an attachment]";
   } else if (!promptText) {
     promptText = `${senderName} mentioned you`;
@@ -196,7 +203,7 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
       traceName: "telegram-message",
       traceMetadata: { chatId, senderId, senderName, chatType: msg.chat.type },
       context: { originChannel: "telegram" },
-      attachments: attachments.length > 0 ? attachments : undefined,
+      attachments: allChatAttachments.length > 0 ? allChatAttachments : undefined,
       replyFn: async (replyText) => {
         await sendTelegramMessage(chatId, replyText, {
           replyToMessageId: msg.message_id,

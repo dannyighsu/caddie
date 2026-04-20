@@ -126,6 +126,18 @@ export function getWebhookSecret(): string {
   return process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
 }
 
+/**
+ * Check if a chat ID is on the allowlist.
+ * If TELEGRAM_ALLOWED_CHATS is not set, all chats are allowed (open mode).
+ * The allowlist is a comma-separated list of chat IDs (can be negative for groups).
+ */
+export function isChatAllowed(chatId: number): boolean {
+  const allowlist = process.env.TELEGRAM_ALLOWED_CHATS;
+  if (!allowlist) return true;
+  const allowed = allowlist.split(",").map((id) => id.trim());
+  return allowed.includes(String(chatId));
+}
+
 // --- Webhook signature verification ---
 
 /**

@@ -174,7 +174,8 @@ export async function handleInboundMessage(
  * Build a prompt that includes conversation history for context.
  * Keeps recent messages (last N exchanges) to avoid blowing up the prompt.
  *
- * Attachments are handled as follows:
+ * Attachments are filtered to only include files referenced in the
+ * conversation window (via [attachment:<fileName>] markers in message content).
  * - Images: referenced by path so the agent can read them (Claude Code is multimodal)
  * - Non-images: referenced by path so the agent knows where the file is
  */
@@ -185,9 +186,9 @@ function buildPromptWithHistory(
 ): string {
   const parts: string[] = [];
 
-  // Conversation history
-  if (messages.length > 0) {
-    const recent = messages.slice(-20);
+  // Conversation history — last 20 messages
+  const recent = messages.length > 0 ? messages.slice(-20) : [];
+  if (recent.length > 0) {
     const historyLines = recent.map((m) => {
       const role = m.role === "user" ? "User" : "Assistant";
       const content = m.content.length > 1000
@@ -205,15 +206,23 @@ function buildPromptWithHistory(
   // Current message
   parts.push("New message:\n" + currentText);
 
-  // Attachments
+  // Filter attachments to only those referenced in the conversation window
+  // or the current message. Messages store [attachment:<fileName>] markers.
   if (attachments && attachments.length > 0) {
-    const attachmentLines = attachments.map((a) => {
-      if (a.isImage) {
-        return `Attached image: ${a.fileName} — saved to ${a.filePath} (read this file to view the image)`;
-      }
-      return `Attached file: ${a.fileName} (${a.mimeType}) — saved to ${a.filePath}`;
-    });
-    parts.push("Attachments:\n" + attachmentLines.join("\n"));
+    const windowText = recent.map((m) => m.content).join("\n") + "\n" + currentText;
+    const referencedAttachments = attachments.filter((a) =>
+      windowText.includes(`[attachment:${a.fileName}]`)
+    );
+
+    if (referencedAttachments.length > 0) {
+      const attachmentLines = referencedAttachments.map((a) => {
+        if (a.isImage) {
+          return `Attached image: ${a.fileName} — saved to ${a.filePath} (read this file to view the image)`;
+        }
+        return `Attached file: ${a.fileName} (${a.mimeType}) — saved to ${a.filePath}`;
+      });
+      parts.push("Attachments:\n" + attachmentLines.join("\n"));
+    }
   }
 
   return parts.join("\n\n---\n\n");

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   isTelegramConfigured,
   verifyWebhookSecret,
+  isChatAllowed,
   type TelegramUpdate,
 } from "@/lib/telegram";
 import { handleTelegramMessage } from "@/lib/telegram-handler";
@@ -32,6 +33,12 @@ export async function POST(request: NextRequest) {
   // We handle regular messages and edits. Ignore channel posts and other update types.
   const msg = update.message ?? update.edited_message;
   if (!msg) {
+    return NextResponse.json({ status: "ignored" }, { status: 200 });
+  }
+
+  // Chat allowlist — ignore messages from unauthorized chats
+  if (!isChatAllowed(msg.chat.id)) {
+    console.log(`[Telegram] Ignoring message from chat ${msg.chat.id} (not in TELEGRAM_ALLOWED_CHATS)`);
     return NextResponse.json({ status: "ignored" }, { status: 200 });
   }
 
