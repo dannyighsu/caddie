@@ -8,15 +8,15 @@ importers:
 
   .:
     dependencies:
-      email-reply-parser:
-        specifier: ^2.3.5
-        version: 2.3.5
+      agentmail:
+        specifier: ^0.5.3
+        version: 0.5.3
       qrcode-terminal:
         specifier: ^0.12.0
         version: 0.12.0
-      resend:
-        specifier: ^6.10.0
-        version: 6.10.0
+      svix:
+        specifier: ^1.94.0
+        version: 1.94.0
     devDependencies:
       '@types/qrcode-terminal':
         specifier: ^0.12.2
@@ -806,6 +806,10 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
+  agentmail@0.5.3:
+    resolution: {integrity: sha512-vQRXADJNvqgn2qKoNv8uFfwKAKuHUmA6FujMyeixjBWos/LaYXLjL6UjBDQ0tI/qBuIA8pN30v9P+HcWVbkEiQ==}
+    engines: {node: '>=18.0.0'}
+
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
     peerDependencies:
@@ -938,15 +942,6 @@ packages:
 
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
-
-  email-reply-parser@2.3.5:
-    resolution: {integrity: sha512-0giLt6y7TKHrd+X1jxblFiDqGeeQmXalGLBkqjyBBl9O0gT19r2da2zMqNa1wHs3uoMZVesjNPny8+g0YtI5fw==}
-    engines: {node: '>= 20.0.0'}
-    peerDependencies:
-      re2: 1.22.1
-    peerDependenciesMeta:
-      re2:
-        optional: true
 
   encodeurl@2.0.0:
     resolution: {integrity: sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg==}
@@ -1457,9 +1452,6 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  postal-mime@2.7.4:
-    resolution: {integrity: sha512-0WdnFQYUrPGGTFu1uOqD2s7omwua8xaeYGdO6rb88oD5yJ/4pPHDA4sdWqfD8wQVfCny563n/HQS7zTFft+f/g==}
-
   postcss@8.4.31:
     resolution: {integrity: sha512-PS08Iboia9mts/2ygV3eLpY5ghnUcfLV/EXTOW1E2qYxJKGGBUtNjN76FYHnMs36RmARn41bC0AZmn+rR0OVpQ==}
     engines: {node: ^10 || ^12 || >=14}
@@ -1527,15 +1519,6 @@ packages:
   require-from-string@2.0.2:
     resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
     engines: {node: '>=0.10.0'}
-
-  resend@6.10.0:
-    resolution: {integrity: sha512-i7CwZpYj4Oho1RxsTpLcCUkO08+HiL4NXrm6jLJ2WzJ89UGI8eROSieLONJA3hnUrf1OYnCyfq5F6POnHUMv1Q==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      '@react-email/render': '*'
-    peerDependenciesMeta:
-      '@react-email/render':
-        optional: true
 
   resolve-pkg-maps@1.0.0:
     resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
@@ -1646,8 +1629,8 @@ packages:
       babel-plugin-macros:
         optional: true
 
-  svix@1.88.0:
-    resolution: {integrity: sha512-vm/JrrUd3bVyBE+3L33TIyVSs8gS5fYx7lrISvKlDJXTYX1ACH4REX8P1tHxsSKoZi/rvifM1t0XRc5Vc45THw==}
+  svix@1.94.0:
+    resolution: {integrity: sha512-FuP5nJez1P/SeK+4zOBI8RrNhtrzMTBSvwuD4yGGsn+Af2yQazid6OwPu3fpZpMifOJxrJua0su/dYB5fe4v9Q==}
 
   tailwindcss@4.2.2:
     resolution: {integrity: sha512-KWBIxs1Xb6NoLdMVqhbhgwZf2PGBpPEiwOqgI4pFIYbNTfBXiKYyWoTsXgBQ9WFg/OlhnvHaY+AEpW7wSmFo2Q==}
@@ -1704,10 +1687,6 @@ packages:
 
   url-template@2.0.8:
     resolution: {integrity: sha512-XdVKMF4SJ0nP/O7XIPB0JwAEuT9lDIYnNsK8yGVe43y0AWoKeJNdv3ZNWh7ksJ6KqQFjOO6ox/VEitLnaVNufw==}
-
-  uuid@10.0.0:
-    resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
-    hasBin: true
 
   uuid@11.1.0:
     resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
@@ -2382,6 +2361,13 @@ snapshots:
 
   agent-base@7.1.4: {}
 
+  agentmail@0.5.3:
+    dependencies:
+      ws: 8.20.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   ajv-formats@3.0.1(ajv@8.18.0):
     optionalDependencies:
       ajv: 8.18.0
@@ -2499,8 +2485,6 @@ snapshots:
       safe-buffer: 5.2.1
 
   ee-first@1.1.1: {}
-
-  email-reply-parser@2.3.5: {}
 
   encodeurl@2.0.0: {}
 
@@ -3026,8 +3010,6 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.2
 
-  postal-mime@2.7.4: {}
-
   postcss@8.4.31:
     dependencies:
       nanoid: 3.3.11
@@ -3086,11 +3068,6 @@ snapshots:
       redis-errors: 1.2.0
 
   require-from-string@2.0.2: {}
-
-  resend@6.10.0:
-    dependencies:
-      postal-mime: 2.7.4
-      svix: 1.88.0
 
   resolve-pkg-maps@1.0.0: {}
 
@@ -3256,10 +3233,9 @@ snapshots:
       client-only: 0.0.1
       react: 19.2.1
 
-  svix@1.88.0:
+  svix@1.94.0:
     dependencies:
       standardwebhooks: 1.0.0
-      uuid: 10.0.0
 
   tailwindcss@4.2.2: {}
 
@@ -3302,8 +3278,6 @@ snapshots:
   unpipe@1.0.0: {}
 
   url-template@2.0.8: {}
-
-  uuid@10.0.0: {}
 
   uuid@11.1.0: {}
 

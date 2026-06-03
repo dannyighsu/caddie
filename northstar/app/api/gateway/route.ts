@@ -167,7 +167,7 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
 
   if (req.channel === "email") {
     if (!isEmailConfigured()) {
-      return { success: false, error: "Email not configured (missing RESEND_API_KEY or EMAIL_FROM)" };
+      return { success: false, error: "Email not configured (missing AGENTMAIL_API_KEY or AGENTMAIL_INBOX_ID)" };
     }
 
     if (!req.to) {

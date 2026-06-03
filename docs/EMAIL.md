@@ -1,44 +1,46 @@
 # Email Setup
 
-Send and receive via [Resend](https://resend.com). No IMAP, no Gmail — just DNS records on a subdomain and a webhook.
+Send and receive via [AgentMail](https://agentmail.to). Each agent gets a real inbox; replies thread automatically.
 
-## 1. Resend setup
+## 1. AgentMail account
 
-1. Sign up at [resend.com](https://resend.com)
-2. Add a domain (e.g. `mail.agints.io`) and add the DNS records Resend gives you (MX, SPF, DKIM)
-3. In the Resend dashboard, grab your **API key**
+1. Sign up at [agentmail.to](https://agentmail.to) and grab your API key
+2. (Optional) Attach a custom domain in the dashboard if you want a branded sender — otherwise inboxes live on `@agentmail.to`
 
-## 2. Webhook setup
+## 2. Provision the inbox + webhook
 
-1. In Resend dashboard > Webhooks, create a new webhook
-2. **Endpoint URL:** `https://your-domain.com/api/email/webhook`
-3. **Events:** select `email.received`
-4. Copy the **signing secret**
+For local development, expose `localhost:3000` with ngrok first.
 
-For local development, use ngrok or similar to expose `localhost:3000`.
+```bash
+AGENTMAIL_API_KEY=... \
+AGENTMAIL_WEBHOOK_URL=https://your-host/api/email/webhook \
+  npx tsx harness/scripts/agentmail-setup.ts
+```
+
+The script creates (or fetches by `clientId`) the inbox and registers the webhook for `message.received`, then prints the values for the next step.
+
+Optional env vars: `AGENTMAIL_INBOX_USERNAME`, `AGENTMAIL_INBOX_DOMAIN`, `AGENTMAIL_INBOX_CLIENT_ID` (default `agints-primary`).
 
 ## 3. Add to `northstar/.env.local`
 
 ```bash
-RESEND_API_KEY=re_xxxxx
-RESEND_WEBHOOK_SECRET=whsec_xxxxx    # from webhook setup
-EMAIL_FROM=Buri <buri@mail.agints.io> # must match verified Resend domain
+AGENTMAIL_API_KEY=...
+AGENTMAIL_INBOX_ID=agent@agentmail.to     # printed by the setup script
+AGENTMAIL_WEBHOOK_SECRET=whsec_xxxxx      # printed by the setup script
 ```
 
 ## How it works
 
-1. Someone emails `buri@mail.agints.io`
-2. Resend receives it (MX records point to Resend)
-3. Resend POSTs a webhook event to `/api/email/webhook`
-4. We fetch the full email body via Resend API
-5. Quoted reply text is stripped — agent only sees the latest message
-6. Agent responds, reply is sent via Resend with proper threading headers
+1. Someone emails the inbox address
+2. AgentMail POSTs a `message.received` webhook to `/api/email/webhook` with the full message inline
+3. We verify the Svix signature, then hand the message to the messaging handler
+4. `extractedText` (quoted history already stripped) is what the agent sees
+5. Agent replies via `messages.reply(inboxId, messageId, …)` — AgentMail preserves threading
 
 ## Behavior
 
-- Conversations are threaded by sender email address
-- Replies include `In-Reply-To` and `References` headers so email clients thread correctly
-- Emails from `EMAIL_FROM` are ignored (no loops)
+- Conversations are keyed by AgentMail's `threadId`, so two unrelated threads from the same sender are separate conversations
+- Emails from the inbox's own address are ignored (no loops)
 - No routing confirmation emails are sent (too noisy)
 
 ## Sending via gateway
@@ -53,7 +55,6 @@ curl -X POST localhost:3000/api/gateway \
 
 | Problem | Fix |
 |---------|-----|
-| No emails received | Check MX records on your subdomain, verify webhook URL is reachable |
-| Webhook 401 | Check `RESEND_WEBHOOK_SECRET` matches the Resend dashboard |
-| Replies not threading | Ensure `EMAIL_FROM` is on the verified domain |
-| Sends fail | Verify domain in Resend, check DNS propagation |
+| No emails received | Check the webhook URL is publicly reachable and registered for `message.received` |
+| Webhook 401 | `AGENTMAIL_WEBHOOK_SECRET` must match the secret from `client.webhooks.get(webhookId).secret` |
+| Sends fail | Confirm `AGENTMAIL_INBOX_ID` matches an existing inbox under your API key |

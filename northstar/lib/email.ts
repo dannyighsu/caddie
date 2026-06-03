@@ -1,39 +1,36 @@
 /**
- * Email Channel — Resend (send + receive)
+ * Email Channel — AgentMail (send + receive)
  *
- * Outbound: sends via Resend API.
- * Inbound: Resend receives emails and POSTs webhook events to /api/email/webhook.
- *          The webhook contains metadata only — we call the Resend API to fetch
- *          the full email body, then strip quoted reply text.
+ * Outbound: sends via AgentMail API.
+ * Inbound: AgentMail receives emails and POSTs webhook events to /api/email/webhook.
+ *          The webhook payload already includes the full message (with `extractedText`
+ *          stripped of quoted history), so no follow-up fetch is needed.
  *
  * Env vars:
- *   RESEND_API_KEY          — Resend API key
- *   RESEND_WEBHOOK_SECRET   — webhook signing secret (from Resend dashboard)
- *   EMAIL_FROM              — sender address (must be on a verified Resend domain)
+ *   AGENTMAIL_API_KEY        — AgentMail API key
+ *   AGENTMAIL_INBOX_ID       — the inbox to send/receive on (e.g. "agent@agentmail.to")
+ *   AGENTMAIL_WEBHOOK_SECRET — Svix-format signing secret ("whsec_...")
  */
 
-import { Resend } from "resend";
-import EmailReplyParser from "email-reply-parser";
+import { AgentMailClient } from "agentmail";
+import { Webhook } from "svix";
 
 // --- Config ---
 
 export function isEmailConfigured(): boolean {
-  return !!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
+  return !!(process.env.AGENTMAIL_API_KEY && process.env.AGENTMAIL_INBOX_ID);
 }
 
-function getResend(): Resend {
-  return new Resend(process.env.RESEND_API_KEY!);
+function getClient(): AgentMailClient {
+  return new AgentMailClient({ apiKey: process.env.AGENTMAIL_API_KEY! });
 }
 
-function getFromAddress(): string {
-  return process.env.EMAIL_FROM!;
+function getInboxId(): string {
+  return process.env.AGENTMAIL_INBOX_ID!;
 }
 
 export function getFromRawAddress(): string {
-  // Extract bare email from "Name <email>" format
-  const from = getFromAddress();
-  const match = from.match(/<(.+)>/);
-  return match ? match[1] : from;
+  return getInboxId();
 }
 
 // --- Send ---
@@ -42,22 +39,24 @@ export async function sendEmail(
   to: string,
   subject: string,
   text: string,
-  inReplyTo?: string,
 ): Promise<void> {
-  const resend = getResend();
-
-  await resend.emails.send({
-    from: getFromAddress(),
+  const client = getClient();
+  await client.inboxes.messages.send(getInboxId(), {
     to,
     subject,
     text,
-    ...(inReplyTo
-      ? { headers: { "In-Reply-To": inReplyTo, References: inReplyTo } }
-      : {}),
   });
 }
 
-// --- Receive (fetch full email from Resend API) ---
+export async function replyToEmail(
+  messageId: string,
+  text: string,
+): Promise<void> {
+  const client = getClient();
+  await client.inboxes.messages.reply(getInboxId(), messageId, { text });
+}
+
+// --- Receive ---
 
 export interface ReceivedEmail {
   from: string;
@@ -65,70 +64,79 @@ export interface ReceivedEmail {
   subject: string;
   text: string;
   html: string;
+  /** Body with quoted reply history stripped (preferred for agent context). */
+  extractedText: string;
   messageId: string;
-  headers: Record<string, string> | null;
-  createdAt: string;
+  threadId: string;
 }
 
 export async function fetchReceivedEmail(
-  emailId: string,
+  messageId: string,
 ): Promise<ReceivedEmail | null> {
-  const resend = getResend();
-
-  const { data, error } = await resend.emails.receiving.get(emailId);
-
-  if (error || !data) {
-    console.error("[Email] Failed to fetch received email:", error);
+  const client = getClient();
+  try {
+    const msg = await client.inboxes.messages.get(getInboxId(), messageId);
+    return normalizeMessage(msg);
+  } catch (err) {
+    console.error("[Email] Failed to fetch message:", err);
     return null;
   }
+}
 
+// Accepts either the AgentMail webhook payload's `message` object or a
+// `messages.get` response — fields are identically shaped between the two.
+export function normalizeMessage(input: unknown): ReceivedEmail {
+  const msg = input as Record<string, unknown>;
+  const fromField = msg.from;
+  const from =
+    typeof fromField === "string"
+      ? fromField
+      : ((fromField as { address?: string } | undefined)?.address ?? "");
+  const toField = Array.isArray(msg.to) ? msg.to : [];
+  const to = toField.map((t) =>
+    typeof t === "string" ? t : ((t as { address?: string })?.address ?? ""),
+  );
   return {
-    from: data.from,
-    to: data.to,
-    subject: data.subject ?? "(no subject)",
-    text: data.text ?? "",
-    html: data.html ?? "",
-    messageId: data.message_id ?? emailId,
-    headers: data.headers ?? null,
-    createdAt: data.created_at,
+    from,
+    to,
+    subject: (msg.subject as string | undefined) ?? "(no subject)",
+    text: (msg.text as string | undefined) ?? "",
+    html: (msg.html as string | undefined) ?? "",
+    extractedText:
+      (msg.extractedText as string | undefined) ??
+      (msg.text as string | undefined) ??
+      "",
+    messageId: msg.messageId as string,
+    threadId: msg.threadId as string,
   };
 }
 
 // --- Webhook verification ---
 
+export interface InboundWebhookEvent {
+  event: string;
+  message: unknown;
+}
+
 export function verifyWebhook(
   payload: string,
   requestHeaders: globalThis.Headers,
-): unknown | null {
-  const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
-  if (!webhookSecret) {
+): InboundWebhookEvent | null {
+  const secret = process.env.AGENTMAIL_WEBHOOK_SECRET;
+  if (!secret) {
     // No secret configured — skip verification (dev mode)
-    return JSON.parse(payload);
+    return JSON.parse(payload) as InboundWebhookEvent;
   }
 
-  const resend = getResend();
-
+  const wh = new Webhook(secret);
   try {
-    return resend.webhooks.verify({
-      payload,
-      headers: {
-        id: requestHeaders.get("svix-id") ?? "",
-        timestamp: requestHeaders.get("svix-timestamp") ?? "",
-        signature: requestHeaders.get("svix-signature") ?? "",
-      },
-      webhookSecret,
-    });
+    return wh.verify(payload, {
+      "svix-id": requestHeaders.get("svix-id") ?? "",
+      "svix-timestamp": requestHeaders.get("svix-timestamp") ?? "",
+      "svix-signature": requestHeaders.get("svix-signature") ?? "",
+    }) as InboundWebhookEvent;
   } catch (err) {
     console.error("[Email] Webhook verification failed:", err);
     return null;
   }
-}
-
-// --- Reply parsing ---
-
-export function extractLatestReply(text: string): string {
-  const parser = new EmailReplyParser();
-  const parsed = parser.read(text);
-  const visible = parsed.getVisibleText().trim();
-  return visible || text.trim();
 }
