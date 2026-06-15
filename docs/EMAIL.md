@@ -26,7 +26,7 @@ Optional env vars: `AGENTMAIL_INBOX_USERNAME`, `AGENTMAIL_INBOX_DOMAIN`, `AGENTM
 ```bash
 AGENTMAIL_API_KEY=...
 AGENTMAIL_INBOX_ID=agent@agentmail.to     # printed by the setup script
-AGENTMAIL_WEBHOOK_SECRET=whsec_xxxxx      # printed by the setup script
+AGENTMAIL_SIGNING_SECRET=whsec_xxxxx      # printed by the setup script
 ```
 
 ## How it works
@@ -56,5 +56,5 @@ curl -X POST localhost:3000/api/gateway \
 | Problem | Fix |
 |---------|-----|
 | No emails received | Check the webhook URL is publicly reachable and registered for `message.received` |
-| Webhook 401 | `AGENTMAIL_WEBHOOK_SECRET` must match the secret from `client.webhooks.get(webhookId).secret` |
+| Webhook 401 | `AGENTMAIL_SIGNING_SECRET` must match the secret from `client.webhooks.get(webhookId).secret` |
 | Sends fail | Confirm `AGENTMAIL_INBOX_ID` matches an existing inbox under your API key |

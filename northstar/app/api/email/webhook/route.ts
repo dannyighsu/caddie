@@ -17,8 +17,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  if (event.event !== "message.received") {
-    return NextResponse.json({ status: "ignored" }, { status: 200 });
+  console.log(`[Email Webhook] event_type=${event.event_type}`);
+
+  if (event.event_type !== "message.received") {
+    return NextResponse.json({ status: "ignored", event_type: event.event_type }, { status: 200 });
   }
 
   // Process async — return 200 quickly so AgentMail doesn't retry.

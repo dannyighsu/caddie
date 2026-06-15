@@ -3,13 +3,13 @@
  *
  * Outbound: sends via AgentMail API.
  * Inbound: AgentMail receives emails and POSTs webhook events to /api/email/webhook.
- *          The webhook payload already includes the full message (with `extractedText`
+ *          The webhook payload already includes the full message (with `extracted_text`
  *          stripped of quoted history), so no follow-up fetch is needed.
  *
  * Env vars:
  *   AGENTMAIL_API_KEY        — AgentMail API key
  *   AGENTMAIL_INBOX_ID       — the inbox to send/receive on (e.g. "agent@agentmail.to")
- *   AGENTMAIL_WEBHOOK_SECRET — Svix-format signing secret ("whsec_...")
+ *   AGENTMAIL_SIGNING_SECRET — Svix-format signing secret ("whsec_...")
  */
 
 import { AgentMailClient } from "agentmail";
@@ -26,7 +26,9 @@ function getClient(): AgentMailClient {
 }
 
 function getInboxId(): string {
-  return process.env.AGENTMAIL_INBOX_ID!;
+  const id = process.env.AGENTMAIL_INBOX_ID;
+  if (!id) throw new Error("AGENTMAIL_INBOX_ID is not set");
+  return id;
 }
 
 export function getFromRawAddress(): string {
@@ -52,6 +54,7 @@ export async function replyToEmail(
   messageId: string,
   text: string,
 ): Promise<void> {
+  if (!messageId) throw new Error("replyToEmail: messageId is empty");
   const client = getClient();
   await client.inboxes.messages.reply(getInboxId(), messageId, { text });
 }
@@ -70,61 +73,62 @@ export interface ReceivedEmail {
   threadId: string;
 }
 
-export async function fetchReceivedEmail(
-  messageId: string,
-): Promise<ReceivedEmail | null> {
-  const client = getClient();
-  try {
-    const msg = await client.inboxes.messages.get(getInboxId(), messageId);
-    return normalizeMessage(msg);
-  } catch (err) {
-    console.error("[Email] Failed to fetch message:", err);
-    return null;
-  }
-}
-
-// Accepts either the AgentMail webhook payload's `message` object or a
-// `messages.get` response — fields are identically shaped between the two.
+// AgentMail webhook JSON is snake_case on the wire. The SDK's typed responses
+// are camelCase. Read both so this works for either source.
 export function normalizeMessage(input: unknown): ReceivedEmail {
   const msg = input as Record<string, unknown>;
-  const fromField = msg.from;
+  const pick = <T = string>(...keys: string[]): T | undefined => {
+    for (const k of keys) {
+      const v = msg[k];
+      if (v !== undefined && v !== null) return v as T;
+    }
+    return undefined;
+  };
+
+  const fromField = pick<unknown>("from");
   const from =
     typeof fromField === "string"
       ? fromField
       : ((fromField as { address?: string } | undefined)?.address ?? "");
-  const toField = Array.isArray(msg.to) ? msg.to : [];
-  const to = toField.map((t) =>
+  const toField = pick<unknown[]>("to") ?? [];
+  const to = (Array.isArray(toField) ? toField : []).map((t) =>
     typeof t === "string" ? t : ((t as { address?: string })?.address ?? ""),
   );
+
   return {
     from,
     to,
-    subject: (msg.subject as string | undefined) ?? "(no subject)",
-    text: (msg.text as string | undefined) ?? "",
-    html: (msg.html as string | undefined) ?? "",
+    subject: pick<string>("subject") ?? "(no subject)",
+    text: pick<string>("text") ?? "",
+    html: pick<string>("html") ?? "",
     extractedText:
-      (msg.extractedText as string | undefined) ??
-      (msg.text as string | undefined) ??
+      pick<string>("extracted_text", "extractedText") ??
+      pick<string>("text") ??
       "",
-    messageId: msg.messageId as string,
-    threadId: msg.threadId as string,
+    messageId: pick<string>("message_id", "messageId") ?? "",
+    threadId: pick<string>("thread_id", "threadId") ?? "",
   };
 }
 
 // --- Webhook verification ---
 
+// The AgentMail webhook envelope. Field names are snake_case on the wire.
 export interface InboundWebhookEvent {
-  event: string;
+  type: string;
+  event_type: string;
+  event_id?: string;
   message: unknown;
+  thread?: unknown;
 }
 
 export function verifyWebhook(
   payload: string,
   requestHeaders: globalThis.Headers,
 ): InboundWebhookEvent | null {
-  const secret = process.env.AGENTMAIL_WEBHOOK_SECRET;
+  const secret = process.env.AGENTMAIL_SIGNING_SECRET;
   if (!secret) {
-    // No secret configured — skip verification (dev mode)
+    // No secret configured — skip verification (dev mode).
+    console.warn("[Email] AGENTMAIL_SIGNING_SECRET not set — accepting unverified webhook");
     return JSON.parse(payload) as InboundWebhookEvent;
   }
 

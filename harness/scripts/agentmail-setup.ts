@@ -44,7 +44,7 @@ async function main() {
 
   console.log("\n--- copy into northstar/.env.local ---");
   console.log(`AGENTMAIL_INBOX_ID=${inboxId}`);
-  console.log(`AGENTMAIL_WEBHOOK_SECRET=${secret}`);
+  console.log(`AGENTMAIL_SIGNING_SECRET=${secret}`);
   console.log("--------------------------------------\n");
 }
 

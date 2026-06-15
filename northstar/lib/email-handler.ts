@@ -24,6 +24,18 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
     return;
   }
 
+  if (!email.messageId || !email.threadId) {
+    console.error(
+      "[Email Handler] Missing IDs after normalize. Raw message keys:",
+      rawMessage && typeof rawMessage === "object"
+        ? Object.keys(rawMessage as object)
+        : typeof rawMessage,
+      "extracted:",
+      { messageId: email.messageId, threadId: email.threadId, from: email.from },
+    );
+    return;
+  }
+
   // Skip emails from our own address (avoid loops)
   if (email.from === getFromRawAddress()) return;
 
