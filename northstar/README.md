@@ -10,8 +10,16 @@ Control plane and API gateway for the agints agent system. Built with Next.js.
 ## Running
 
 ```bash
-pnpm dev    # http://localhost:3000
+pnpm dev                  # dev server with hot reload (active development only)
+pnpm build && pnpm start  # production server — use for long-lived sessions
 ```
+
+Prefer the production server (`pnpm build && pnpm start`) for anything left
+running for hours: the Turbopack dev compiler accumulates memory over long
+uptime and will eventually OOM. From the repo root, `make run` (production) and
+`make dev` (dev server) wrap these, and `make debug` adds memory diagnostics.
+The dev server still needs the harness built (`@agints/harness`) — the `make`
+targets handle that for you.
 
 ## Ingress
 

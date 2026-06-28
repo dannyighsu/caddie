@@ -21,9 +21,12 @@ agints/
 
 ```bash
 pnpm install              # install dependencies
-make run                  # start Northstar on http://localhost:3000
+make run                  # start Northstar (production build) on http://localhost:3000
 make smoke                # run a smoke test directly via the harness
 ```
+
+> Use `make run` for any long-lived session — it serves a production build, so
+> memory stays bounded. For active development with hot reload, use `make dev`.
 
 ## Creating an Agent
 
@@ -253,20 +256,40 @@ The workspace directory is gitignored.
 ## Running
 
 ```bash
-make run          # start Northstar on http://localhost:3000
+make run          # PROD: next build + next start on http://localhost:3000 (use for long-lived sessions)
+make dev          # DEV: next dev with hot reload (active development only)
+make debug        # DEV + memory diagnostics (see below)
 make build        # build harness + northstar
 make install      # install all dependencies
 make smoke        # run a quick smoke test via the harness
 make google-auth  # one-time Google Calendar OAuth setup (opens browser)
 ```
 
+`make run` vs `make dev`: the dev server runs the Turbopack dev compiler, which
+accumulates compiled-module state in memory over long uptime — fine for an
+editing session, but it will eventually OOM if left running for hours. The
+long-lived control plane should always use `make run` (production build), whose
+memory stays flat. Reach for `make dev` only when you want hot reload while
+editing.
+
 Or directly:
 
 ```bash
-cd northstar && pnpm dev                                      # start Northstar
+cd northstar && pnpm dev                                      # dev server (hot reload)
+cd northstar && pnpm build && pnpm start                      # production server
 cd harness && pnpm smoke                                      # default: buri agent
 cd harness && pnpm smoke -- --agent buri --prompt "..."       # specify agent and prompt
 ```
+
+### Debugging memory
+
+`make debug` runs the dev server with Node memory diagnostics from
+`northstar/scripts/mem-logger.cjs`: periodic per-process `memoryUsage()` logging
+(tagged `server` / `agent` / `child`), major-GC logging, and heap-snapshot dumps
+(automatic near the heap limit, or on demand via `make debug-snapshot`). Filter
+the noise with `make debug 2>&1 | grep ' server '`. Snapshots land in
+`northstar/` (`*.heapsnapshot`, gitignored) — open them in Chrome DevTools →
+Memory.
 
 ## Prerequisites
 
