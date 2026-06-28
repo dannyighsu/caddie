@@ -32,6 +32,7 @@ import {
   formatSenderName,
   extractAttachment,
   downloadTelegramFile,
+  resolveTelegramIdentity,
   type TelegramMessage,
 } from "./telegram";
 
@@ -196,11 +197,19 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
   // Pass only the cleaned user message — conversation history is handled
   // by messaging.ts via the DB conversation record. Do NOT prepend
   // Telegram chat history here; that causes nested duplication.
+  const identity = resolveTelegramIdentity(msg.from);
+  console.log(
+    `[Telegram Handler] Identity: kind=${identity.kind}` +
+      (identity.kind === "authenticated" ? ` userId=${identity.userId}` : "") +
+      ` rawSender=${identity.rawSender}`,
+  );
+
   try {
     await handleInboundMessage({
       text: promptText,
       externalId,
       traceName: "telegram-message",
+      identity,
       traceMetadata: { chatId, senderId, senderName, chatType: msg.chat.type },
       context: { originChannel: "telegram" },
       attachments: allChatAttachments.length > 0 ? allChatAttachments : undefined,

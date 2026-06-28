@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { resolveCapabilities } from "./mcp-resolver.js";
+import { resolveCapabilities, filterCapabilitiesByTrust } from "./mcp-resolver.js";
 import * as fs from "fs/promises";
 
 vi.mock("fs/promises");
@@ -124,5 +124,46 @@ describe("resolveCapabilities", () => {
     expect(result.servers).toEqual({});
     expect(result.flags).toEqual([]);
     expect(result.warnings).toEqual([]);
+  });
+});
+
+describe("filterCapabilitiesByTrust", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("drops household-trust capabilities when tier is guest", async () => {
+    mockReadFile
+      .mockResolvedValueOnce(JSON.stringify({ name: "calendar", trust: "household", server: { command: "x", args: [] } }))
+      .mockResolvedValueOnce(JSON.stringify({ name: "web-search", server: { command: "y", args: [] } }));
+
+    const result = await filterCapabilitiesByTrust(["calendar", "web-search"], "/caps", "guest");
+    expect(result.kept).toEqual(["web-search"]);
+    expect(result.dropped).toEqual(["calendar"]);
+  });
+
+  it("preserves all capabilities when tier is household", async () => {
+    mockReadFile
+      .mockResolvedValueOnce(JSON.stringify({ name: "calendar", trust: "household" }))
+      .mockResolvedValueOnce(JSON.stringify({ name: "web-search" }));
+
+    const result = await filterCapabilitiesByTrust(["calendar", "web-search"], "/caps", "household");
+    expect(result.kept).toEqual(["calendar", "web-search"]);
+    expect(result.dropped).toEqual([]);
+  });
+
+  it("treats missing trust field as public (allowed at any tier)", async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({ name: "egress" }));
+
+    const result = await filterCapabilitiesByTrust(["egress"], "/caps", "guest");
+    expect(result.kept).toEqual(["egress"]);
+  });
+
+  it("silently drops capabilities that fail to load (resolveCapabilities surfaces the warning)", async () => {
+    mockReadFile.mockRejectedValueOnce(new Error("ENOENT"));
+
+    const result = await filterCapabilitiesByTrust(["missing"], "/caps", "household");
+    expect(result.kept).toEqual([]);
+    expect(result.dropped).toEqual([]);
   });
 });

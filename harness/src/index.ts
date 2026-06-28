@@ -22,7 +22,7 @@ export { ClaudeCodeRuntime, type ClaudeCodeRuntimeOptions } from "./runtime/clau
 export { createRuntime, type RuntimeConfig } from "./runtime/factory.js";
 
 // Agent
-export type { AgentConfig, AgentInput, AgentResult } from "./agent/types.js";
+export type { AgentConfig, AgentInput, AgentResult, TrustTier } from "./agent/types.js";
 export { createLauncher, type LauncherConfig } from "./agent/launcher.js";
 
 // Capability

@@ -19,6 +19,11 @@ import {
 import { classifyMessage } from "./classifier";
 import { currentTimePST } from "./helpers";
 import {
+  describeSender,
+  toTrustTier,
+  type ResolvedIdentity,
+} from "./identity";
+import {
   createTraceId,
   createTrace,
   completeTrace,
@@ -45,6 +50,13 @@ export interface InboundMessageParams {
   externalId: string;
   /** Channel name for tracing, e.g. "slack-message" or "telegram-message" */
   traceName: string;
+  /**
+   * Verified sender identity produced by the channel handler's identity
+   * resolver. This is a TRUSTED field — the messaging layer does not
+   * re-derive or re-verify it. Profile selection (intent) stays orthogonal
+   * to trust; this drives the trust tier passed to the launcher.
+   */
+  identity: ResolvedIdentity;
   /** Trace metadata (channel-specific context) */
   traceMetadata?: Record<string, string>;
   /** Send a reply back to the originating channel */
@@ -74,10 +86,18 @@ export interface InboundMessageResult {
 export async function handleInboundMessage(
   params: InboundMessageParams
 ): Promise<InboundMessageResult> {
-  const { text, externalId, traceName, traceMetadata, replyFn, context, attachments } = params;
+  const { text, externalId, traceName, traceMetadata, replyFn, context, attachments, identity } = params;
+
+  const trustTier = toTrustTier(identity);
+  const senderIdentity = describeSender(identity);
 
   const traceId = createTraceId();
-  await createTrace(traceId, traceName, traceMetadata);
+  await createTrace(traceId, traceName, {
+    ...traceMetadata,
+    identityKind: identity.kind,
+    identityUser: identity.kind === "authenticated" ? identity.userId : "guest",
+    trustTier,
+  });
 
   try {
     let conversation = await getConversationByExternalId(externalId);
@@ -103,18 +123,27 @@ export async function handleInboundMessage(
       console.log(`[Messaging] Routed to ${classification.label}`);
     }
 
-    // Build prompt with conversation history for continuity.
-    // Each run is a fresh session — no --resume — so we prepend prior
-    // messages so the agent has context from previous exchanges.
-    const fullPrompt = buildPromptWithHistory(conversation.messages, text, attachments);
+    // Build prompt with conversation history for continuity. Each run is a
+    // fresh session — no --resume — so we prepend prior messages so the agent
+    // has context from previous exchanges, tagged with each turn's sender so
+    // mixed authenticated/guest threads remain attributable.
+    const fullPrompt = buildPromptWithHistory(
+      conversation.messages,
+      text,
+      identity,
+      attachments,
+    );
 
     const launcher = getLauncher();
     const result = await launcher.launch({
       agentId: conversation.agent_id,
       profile,
+      trustTier,
       prompt: fullPrompt,
       context: {
         currentTime: currentTimePST(),
+        senderIdentity,
+        trustTier,
         ...context,
       },
       additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
@@ -124,9 +153,16 @@ export async function handleInboundMessage(
 
     // Record messages
     const now = new Date().toISOString();
-    const newMessages: Message[] = [
-      { role: "user", content: text, timestamp: now },
-    ];
+    const userMessage: Message = {
+      role: "user",
+      content: text,
+      timestamp: now,
+      sender:
+        identity.kind === "authenticated"
+          ? { kind: "authenticated", userId: identity.userId }
+          : { kind: "guest" },
+    };
+    const newMessages: Message[] = [userMessage];
     if (rawText) {
       newMessages.push({
         role: "assistant",
@@ -179,9 +215,22 @@ export async function handleInboundMessage(
  * - Images: referenced by path so the agent can read them (Claude Code is multimodal)
  * - Non-images: referenced by path so the agent knows where the file is
  */
+function senderLabel(m: Message): string {
+  if (m.role === "assistant") return "Assistant";
+  if (!m.sender) return "User";
+  if (m.sender.kind === "guest") return "Guest";
+  return m.sender.userId === "danny" ? "Danny" : "Betty";
+}
+
+function currentMessageLabel(identity: ResolvedIdentity): string {
+  if (identity.kind === "guest") return "Guest";
+  return identity.userId === "danny" ? "Danny" : "Betty";
+}
+
 function buildPromptWithHistory(
   messages: Message[],
   currentText: string,
+  identity: ResolvedIdentity,
   attachments?: Attachment[],
 ): string {
   const parts: string[] = [];
@@ -190,11 +239,11 @@ function buildPromptWithHistory(
   const recent = messages.length > 0 ? messages.slice(-20) : [];
   if (recent.length > 0) {
     const historyLines = recent.map((m) => {
-      const role = m.role === "user" ? "User" : "Assistant";
+      const label = senderLabel(m);
       const content = m.content.length > 1000
         ? m.content.substring(0, 1000) + "..."
         : m.content;
-      return `[${role}]: ${content}`;
+      return `[${label}]: ${content}`;
     });
 
     parts.push(
@@ -203,8 +252,8 @@ function buildPromptWithHistory(
     );
   }
 
-  // Current message
-  parts.push("New message:\n" + currentText);
+  // Current message — labeled by sender so the agent sees who is speaking now
+  parts.push(`New message from [${currentMessageLabel(identity)}]:\n` + currentText);
 
   // Filter attachments to only those referenced in the conversation window
   // or the current message. Messages store [attachment:<fileName>] markers.

@@ -9,6 +9,7 @@
 import { readFile } from "fs/promises";
 import { resolve } from "path";
 import type { MCPServerConfig } from "../runtime/types.js";
+import type { TrustTier } from "../agent/types.js";
 
 export interface CapabilityDefinition {
   name: string;
@@ -19,6 +20,12 @@ export interface CapabilityDefinition {
     args: string[];
     env?: Record<string, string>;
   };
+  /**
+   * Trust required to mount this capability. `"household"` means only
+   * authenticated household members may use it (private data sources).
+   * Omit for public capabilities available to all senders.
+   */
+  trust?: "household";
 }
 
 const ENV_VAR_PATTERN = /\$\{([^}]+)\}/g;
@@ -123,4 +130,54 @@ export async function resolveCapabilities(
   }
 
   return { servers, flags, warnings };
+}
+
+export interface TrustFilterResult {
+  /** Capability names that survived the filter. */
+  kept: string[];
+  /** Capability names that were dropped because the trust tier didn't allow them. */
+  dropped: string[];
+}
+
+/**
+ * Filter a list of capability names by trust tier. Drops any capability whose
+ * JSON declares `trust: "household"` when the run's tier is `"guest"`.
+ *
+ * Default-deny on unknown trust values: anything not strictly `undefined` and
+ * not the active tier's allowed set gets dropped, so adding a future trust tier
+ * (e.g. `"admin"`) won't accidentally expose it to existing tiers.
+ *
+ * Capabilities that fail to load are dropped silently here — `resolveCapabilities`
+ * will surface the load failure with its own warning.
+ */
+export async function filterCapabilitiesByTrust(
+  capabilityNames: string[],
+  capabilitiesDir: string,
+  trustTier: TrustTier
+): Promise<TrustFilterResult> {
+  const kept: string[] = [];
+  const dropped: string[] = [];
+
+  for (const name of capabilityNames) {
+    let def: CapabilityDefinition;
+    try {
+      def = await loadCapability(capabilitiesDir, name);
+    } catch {
+      continue;
+    }
+
+    const required = def.trust;
+    if (required === undefined) {
+      kept.push(name);
+      continue;
+    }
+
+    if (required === "household" && trustTier === "household") {
+      kept.push(name);
+    } else {
+      dropped.push(name);
+    }
+  }
+
+  return { kept, dropped };
 }

@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createLauncher } from "./launcher.js";
 import type { AgentRuntime, AgentRuntimeOutput } from "../runtime/types.js";
 import * as fs from "fs/promises";
+import {
+  filterCapabilitiesByTrust,
+  resolveCapabilities,
+} from "../capability/mcp-resolver.js";
 
 vi.mock("fs/promises");
 vi.mock("../capability/mcp-resolver.js", () => ({
@@ -10,6 +14,10 @@ vi.mock("../capability/mcp-resolver.js", () => ({
     flags: [],
     warnings: [],
   }),
+  filterCapabilitiesByTrust: vi.fn(async (names: string[]) => ({
+    kept: names,
+    dropped: [],
+  })),
 }));
 vi.mock("../resolver/runner.js", () => ({
   runResolvers: vi.fn().mockResolvedValue({}),
@@ -207,6 +215,87 @@ describe("createLauncher", () => {
 
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.maxTurns).toBe(150);
+  });
+
+  it("defaults to guest trust tier when none is provided", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({ ...baseAgentConfig, capabilities: ["calendar", "web-search"] });
+      }
+      if (String(path).endsWith("persona.md")) return "persona";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({ agentId: "test-agent", prompt: "go" });
+
+    expect(filterCapabilitiesByTrust).toHaveBeenCalledWith(
+      ["calendar", "web-search"],
+      "/caps",
+      "guest",
+    );
+  });
+
+  it("passes trustTier through to the capability filter", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({ ...baseAgentConfig, capabilities: ["calendar"] });
+      }
+      if (String(path).endsWith("persona.md")) return "persona";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      prompt: "go",
+      trustTier: "household",
+    });
+
+    expect(filterCapabilitiesByTrust).toHaveBeenCalledWith(
+      ["calendar"],
+      "/caps",
+      "household",
+    );
+  });
+
+  it("only resolves capabilities that survived the trust filter", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({ ...baseAgentConfig, capabilities: ["calendar", "web-search"] });
+      }
+      if (String(path).endsWith("persona.md")) return "persona";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    vi.mocked(filterCapabilitiesByTrust).mockResolvedValueOnce({
+      kept: ["web-search"],
+      dropped: ["calendar"],
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      prompt: "go",
+      trustTier: "guest",
+    });
+
+    expect(resolveCapabilities).toHaveBeenCalledWith(["web-search"], "/caps");
   });
 
   it("passes harnessRoot to runtime", async () => {

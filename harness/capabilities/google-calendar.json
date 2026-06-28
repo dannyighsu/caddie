@@ -1,6 +1,7 @@
 {
   "name": "google-calendar",
   "description": "Google Calendar read/write access via MCP",
+  "trust": "household",
   "server": {
     "command": "node",
     "args": ["../mcp-servers/google-calendar.mjs"],

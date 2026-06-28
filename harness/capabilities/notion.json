@@ -1,6 +1,7 @@
 {
   "name": "notion",
   "description": "Notion workspace access via MCP",
+  "trust": "household",
   "server": {
     "command": "bunx",
     "args": ["@notionhq/notion-mcp-server"],

@@ -14,6 +14,7 @@
 
 import { AgentMailClient } from "agentmail";
 import { Webhook } from "svix";
+import type { ResolvedIdentity, UserId } from "./identity";
 
 // --- Config ---
 
@@ -71,6 +72,8 @@ export interface ReceivedEmail {
   extractedText: string;
   messageId: string;
   threadId: string;
+  /** Raw RFC 5322 headers from the inbound message (header name → value). */
+  headers: Record<string, string>;
 }
 
 // AgentMail webhook JSON is snake_case on the wire. The SDK's typed responses
@@ -95,6 +98,14 @@ export function normalizeMessage(input: unknown): ReceivedEmail {
     typeof t === "string" ? t : ((t as { address?: string })?.address ?? ""),
   );
 
+  const rawHeaders = pick<unknown>("headers");
+  const headers: Record<string, string> = {};
+  if (rawHeaders && typeof rawHeaders === "object" && !Array.isArray(rawHeaders)) {
+    for (const [k, v] of Object.entries(rawHeaders as Record<string, unknown>)) {
+      if (typeof v === "string") headers[k] = v;
+    }
+  }
+
   return {
     from,
     to,
@@ -107,7 +118,96 @@ export function normalizeMessage(input: unknown): ReceivedEmail {
       "",
     messageId: pick<string>("message_id", "messageId") ?? "",
     threadId: pick<string>("thread_id", "threadId") ?? "",
+    headers,
   };
+}
+
+// --- Identity resolution ---
+
+function bareAddress(field: string): string {
+  const match = field.match(/<([^>]+)>/);
+  return (match ? match[1] : field).trim().toLowerCase();
+}
+
+function getHeader(headers: Record<string, string>, name: string): string | undefined {
+  const target = name.toLowerCase();
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === target && v) return v;
+  }
+  return undefined;
+}
+
+interface AuthResults {
+  spf?: string;
+  dkim?: string;
+  dmarc?: string;
+}
+
+// RFC 7601: `method=result` pairs separated by `;`, prefixed by the
+// authserv-id. First occurrence of each method wins — that's the trusted
+// ADMD's stamp; downstream re-stamps from forwarders are advisory.
+function parseAuthenticationResults(value: string): AuthResults {
+  const results: AuthResults = {};
+  for (const part of value.split(";")) {
+    const match = part.trim().match(/^(spf|dkim|dmarc)\s*=\s*([a-z]+)/i);
+    if (!match) continue;
+    const method = match[1].toLowerCase() as keyof AuthResults;
+    if (!results[method]) results[method] = match[2].toLowerCase();
+  }
+  return results;
+}
+
+function householdEmailMap(): Map<string, UserId> {
+  const map = new Map<string, UserId>();
+  const add = (envValue: string | undefined, userId: UserId) => {
+    if (!envValue) return;
+    for (const addr of envValue.split(",")) {
+      const cleaned = addr.trim().toLowerCase();
+      if (cleaned) map.set(cleaned, userId);
+    }
+  };
+  add(process.env.DANNY_EMAIL, "danny");
+  add(process.env.BETTY_EMAIL, "betty");
+  return map;
+}
+
+/**
+ * Resolve an inbound email to a household identity or fall back to guest.
+ *
+ * Requires both:
+ *   1. `From` address matches DANNY_EMAIL or BETTY_EMAIL (case-insensitive).
+ *   2. An Authentication-Results header with spf=pass, dkim=pass, dmarc=pass.
+ *
+ * Any failure downgrades to guest — we'd rather lose authenticated access
+ * than grant it on a spoofed `From`. AgentMail does not surface
+ * SPF/DKIM/DMARC as first-class webhook fields, so this is the only
+ * spoofing defense available at the message boundary.
+ */
+export function resolveEmailIdentity(email: ReceivedEmail): ResolvedIdentity {
+  const sender = bareAddress(email.from);
+  const userId = householdEmailMap().get(sender);
+
+  if (!userId) {
+    return { kind: "guest", channel: "email", rawSender: sender };
+  }
+
+  const authResults = getHeader(email.headers, "Authentication-Results");
+  if (!authResults) {
+    console.warn(
+      `[Email Identity] Allowlisted sender ${sender} missing Authentication-Results — downgrading to guest`,
+    );
+    return { kind: "guest", channel: "email", rawSender: sender };
+  }
+
+  const parsed = parseAuthenticationResults(authResults);
+  if (parsed.spf !== "pass" || parsed.dkim !== "pass" || parsed.dmarc !== "pass") {
+    console.warn(
+      `[Email Identity] Allowlisted sender ${sender} did not pass all auth checks (spf=${parsed.spf} dkim=${parsed.dkim} dmarc=${parsed.dmarc}) — downgrading to guest`,
+    );
+    return { kind: "guest", channel: "email", rawSender: sender };
+  }
+
+  return { kind: "authenticated", userId, channel: "email", rawSender: sender };
 }
 
 // --- Webhook verification ---

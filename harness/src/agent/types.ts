@@ -8,6 +8,16 @@
 import type { TriggerContext } from "../trigger/types.js";
 
 /**
+ * Trust tier for an agent run. `household` unlocks capabilities tagged
+ * `trust: "household"` in the capability JSON (private data sources like
+ * calendar, gmail, internal Notion). `guest` filters them out.
+ *
+ * Resolved by the caller (e.g. northstar's messaging layer) from the inbound
+ * sender's identity — never from message content.
+ */
+export type TrustTier = "household" | "guest";
+
+/**
  * Static agent configuration, loaded from agent.json.
  */
 export interface AgentConfig {
@@ -48,6 +58,12 @@ export interface AgentInput {
   agentId: string;
   /** Which profile to use (overrides base capabilities). */
   profile?: string;
+  /**
+   * Trust tier for this run. Defaults to "guest" if omitted — callers must
+   * opt in to authenticated trust explicitly. Filters out capabilities tagged
+   * `trust: "household"` for guests.
+   */
+  trustTier?: TrustTier;
   /** The user's message or task prompt. */
   prompt: string;
   /** Resume a prior session for conversation continuation. */

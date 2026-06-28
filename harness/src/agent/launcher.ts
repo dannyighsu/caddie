@@ -13,7 +13,7 @@
 import { readFile, mkdir, symlink, lstat, readdir, copyFile } from "fs/promises";
 import { resolve } from "path";
 import type { AgentRuntime } from "../runtime/types.js";
-import { resolveCapabilities } from "../capability/mcp-resolver.js";
+import { resolveCapabilities, filterCapabilitiesByTrust } from "../capability/mcp-resolver.js";
 import { runResolvers } from "../resolver/runner.js";
 import type { AgentConfig, AgentInput, AgentResult } from "./types.js";
 
@@ -252,9 +252,21 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       }
     }
 
-    // 6. Resolve MCP capabilities
-    const resolved = agent.capabilities.length > 0
-      ? await resolveCapabilities(agent.capabilities, capabilitiesDir)
+    // 6. Filter capabilities by trust tier (default-deny: missing tier = guest),
+    // then resolve the survivors into MCP server configs.
+    const trustTier = input.trustTier ?? "guest";
+    const trustFiltered = agent.capabilities.length > 0
+      ? await filterCapabilitiesByTrust(agent.capabilities, capabilitiesDir, trustTier)
+      : { kept: [], dropped: [] };
+
+    if (trustFiltered.dropped.length > 0) {
+      console.log(
+        `[Launcher] Trust tier "${trustTier}" dropped capabilities: ${trustFiltered.dropped.join(", ")}`
+      );
+    }
+
+    const resolved = trustFiltered.kept.length > 0
+      ? await resolveCapabilities(trustFiltered.kept, capabilitiesDir)
       : undefined;
 
     const mcpServers = resolved && Object.keys(resolved.servers).length > 0

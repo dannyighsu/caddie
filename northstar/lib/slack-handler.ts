@@ -9,7 +9,7 @@
  * and the handler replies in the Slack thread with the result.
  */
 
-import { replyInThread } from "./slack";
+import { replyInThread, resolveSlackIdentity } from "./slack";
 import { handleInboundMessage } from "./messaging";
 import type { SlackMessageHandler } from "./slack";
 
@@ -18,13 +18,21 @@ export const handleSlackMessage: SlackMessageHandler = async ({
   channel,
   ts,
   threadTs,
+  user,
 }) => {
   const conversationThreadTs = threadTs ?? ts;
+  const identity = resolveSlackIdentity(user);
+  console.log(
+    `[Slack Handler] Identity: kind=${identity.kind}` +
+      (identity.kind === "authenticated" ? ` userId=${identity.userId}` : "") +
+      ` rawSender=${identity.rawSender}`,
+  );
 
   await handleInboundMessage({
     text,
     externalId: `slack:${channel}:${conversationThreadTs}`,
     traceName: "slack-message",
+    identity,
     traceMetadata: { channel, text: text.substring(0, 100) },
     context: { originChannel: "slack" },
     replyFn: async (replyText) => {

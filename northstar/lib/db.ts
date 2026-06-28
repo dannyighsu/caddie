@@ -15,6 +15,15 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  /**
+   * Verified sender of this message at the time of receipt. Set on `user`
+   * rows by the messaging layer from the channel's identity resolver.
+   * Omitted on `assistant` rows and on user rows persisted before the
+   * identity layer existed (rendered as `[User]` in history).
+   */
+  sender?:
+    | { kind: "authenticated"; userId: "danny" | "betty" }
+    | { kind: "guest" };
 }
 
 export interface Conversation {

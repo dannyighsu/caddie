@@ -1,6 +1,7 @@
 {
   "name": "google-gmail",
   "description": "Gmail read-only access via MCP (search and read emails)",
+  "trust": "household",
   "server": {
     "command": "node",
     "args": ["../mcp-servers/google-gmail.mjs"],

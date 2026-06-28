@@ -12,6 +12,7 @@ import {
   normalizeMessage,
   replyToEmail,
   getFromRawAddress,
+  resolveEmailIdentity,
   type ReceivedEmail,
 } from "./email";
 
@@ -42,6 +43,13 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
   const body = email.extractedText.trim();
   if (!body) return;
 
+  const identity = resolveEmailIdentity(email);
+  console.log(
+    `[Email Handler] Identity: kind=${identity.kind}` +
+      (identity.kind === "authenticated" ? ` userId=${identity.userId}` : "") +
+      ` rawSender=${identity.rawSender}`,
+  );
+
   const externalId = `email:${email.threadId}`;
 
   try {
@@ -49,6 +57,7 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
       text: body,
       externalId,
       traceName: "email-message",
+      identity,
       traceMetadata: {
         from: email.from,
         subject: email.subject,

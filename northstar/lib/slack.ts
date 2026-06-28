@@ -11,6 +11,7 @@
 
 import { WebClient } from "@slack/web-api";
 import { SocketModeClient } from "@slack/socket-mode";
+import type { ResolvedIdentity, UserId } from "./identity";
 
 // --- Web API (sending) ---
 
@@ -116,4 +117,34 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
     console.error("[Slack] Socket Mode failed to start:", err);
     socketStarted = false;
   });
+}
+
+// --- Identity resolution ---
+
+function householdSlackMap(): Map<string, UserId> {
+  const map = new Map<string, UserId>();
+  const add = (envValue: string | undefined, userId: UserId) => {
+    if (!envValue) return;
+    for (const raw of envValue.split(",")) {
+      const cleaned = raw.trim();
+      if (cleaned) map.set(cleaned, userId);
+    }
+  };
+  add(process.env.DANNY_SLACK_USER_ID, "danny");
+  add(process.env.BETTY_SLACK_USER_ID, "betty");
+  return map;
+}
+
+/**
+ * Resolve a Slack `event.user` ID against the household allowlist.
+ * Socket Mode events are not per-event signed, but the connection is
+ * token-authenticated and `event.bot_id` is filtered upstream, so `user`
+ * is treated as a verified ID.
+ */
+export function resolveSlackIdentity(user: string): ResolvedIdentity {
+  const userId = householdSlackMap().get(user);
+  if (userId) {
+    return { kind: "authenticated", userId, channel: "slack", rawSender: user };
+  }
+  return { kind: "guest", channel: "slack", rawSender: user };
 }
