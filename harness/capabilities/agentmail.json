@@ -1,0 +1,17 @@
+{
+  "name": "agentmail",
+  "description": "Email via AgentMail — send messages, search the inbox, and read threads. Operates on the agent's AgentMail inbox (not the user's personal Gmail).",
+  "trust": "household",
+  "server": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "agentmail-mcp@0.2.2",
+      "--tools",
+      "send_message,search_messages,get_thread"
+    ],
+    "env": {
+      "AGENTMAIL_API_KEY": "${AGENTMAIL_API_KEY}"
+    }
+  }
+}
