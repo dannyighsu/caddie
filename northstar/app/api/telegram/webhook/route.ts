@@ -33,6 +33,9 @@ export async function POST(request: NextRequest) {
   // We handle regular messages and edits. Ignore channel posts and other update types.
   const msg = update.message ?? update.edited_message;
   if (!msg) {
+    console.log(
+      `[Telegram] Skipping update: not a message or edited_message (keys=${Object.keys(update).join(",")})`,
+    );
     return NextResponse.json({ status: "ignored" }, { status: 200 });
   }
 

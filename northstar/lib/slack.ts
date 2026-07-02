@@ -87,10 +87,20 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
   socketClient.on("app_mention", async ({ event, ack }) => {
     await ack();
 
-    if (event.bot_id) return;
+    if (event.bot_id) {
+      console.log(
+        `[Slack Socket] Skipping mention: from bot (bot_id=${event.bot_id}) channel=${event.channel}`,
+      );
+      return;
+    }
 
     const text = (event.text as string ?? "").replace(/<@[A-Z0-9]+>/g, "").trim();
-    if (!text) return;
+    if (!text) {
+      console.log(
+        `[Slack Socket] Skipping mention: empty text after stripping mention user=${event.user} channel=${event.channel}`,
+      );
+      return;
+    }
 
     try {
       await onMessage({

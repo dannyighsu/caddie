@@ -21,8 +21,14 @@ const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 export interface ClaudeCodeRuntimeOptions {
   /** Path to the `claude` binary. Defaults to "claude" (on PATH). */
   claudeBinary?: string;
-  /** Model to use (e.g., "claude-sonnet-4-5"). If omitted, uses Claude Code default. */
+  /** Model to use (e.g., "claude-sonnet-5"). If omitted, uses Claude Code default. */
   model?: string;
+  /**
+   * Reasoning effort level (low | medium | high | xhigh | max). If omitted,
+   * uses the model's default effort. If the model doesn't support the given
+   * level, Claude Code falls back to the highest supported level at or below it.
+   */
+  effort?: string;
   /** Timeout in ms. Defaults to 10 minutes. */
   timeoutMs?: number;
 }
@@ -31,11 +37,13 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   readonly name = "claude-code";
   private binary: string;
   private model?: string;
+  private effort?: string;
   private timeoutMs: number;
 
   constructor(options: ClaudeCodeRuntimeOptions = {}) {
     this.binary = options.claudeBinary ?? "claude";
     this.model = options.model;
+    this.effort = options.effort;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
@@ -96,6 +104,10 @@ export class ClaudeCodeRuntime implements AgentRuntime {
 
     if (this.model) {
       args.push("--model", this.model);
+    }
+
+    if (this.effort) {
+      args.push("--effort", this.effort);
     }
 
     if (input.enableChrome) {

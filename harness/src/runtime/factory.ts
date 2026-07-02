@@ -27,6 +27,7 @@ export function createRuntime(config: RuntimeConfig = {}): AgentRuntime {
       return new ClaudeCodeRuntime({
         claudeBinary: (config.options?.claudeBinary as string) ?? process.env.CLAUDE_BINARY,
         model: (config.options?.model as string) ?? process.env.CLAUDE_MODEL,
+        effort: (config.options?.effort as string) ?? process.env.CLAUDE_EFFORT,
         timeoutMs: config.options?.timeoutMs as number | undefined,
       });
     default:

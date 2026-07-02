@@ -10,6 +10,7 @@
 import { handleInboundMessage } from "./messaging";
 import {
   normalizeMessage,
+  fetchMessage,
   replyToEmail,
   getFromRawAddress,
   resolveEmailIdentity,
@@ -38,10 +39,31 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
   }
 
   // Skip emails from our own address (avoid loops)
-  if (email.from === getFromRawAddress()) return;
+  if (email.from === getFromRawAddress()) {
+    console.log(
+      `[Email Handler] Skipping message: self-sent (loop prevention) from=${email.from} thread=${email.threadId}`,
+    );
+    return;
+  }
 
-  const body = email.extractedText.trim();
-  if (!body) return;
+  // The webhook offloads the body for all but the smallest messages: text/html
+  // are absent and only `preview` + a short-lived `body_url` are sent. When the
+  // inlined body is empty, fetch the full message by id and use that instead.
+  let body = email.extractedText.trim();
+  if (!body) {
+    const full = await fetchMessage(email.messageId);
+    if (full) {
+      email = full;
+      body = email.extractedText.trim();
+    }
+  }
+  if (!body) {
+    console.log(
+      `[Email Handler] Skipping message: empty body from=${email.from} thread=${email.threadId} ` +
+        `(after fetch: text=${email.text.length}b html=${email.html.length}b subject="${email.subject}")`,
+    );
+    return;
+  }
 
   const identity = resolveEmailIdentity(email);
   console.log(

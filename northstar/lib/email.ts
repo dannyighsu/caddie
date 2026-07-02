@@ -106,20 +106,81 @@ export function normalizeMessage(input: unknown): ReceivedEmail {
     }
   }
 
+  const text = pick<string>("text") ?? "";
+  const html = pick<string>("html") ?? "";
+
+  // Body resolution. `extracted_text` is the *new* content with quoted/forwarded
+  // history stripped — but forwards often leave it empty (the whole body reads as
+  // quoted), so fall through to the full text, then to stripped HTML. Use a
+  // non-empty check rather than `??` because empty strings are present-but-blank
+  // and must NOT short-circuit the chain.
+  const extractedText = firstNonEmpty(
+    pick<string>("extracted_text", "extractedText"),
+    text,
+    stripHtml(pick<string>("extracted_html", "extractedHtml")),
+    stripHtml(html),
+  );
+
   return {
     from,
     to,
     subject: pick<string>("subject") ?? "(no subject)",
-    text: pick<string>("text") ?? "",
-    html: pick<string>("html") ?? "",
-    extractedText:
-      pick<string>("extracted_text", "extractedText") ??
-      pick<string>("text") ??
-      "",
+    text,
+    html,
+    extractedText,
     messageId: pick<string>("message_id", "messageId") ?? "",
     threadId: pick<string>("thread_id", "threadId") ?? "",
     headers,
   };
+}
+
+/** Return the first argument that has non-whitespace content, else "". */
+function firstNonEmpty(...vals: (string | undefined)[]): string {
+  for (const v of vals) {
+    if (v && v.trim()) return v;
+  }
+  return "";
+}
+
+/**
+ * Fetch the full message by id via the API.
+ *
+ * The inbound webhook offloads the body: for anything but the smallest
+ * messages it omits `text`/`html`/`extracted_text` and sends only `preview`
+ * plus a short-lived `body_url`. The documented way to get the complete body
+ * is the Get Message endpoint, so when the webhook body is empty we retrieve
+ * the message by id and re-normalize the (now inlined) result.
+ *
+ * Returns null if the fetch fails so callers can fall back gracefully.
+ */
+export async function fetchMessage(messageId: string): Promise<ReceivedEmail | null> {
+  if (!messageId) return null;
+  try {
+    const client = getClient();
+    const full = await client.inboxes.messages.get(getInboxId(), messageId);
+    return normalizeMessage(full);
+  } catch (err) {
+    console.error(`[Email] Failed to fetch full message ${messageId}:`, err);
+    return null;
+  }
+}
+
+/** Minimal HTML→text fallback for messages that arrive HTML-only. */
+function stripHtml(html: string | undefined): string {
+  if (!html) return "";
+  return html
+    .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<\/(p|div|br|tr|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // --- Identity resolution ---

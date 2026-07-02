@@ -106,6 +106,13 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
         ? req.to
         : undefined);
 
+    // Validate up front, mirroring the immediate-send paths below. Email has no
+    // default recipient, so a missing one can never be resolved at fire time —
+    // reject now instead of accepting the job and failing later in the scheduler.
+    if (notificationChannel === "email" && !notificationRecipient) {
+      return { success: false, error: "Email recipient (to) is required" };
+    }
+
     const job = await scheduleNotification(runAt, {
       message: req.message,
       from: req.from,

@@ -132,7 +132,12 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
   const textContent = msg.text ?? msg.caption ?? "";
   const hasAttachment = !!(msg.photo || msg.document || msg.audio || msg.voice || msg.video);
 
-  if (!textContent && !hasAttachment) return;
+  if (!textContent && !hasAttachment) {
+    console.log(
+      `[Telegram Handler] Skipping message: no text or attachment chat=${msg.chat.id} messageId=${msg.message_id}`,
+    );
+    return;
+  }
 
   const chatId = String(msg.chat.id);
   const senderId = msg.from ? String(msg.from.id) : chatId;
@@ -150,6 +155,9 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
   const isActiveChat = !!conversation;
 
   if (!isActiveChat && !mentioned) {
+    console.log(
+      `[Telegram Handler] Skipping message: inactive chat and bot not mentioned chat=${chatId} sender=${senderName}`,
+    );
     return;
   }
 
@@ -176,6 +184,9 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
   );
 
   if (!mentioned) {
+    console.log(
+      `[Telegram Handler] Skipping trigger: bot not mentioned (message stored for context) chat=${chatId} sender=${senderName}`,
+    );
     return;
   }
 
