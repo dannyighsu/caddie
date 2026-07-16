@@ -15,6 +15,13 @@
 import { AgentMailClient } from "agentmail";
 import { Webhook } from "svix";
 import type { ResolvedIdentity, UserId } from "./identity";
+import {
+  createConversation,
+  getConversationByExternalId,
+  appendMessages,
+  type Message,
+} from "./db";
+import type { ThreadContext } from "./thread-context";
 
 // --- Config ---
 
@@ -38,17 +45,80 @@ export function getFromRawAddress(): string {
 
 // --- Send ---
 
+/** The agent that owns outbound-initiated email threads. */
+const OUTBOUND_AGENT_ID = "buri";
+
+/**
+ * Send an ad-hoc outbound email and return AgentMail's thread/message ids.
+ *
+ * The resulting thread is recorded locally (keyed by `email:<threadId>`) so
+ * that when the recipient replies — the reply carries the same AgentMail
+ * thread id — the shared messaging handler finds the conversation and can
+ * supply prior context. Without this, agent-initiated threads (scheduled
+ * reminders, gateway notifications) have no local record, so replies land as
+ * brand-new conversations with no history.
+ */
 export async function sendEmail(
   to: string,
   subject: string,
   text: string,
-): Promise<void> {
+  opts?: { threadContext?: ThreadContext },
+): Promise<{ messageId: string; threadId: string }> {
   const client = getClient();
-  await client.inboxes.messages.send(getInboxId(), {
+  const res = await client.inboxes.messages.send(getInboxId(), {
     to,
     subject,
     text,
   });
+
+  const result = { messageId: res.messageId, threadId: res.threadId };
+
+  // Best-effort: a failed record must not fail the send itself.
+  try {
+    await recordOutboundThread(result.threadId, subject, text, opts?.threadContext);
+  } catch (err) {
+    console.error(
+      `[Email] Sent to ${to} (thread ${result.threadId}) but failed to record local conversation:`,
+      err,
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Create-or-append the local conversation for an outbound-initiated thread,
+ * storing the sent message as an assistant turn so it shows up as history when
+ * the recipient replies. Idempotent per thread: subsequent sends on the same
+ * thread append rather than duplicate the conversation.
+ */
+async function recordOutboundThread(
+  threadId: string,
+  subject: string,
+  body: string,
+  threadContext?: ThreadContext,
+): Promise<void> {
+  const externalId = `email:${threadId}`;
+  const existing = await getConversationByExternalId(externalId);
+  const conversationId = existing
+    ? existing.id
+    : (
+        await createConversation(
+          OUTBOUND_AGENT_ID,
+          // "Notification" is the generic default subject; prefer a body snippet.
+          subject && subject !== "Notification" ? subject : body.slice(0, 80),
+          externalId,
+          undefined,
+          threadContext,
+        )
+      ).id;
+
+  const message: Message = {
+    role: "assistant",
+    content: body,
+    timestamp: new Date().toISOString(),
+  };
+  await appendMessages(conversationId, [message]);
 }
 
 export async function replyToEmail(

@@ -11,7 +11,15 @@
  * One-shot jobs are removed after firing.
  */
 
-import { getDueJobs, markJobFired, overrideNextRun, type ScheduledJob } from "./redis";
+import {
+  getDueJobs,
+  markJobFired,
+  overrideNextRun,
+  acquireActiveRun,
+  clearActiveRun,
+  isRunActive,
+  type ScheduledJob,
+} from "./redis";
 import { currentTimePST } from "./helpers";
 import { getLauncher } from "./harness";
 import {
@@ -23,6 +31,7 @@ import {
   createTrace,
   completeTrace,
 } from "./tracing";
+import type { ThreadContext } from "./thread-context";
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 let running = false;
@@ -48,12 +57,21 @@ export function startScheduler(): void {
         // Mark as fired first (prevents re-firing on slow runs)
         await markJobFired(job.id);
 
-        // Fire async — don't block the poller
-        fireJob(job).catch(async (err) => {
-          const error = err instanceof Error ? err.message : String(err);
-          console.error(`[Scheduler] Job ${job.id} failed:`, error);
-          await notifyFailure(job, error);
-        });
+        // Fire async — don't block the poller. executeJob takes a per-agent
+        // active-run lock: if a run for this agent+profile is still in flight
+        // (long run, or a manual "run now"), this occurrence is skipped rather
+        // than run concurrently and clobber the shared workspace.
+        executeJob(job, { source: "scheduler" })
+          .then((result) => {
+            if (result.skipped) {
+              console.log(`[Scheduler] Job ${job.id} skipped: ${result.error}`);
+            }
+          })
+          .catch(async (err) => {
+            const error = err instanceof Error ? err.message : String(err);
+            console.error(`[Scheduler] Job ${job.id} failed:`, error);
+            await notifyFailure(job, error);
+          });
       }
     } catch (err) {
       console.error("[Scheduler] Poll error:", err);
@@ -61,65 +79,170 @@ export function startScheduler(): void {
   }, POLL_INTERVAL_MS);
 }
 
+/** How a job execution was initiated. */
+export type JobSource = "scheduler" | "trigger";
+
+export interface ExecuteJobResult {
+  success: boolean;
+  /** Final agent output text, for "run" jobs. */
+  rawText?: string;
+  error?: string;
+  /**
+   * True when the job did not run because another run for the same agent was
+   * already active (concurrency lock not acquired). Not a failure — the
+   * caller should treat this as "try again later".
+   */
+  skipped?: boolean;
+}
+
+/** Active-run lock key: one in-flight agent run per agent+profile. */
+function runLockKey(job: ScheduledJob): string {
+  return `${job.agentId}:${job.profile ?? "default"}`;
+}
+
 /**
- * Execute a scheduled job.
+ * Whether an agent run for this job's agent is currently in flight. Notify jobs
+ * take no lock, so they are never "active". Advisory (non-atomic) — the real
+ * guard is the atomic acquire inside executeJob; this exists so callers can
+ * give immediate "already running" feedback before firing a long run.
  */
-async function fireJob(job: ScheduledJob): Promise<void> {
-  // Handle notification jobs
+export async function isJobActive(job: ScheduledJob): Promise<boolean> {
+  if (job.action === "notify") return false;
+  return isRunActive(runLockKey(job));
+}
+
+/**
+ * Build the source-task facts attached to any email thread this run creates,
+ * so a reply can be traced back to the task (and acted on). Just facts — the
+ * agent decides what to do from them.
+ */
+function buildThreadContext(job: ScheduledJob, source: JobSource): ThreadContext {
+  return {
+    taskId: job.id,
+    description: job.description,
+    schedule: job.cron,
+    // A manual "run now" has no scheduled fire time. For scheduled fires,
+    // job.nextRun is still this run's due time here (the poller's in-memory job
+    // isn't mutated by markJobFired).
+    scheduledTime: source === "trigger" ? undefined : new Date(job.nextRun).toISOString(),
+    runTime: new Date().toISOString(),
+  };
+}
+
+/**
+ * Execute a job's payload — shared by the scheduler poller and manual "run now"
+ * triggers.
+ *
+ * This does NOT touch the schedule (no markJobFired). The poller reschedules /
+ * consumes the job before calling this; the trigger path leaves recurring
+ * schedules intact and consumes one-shots itself.
+ *
+ * Behavior that depends on `source`:
+ *   - The agent's requested next-run override is only honored for "scheduler"
+ *     runs — a manual trigger must not shift the schedule.
+ *   - Failure notifications are only pushed to the job's channel for
+ *     "scheduler" runs; manual triggers surface the error to the caller (UI)
+ *     instead of spamming the channel.
+ *
+ * "run" (agent) jobs take an active-run lock so a manual trigger can't overlap
+ * a scheduled fire (or another trigger) for the same agent and clobber the
+ * shared workspace. "notify" jobs have no such lock (no agent workspace).
+ */
+export async function executeJob(
+  job: ScheduledJob,
+  opts: { source: JobSource }
+): Promise<ExecuteJobResult> {
   if (job.action === "notify") {
-    await fireNotifyJob(job);
-    return;
+    return executeNotifyJob(job, opts.source);
   }
 
-  const traceId = createTraceId();
-  await createTrace(traceId, job.agentId, {
-    trigger: "scheduler",
-    jobId: job.id,
-    profile: job.profile,
-  });
+  const lockKey = runLockKey(job);
+  const acquired = await acquireActiveRun(lockKey);
+  if (!acquired) {
+    return {
+      success: false,
+      skipped: true,
+      error: `A run is already in progress for ${lockKey}`,
+    };
+  }
 
-  const launcher = getLauncher();
-  const result = await launcher.launch({
-    agentId: job.agentId,
-    profile: job.profile,
-    prompt: (job.params?.prompt as string) ?? "Run.",
-    context: {
-      currentTime: currentTimePST(),
-    },
-    additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
-  });
+  try {
+    const traceId = createTraceId();
+    await createTrace(traceId, job.agentId, {
+      trigger: opts.source,
+      jobId: job.id,
+      profile: job.profile,
+    });
 
-  // Auto-reschedule: agent output can override the cron-computed next run
-  const nextMinutes = result.output?.nextCheckInTime as number | undefined;
-  if (nextMinutes && job.cron) {
-    const nextTime = new Date(Date.now() + nextMinutes * 60 * 1000);
-    try {
-      await overrideNextRun(job.id, nextTime);
-      console.log(`[Scheduler] Agent requested next run in ${nextMinutes}m — overriding cron for job ${job.id}`);
-    } catch (err) {
-      console.error(`[Scheduler] Failed to override next run for ${job.id}:`, err);
+    // Scheduled/triggered runs are the household's own automations (the
+    // initiator is the authenticated owner, not an external sender), so they
+    // run at household trust by default — otherwise every household-gated
+    // capability (email, agentmail, notion, calendar) is filtered out. A job
+    // can pin itself to "guest" for least privilege.
+    const trustTier = job.trustTier ?? "household";
+
+    // Attached to any email thread the run creates (via env → email-mcp →
+    // gateway), so a reply can be traced back to this task.
+    const threadContext = buildThreadContext(job, opts.source);
+
+    const launcher = getLauncher();
+    const result = await launcher.launch({
+      agentId: job.agentId,
+      profile: job.profile,
+      trustTier,
+      prompt: (job.params?.prompt as string) ?? "Run.",
+      context: {
+        currentTime: currentTimePST(),
+        trustTier,
+        senderIdentity: "Automated run (no external sender)",
+        originChannel: opts.source === "trigger" ? "manual-trigger" : "schedule",
+      },
+      additionalEnv: {
+        NORTHSTAR_TRACE_ID: traceId,
+        NORTHSTAR_THREAD_CONTEXT: JSON.stringify(threadContext),
+      },
+    });
+
+    // Auto-reschedule: agent output can override the cron-computed next run.
+    // Only for scheduled runs — a manual trigger must not shift the schedule.
+    if (opts.source === "scheduler") {
+      const nextMinutes = result.output?.nextCheckInTime as number | undefined;
+      if (nextMinutes && job.cron) {
+        const nextTime = new Date(Date.now() + nextMinutes * 60 * 1000);
+        try {
+          await overrideNextRun(job.id, nextTime);
+          console.log(`[Scheduler] Agent requested next run in ${nextMinutes}m — overriding cron for job ${job.id}`);
+        } catch (err) {
+          console.error(`[Scheduler] Failed to override next run for ${job.id}:`, err);
+        }
+      }
     }
-  }
 
-  await completeTrace(traceId, {
-    success: result.success,
-    error: result.error,
-  });
+    await completeTrace(traceId, {
+      success: result.success,
+      error: result.error,
+    });
 
-  // Notify on failure
-  if (!result.success) {
-    await notifyFailure(job, result.error || "Unknown error");
+    // Push failure to the job's channel only for scheduled runs; manual
+    // triggers report the error back through the return value.
+    if (!result.success && opts.source === "scheduler") {
+      await notifyFailure(job, result.error || "Unknown error");
+    }
+
+    return { success: result.success, rawText: result.rawText, error: result.error };
+  } finally {
+    await clearActiveRun(lockKey);
   }
 }
 
 /**
- * Execute a scheduled notification job — send a message to the configured channel.
+ * Execute a notification job — send a message to the configured channel.
  */
-async function fireNotifyJob(job: ScheduledJob): Promise<void> {
+async function executeNotifyJob(job: ScheduledJob, source: JobSource): Promise<ExecuteJobResult> {
   const message = job.params?.message as string;
   if (!message) {
     console.error("[Scheduler] Notify job has no message:", job.id);
-    return;
+    return { success: false, error: "Notify job has no message" };
   }
 
   const channel = job.notificationChannel ?? DEFAULT_NOTIFICATION_CHANNEL;
@@ -130,9 +253,14 @@ async function fireNotifyJob(job: ScheduledJob): Promise<void> {
       message,
       from,
       recipient: job.notificationRecipient,
+      // Only meaningful for the email channel; harmless elsewhere.
+      threadContext: buildThreadContext(job, source),
     });
+    return { success: true };
   } catch (err) {
-    console.error(`[Scheduler] Failed to send notify job ${job.id} via ${channel}:`, err);
+    const error = err instanceof Error ? err.message : String(err);
+    console.error(`[Scheduler] Failed to send notify job ${job.id} via ${channel}:`, error);
+    return { success: false, error };
   }
 }
 

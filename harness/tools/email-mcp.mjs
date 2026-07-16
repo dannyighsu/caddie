@@ -1,0 +1,135 @@
+#!/usr/bin/env node
+
+/**
+ * Email Egress MCP Server
+ *
+ * Outbound email for the agent, proxied through the Northstar gateway
+ * (`notify` action, `email` channel). Routing sends through the gateway —
+ * rather than calling AgentMail directly — means every send is recorded as a
+ * local conversation keyed by its AgentMail thread id, so when the recipient
+ * replies the shared messaging handler finds the thread and supplies prior
+ * context.
+ *
+ * This is intentionally a SEPARATE, household-trust capability (see
+ * capabilities/email.json) rather than a tool on the public `egress` server:
+ * sending mail as the household must stay gated to authenticated senders.
+ *
+ * Env:
+ *   NORTHSTAR_URL — Base URL for the Northstar gateway (default: http://localhost:3000)
+ */
+
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+
+const NORTHSTAR_URL = process.env.NORTHSTAR_URL || "http://localhost:3000";
+
+const server = new Server(
+  { name: "email", version: "0.1.0" },
+  { capabilities: { tools: {} } }
+);
+
+const tools = [
+  {
+    name: "send_email",
+    description:
+      "Send an ad-hoc outbound email from your AgentMail inbox to a recipient. " +
+      "Use this for NEW mail you initiate — reaching out to someone, sending a heads-up or notification. " +
+      "DO NOT use this to answer an email someone just sent you: the harness already delivers your reply into the current thread automatically, and using this would start a new thread. " +
+      "Any reply the recipient sends comes back to you with the full thread history attached, so you don't need to restate context you've already sent.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        to: {
+          type: "string",
+          description: "Recipient email address.",
+        },
+        subject: {
+          type: "string",
+          description: "Email subject line.",
+        },
+        message: {
+          type: "string",
+          description: "The email body.",
+        },
+      },
+      required: ["to", "subject", "message"],
+    },
+  },
+];
+
+async function handleSendEmail(args) {
+  const { to, subject, message } = args;
+
+  if (!to || !subject || !message) {
+    return {
+      content: [{ type: "text", text: "send_email requires `to`, `subject`, and `message`." }],
+      isError: true,
+    };
+  }
+
+  // If this run was launched by a task, the harness passes the source-task facts
+  // via NORTHSTAR_THREAD_CONTEXT (inherited from the run env). Forward them so
+  // the gateway can attach them to the created thread for reply continuity.
+  let threadContext;
+  const rawCtx = process.env.NORTHSTAR_THREAD_CONTEXT;
+  if (rawCtx) {
+    try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
+  }
+
+  const res = await fetch(`${NORTHSTAR_URL}/api/gateway`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "notify",
+      channel: "email",
+      to,
+      subject,
+      message,
+      ...(threadContext && { threadContext }),
+    }),
+  });
+
+  const result = await res.json();
+
+  if (!result.success) {
+    return {
+      content: [{ type: "text", text: `Failed to send email: ${result.error ?? "unknown error"}` }],
+      isError: true,
+    };
+  }
+
+  return {
+    content: [{ type: "text", text: `Email sent to ${to}.` }],
+  };
+}
+
+const handlers = {
+  send_email: handleSendEmail,
+};
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  const handler = handlers[name];
+
+  if (!handler) {
+    return {
+      content: [{ type: "text", text: `Unknown tool: ${name}` }],
+      isError: true,
+    };
+  }
+
+  try {
+    return await handler(args ?? {});
+  } catch (err) {
+    return {
+      content: [{ type: "text", text: `Error: ${err.message}` }],
+      isError: true,
+    };
+  }
+});
+
+const transport = new StdioServerTransport();
+await server.connect(transport);

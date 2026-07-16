@@ -18,6 +18,7 @@ import {
 } from "./db";
 import { classifyMessage } from "./classifier";
 import { currentTimePST } from "./helpers";
+import { renderThreadContext } from "./thread-context";
 import {
   describeSender,
   toTrustTier,
@@ -127,7 +128,14 @@ export async function handleInboundMessage(
     // fresh session — no --resume — so we prepend prior messages so the agent
     // has context from previous exchanges, tagged with each turn's sender so
     // mixed authenticated/guest threads remain attributable.
-    const fullPrompt = buildPromptWithHistory(
+    //
+    // If this thread was created by one of the agent's own tasks (e.g. a
+    // recurring reminder), prepend the source-task facts so the agent can trace
+    // the reply back to the task and act on it (e.g. stop the reminder).
+    const taskPreamble = conversation.thread_context
+      ? renderThreadContext(conversation.thread_context) + "\n\n---\n\n"
+      : "";
+    const fullPrompt = taskPreamble + buildPromptWithHistory(
       conversation.messages,
       text,
       identity,

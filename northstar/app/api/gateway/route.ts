@@ -25,14 +25,17 @@ import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
+import type { TrustTier } from "@/lib/identity";
+import type { ThreadContext } from "@/lib/thread-context";
 import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
 import { currentTimePST } from "@/lib/helpers";
 import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, deleteJob, getJob, upsertJob } from "@/lib/redis";
+import { executeJob, isJobActive } from "@/lib/scheduler";
 import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 
 interface GatewayRequest {
-  action: "notify" | "run" | "schedule" | "update_schedule";
+  action: "notify" | "run" | "schedule" | "update_schedule" | "trigger";
 
   // --- notify fields ---
   channel?: NotificationChannel;
@@ -44,12 +47,23 @@ interface GatewayRequest {
   to?: string;
   /** Email subject line */
   subject?: string;
+  /**
+   * Source-task facts to attach to the email thread this send creates (email
+   * channel only). Forwarded by email-mcp from the run's NORTHSTAR_THREAD_CONTEXT.
+   */
+  threadContext?: ThreadContext;
 
   // --- run fields ---
   agentId?: string;
   profile?: string;
   prompt?: string;
   context?: Record<string, string>;
+  /**
+   * Trust tier for scheduled/one-shot agent runs. Defaults to "household" at
+   * execution time (these are the household's own automations). Set "guest" to
+   * pin a job to least privilege.
+   */
+  trustTier?: TrustTier;
 
   // --- scheduling ---
   scheduledFor?: string;    // ISO timestamp for one-shot deferred execution
@@ -80,9 +94,73 @@ async function executeAction(req: GatewayRequest): Promise<Record<string, unknow
       return executeSchedule(req);
     case "update_schedule":
       return executeUpdateSchedule(req);
+    case "trigger":
+      return executeTrigger(req);
     default:
       return { success: false, error: `Unknown action: ${req.action}` };
   }
+}
+
+/**
+ * Trigger an existing scheduled job to run immediately ("run now").
+ *
+ * Runs the job's stored payload out-of-band via the shared executor. The
+ * schedule is preserved: recurring jobs keep their cron/nextRun untouched (this
+ * is an EXTRA fire), while one-shot jobs are consumed (deleted) after running
+ * so they don't also fire at their scheduled time.
+ *
+ * If a run for the same agent is already in progress, the job is not run and
+ * the caller is told to retry later.
+ */
+async function executeTrigger(req: GatewayRequest): Promise<Record<string, unknown>> {
+  if (!req.jobId) {
+    return { success: false, error: "jobId is required for trigger" };
+  }
+
+  const job = await getJob(req.jobId);
+  if (!job) {
+    return { success: false, error: `Job not found: ${req.jobId}` };
+  }
+
+  // Immediate "already running" feedback so we don't fire (or consume a
+  // one-shot) while a run for the same agent is in flight.
+  if (await isJobActive(job)) {
+    return { success: false, skipped: true, error: "A run is already in progress for this agent" };
+  }
+
+  // One-shot jobs are consumed (deleted) once they run, so they don't also fire
+  // at their scheduled time. Recurring jobs stay on their schedule — a manual
+  // trigger is just an extra run.
+  const consumed = !job.cron;
+
+  // Notify jobs are fast — run inline and report the result.
+  if (job.action === "notify") {
+    const result = await executeJob(job, { source: "trigger" });
+    if (result.success && consumed) {
+      await deleteJob(job.id);
+    }
+    return { success: result.success, error: result.error, consumed: result.success && consumed };
+  }
+
+  // Agent "run" jobs can take minutes — fire async so the request returns
+  // promptly (mirrors how the scheduler fires). Consume a one-shot only after
+  // it actually ran (not if the concurrency lock was lost in the meantime).
+  executeJob(job, { source: "trigger" })
+    .then(async (result) => {
+      if (result.skipped) {
+        console.log(`[Gateway] Trigger ${job.id} skipped: ${result.error}`);
+        return;
+      }
+      if (consumed) {
+        await deleteJob(job.id);
+      }
+    })
+    .catch((err) => {
+      const error = err instanceof Error ? err.message : String(err);
+      console.error(`[Gateway] Trigger ${job.id} failed:`, error);
+    });
+
+  return { success: true, started: true, recurring: !!job.cron, consumed };
 }
 
 async function executeNotify(req: GatewayRequest): Promise<Record<string, unknown>> {
@@ -186,7 +264,7 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
       ? `[${req.from}] ${req.message}`
       : req.message;
 
-    await sendEmail(req.to, subject, formatted);
+    await sendEmail(req.to, subject, formatted, { threadContext: req.threadContext });
     return { success: true, channel: "email", to: req.to };
   }
 
@@ -210,6 +288,7 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
       description: req.description,
       notificationChannel: req.notificationChannel,
       notificationRecipient: req.notificationRecipient,
+      trustTier: req.trustTier,
     });
     return { success: true, scheduled: true, jobId: job.id, nextRun: new Date(job.nextRun).toISOString() };
   }
@@ -267,6 +346,7 @@ async function executeSchedule(req: GatewayRequest): Promise<Record<string, unkn
       description: req.description,
       notificationChannel: req.notificationChannel,
       notificationRecipient: req.notificationRecipient,
+      trustTier: req.trustTier,
     });
     return {
       success: true,
@@ -315,6 +395,9 @@ async function executeUpdateSchedule(req: GatewayRequest): Promise<Record<string
   }
   if (req.notificationRecipient !== undefined) {
     existing.notificationRecipient = req.notificationRecipient;
+  }
+  if (req.trustTier !== undefined) {
+    existing.trustTier = req.trustTier;
   }
 
   await upsertJob(existing);

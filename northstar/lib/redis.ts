@@ -7,6 +7,7 @@
 
 import Redis from "ioredis";
 import type { NotificationChannel } from "./notification-channels";
+import type { TrustTier } from "./identity";
 
 let redis: Redis | null = null;
 
@@ -44,6 +45,29 @@ export async function isRunActive(key: string): Promise<boolean> {
 
 export async function clearActiveRun(key: string): Promise<void> {
   await getRedis().del(`northstar:active:${key}`);
+}
+
+/**
+ * Atomically acquire the active-run lock for a key.
+ *
+ * Returns true if the lock was acquired, false if a run is already active
+ * (Redis SET NX). Use this — rather than a separate isRunActive/setActiveRun
+ * pair — to avoid a check-then-set race between the scheduler poller and a
+ * manual "run now" trigger. Always pair a successful acquire with
+ * clearActiveRun in a finally block.
+ */
+export async function acquireActiveRun(
+  key: string,
+  ttlSeconds = 900
+): Promise<boolean> {
+  const res = await getRedis().set(
+    `northstar:active:${key}`,
+    String(Date.now()),
+    "EX",
+    ttlSeconds,
+    "NX"
+  );
+  return res === "OK";
 }
 
 // =============================================================================
@@ -85,6 +109,13 @@ export interface ScheduledJob {
    * If omitted, the channel's configured default is used.
    */
   notificationRecipient?: string;
+  /**
+   * Trust tier the agent run launches at. Scheduled/triggered runs are the
+   * household's own automations, so they default to "household" (giving access
+   * to household-gated capabilities like email/notion/calendar). Pin to "guest"
+   * for a job that should run least-privilege. Only applies to "run" jobs.
+   */
+  trustTier?: TrustTier;
 }
 
 const JOBS_HASH = "northstar:jobs";
@@ -138,6 +169,7 @@ export async function scheduleOneShot(
     description?: string;
     notificationChannel?: NotificationChannel;
     notificationRecipient?: string;
+    trustTier?: TrustTier;
   }
 ): Promise<ScheduledJob> {
   const job: ScheduledJob = {
@@ -150,6 +182,7 @@ export async function scheduleOneShot(
     description: options?.description,
     notificationChannel: options?.notificationChannel,
     notificationRecipient: options?.notificationRecipient,
+    trustTier: options?.trustTier,
   };
   await upsertJob(job);
   return job;
@@ -199,6 +232,7 @@ export async function scheduleRecurring(
     description?: string;
     notificationChannel?: NotificationChannel;
     notificationRecipient?: string;
+    trustTier?: TrustTier;
   }
 ): Promise<ScheduledJob> {
   const nextRun = await computeNextRun(cronExpr);
@@ -213,6 +247,7 @@ export async function scheduleRecurring(
     description: options?.description,
     notificationChannel: options?.notificationChannel,
     notificationRecipient: options?.notificationRecipient,
+    trustTier: options?.trustTier,
   };
   await upsertJob(job);
   return job;

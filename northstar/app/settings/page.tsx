@@ -200,6 +200,37 @@ function Schedules() {
     refreshJobs();
   }
 
+  const [running, setRunning] = useState<string | null>(null);
+
+  async function handleRunNow(job: Job) {
+    const sideEffects =
+      "If this job has side effects (sending email, posting, creating events), running it now may duplicate them";
+    const tail = job.cron
+      ? " in addition to its scheduled runs."
+      : ", and it will then be removed from the schedule (it won't fire at its scheduled time).";
+    if (!window.confirm(`Run "${job.description ?? job.id}" now?\n\n${sideEffects}${tail}`)) {
+      return;
+    }
+
+    setRunning(job.id);
+    try {
+      const res = await fetch("/api/gateway", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "trigger", jobId: job.id }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        window.alert(data.error ?? "Failed to run job.");
+      } else if (data.started) {
+        window.alert("Run started — watch the transcripts for output.");
+      }
+      refreshJobs();
+    } finally {
+      setRunning(null);
+    }
+  }
+
   function formatNextRun(epochMs: number): string {
     const d = new Date(epochMs);
     const now = new Date();
@@ -251,6 +282,13 @@ function Schedules() {
                   <span className={`text-xs ${job.enabled ? "text-green-400" : "text-gray-600"}`}>
                     {job.enabled ? formatNextRun(job.nextRun) : "disabled"}
                   </span>
+                  <button
+                    onClick={() => handleRunNow(job)}
+                    disabled={running === job.id}
+                    className="text-xs text-gray-600 hover:text-green-400 transition-colors disabled:opacity-50"
+                  >
+                    {running === job.id ? "running..." : "run now"}
+                  </button>
                   <button
                     onClick={() => handleDelete(job.id)}
                     className="text-xs text-gray-600 hover:text-red-400 transition-colors"

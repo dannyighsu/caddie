@@ -1,0 +1,9 @@
+{
+  "name": "email",
+  "description": "Send ad-hoc outbound email as the household, via the Northstar gateway (records the thread so replies come back with context).",
+  "trust": "household",
+  "server": {
+    "command": "node",
+    "args": ["${HARNESS_ROOT}/tools/email-mcp.mjs"]
+  }
+}

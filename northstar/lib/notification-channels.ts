@@ -9,6 +9,7 @@ import { sendMessage, isSlackConfigured } from "./slack";
 import { sendTelegramMessage, isTelegramConfigured } from "./telegram";
 import { sendEmail, isEmailConfigured } from "./email";
 import { getSetting } from "./db";
+import type { ThreadContext } from "./thread-context";
 
 export const NOTIFICATION_CHANNELS = ["slack", "telegram", "email"] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
@@ -28,6 +29,8 @@ export interface NotificationOptions {
   recipient?: string;
   /** Email subject (only used for email channel) */
   subject?: string;
+  /** Source-task facts to attach to the created email thread (email channel only). */
+  threadContext?: ThreadContext;
 }
 
 /**
@@ -81,7 +84,7 @@ export async function sendNotification(
       throw new Error("Email recipient is required");
     }
     const subject = options.subject ?? "Notification";
-    await sendEmail(options.recipient, subject, formatted);
+    await sendEmail(options.recipient, subject, formatted, { threadContext: options.threadContext });
     return;
   }
 

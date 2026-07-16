@@ -8,6 +8,7 @@
 
 import pg from "pg";
 import { v4 as uuid } from "uuid";
+import type { ThreadContext } from "./thread-context";
 
 const { Pool } = pg;
 
@@ -34,6 +35,12 @@ export interface Conversation {
   title: string | null;
   external_id: string | null;
   messages: Message[];
+  /**
+   * Facts about the task run that created this thread (set on outbound-initiated
+   * threads). Replayed to the agent when a reply is handled. Null for
+   * inbound-initiated or ad-hoc threads.
+   */
+  thread_context: ThreadContext | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +70,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   title TEXT,
   external_id TEXT,
   messages JSONB DEFAULT '[]'::jsonb,
+  thread_context JSONB,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -92,6 +100,15 @@ DO $$ BEGIN
     WHERE table_name = 'conversations' AND column_name = 'profile'
   ) THEN
     ALTER TABLE conversations ADD COLUMN profile TEXT;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'conversations' AND column_name = 'thread_context'
+  ) THEN
+    ALTER TABLE conversations ADD COLUMN thread_context JSONB;
   END IF;
 END $$;
 
@@ -138,7 +155,8 @@ export async function createConversation(
   agentId: string,
   title: string,
   externalId?: string,
-  profile?: string
+  profile?: string,
+  threadContext?: ThreadContext
 ): Promise<Conversation> {
   await ensureSchema();
   const id = uuid();
@@ -146,12 +164,12 @@ export async function createConversation(
   // If external_id collides (race between concurrent inbound messages on the
   // same thread), return the existing row instead of throwing.
   const result = await getPool().query(
-    `INSERT INTO conversations (id, agent_id, profile, title, external_id, messages)
-     VALUES ($1, $2, $3, $4, $5, '[]'::jsonb)
+    `INSERT INTO conversations (id, agent_id, profile, title, external_id, messages, thread_context)
+     VALUES ($1, $2, $3, $4, $5, '[]'::jsonb, $6)
      ON CONFLICT (external_id) WHERE external_id IS NOT NULL DO UPDATE
        SET updated_at = conversations.updated_at
      RETURNING *`,
-    [id, agentId, profile ?? null, title, externalId ?? null]
+    [id, agentId, profile ?? null, title, externalId ?? null, threadContext ? JSON.stringify(threadContext) : null]
   );
   return rowToConversation(result.rows[0]);
 }
@@ -326,6 +344,11 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     messages: (typeof row.messages === "string"
       ? JSON.parse(row.messages)
       : row.messages) as Message[],
+    thread_context: (row.thread_context == null
+      ? null
+      : typeof row.thread_context === "string"
+        ? JSON.parse(row.thread_context)
+        : row.thread_context) as ThreadContext | null,
     created_at: (row.created_at as Date).toISOString(),
     updated_at: (row.updated_at as Date).toISOString(),
   };
