@@ -20,7 +20,7 @@ export default function TranscriptsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-gray-500">Loading...</p>;
+  if (loading) return <p className="text-ink-faint">Loading...</p>;
 
   function formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes}B`;
@@ -46,25 +46,28 @@ export default function TranscriptsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Traces</h1>
-        <span className="text-sm text-gray-500">{transcripts.length} sessions</span>
+        <h1 className="flex items-center gap-2 text-xl font-semibold">
+          <span className="h-4 w-1.5 rounded-full bg-accent" />
+          Traces
+        </h1>
+        <span className="text-sm text-ink-faint">{transcripts.length} sessions</span>
       </div>
 
       {transcripts.length === 0 ? (
-        <p className="text-gray-500">No transcripts found.</p>
+        <p className="text-ink-faint">No transcripts found.</p>
       ) : (
         <div className="space-y-2">
           {transcripts.map((t) => (
             <Link
               key={t.sessionId}
               href={`/transcripts/${t.sessionId}?agentId=buri`}
-              className="block border border-gray-800 rounded-lg p-3 hover:border-gray-600 transition-colors"
+              className="block border border-line bg-surface rounded-xl p-3 shadow-sm hover:border-primary hover:shadow-md transition-all"
             >
               <div className="flex items-center justify-between text-sm">
-                <span className="font-mono text-gray-300">
+                <span className="font-mono text-primary">
                   {t.sessionId.substring(0, 12)}...
                 </span>
-                <div className="flex items-center gap-3 text-gray-500">
+                <div className="flex items-center gap-3 text-ink-faint">
                   <span>{formatSize(t.size)}</span>
                   <span>{formatTime(t.modified)}</span>
                 </div>

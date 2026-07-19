@@ -43,6 +43,27 @@ describe("ClaudeCodeRuntime", () => {
       expect(args).toContain("opus");
     });
 
+    it("disables all built-in tools with --tools \"\" when disableBuiltinTools is set", () => {
+      const args: string[] = buildArgs({
+        prompt: "hi",
+        maxTurns: 5,
+        workingDirectory: "/tmp",
+        disableBuiltinTools: true,
+      });
+      const idx = args.indexOf("--tools");
+      expect(idx).toBeGreaterThan(-1);
+      expect(args[idx + 1]).toBe("");
+    });
+
+    it("does not pass --tools when built-in tools are allowed", () => {
+      const args: string[] = buildArgs({
+        prompt: "hi",
+        maxTurns: 5,
+        workingDirectory: "/tmp",
+      });
+      expect(args).not.toContain("--tools");
+    });
+
     it("includes maxTurns as string in args", () => {
       const args: string[] = buildArgs({
         prompt: "test",

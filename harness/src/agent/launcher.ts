@@ -13,7 +13,13 @@
 import { readFile, mkdir, symlink, lstat, readdir, copyFile } from "fs/promises";
 import { resolve } from "path";
 import type { AgentRuntime } from "../runtime/types.js";
-import { resolveCapabilities, filterCapabilitiesByTrust } from "../capability/mcp-resolver.js";
+import { resolveCapabilities } from "../capability/mcp-resolver.js";
+import {
+  loadPermissions,
+  isAllowed,
+  filterCapabilitiesByPolicy,
+  BASE_TOOLS_KEY,
+} from "../policy/permissions.js";
 import { runResolvers } from "../resolver/runner.js";
 import type { AgentConfig, AgentInput, AgentResult } from "./types.js";
 
@@ -207,7 +213,9 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       });
     }
 
-    // 4b. Load and interpolate persona (only resolver context goes here)
+    // 4b. Load and interpolate persona. The persona is kept static (no per-run
+    // values) so it stays a stable prefix for prompt caching — dynamic values
+    // go in the run-context block below instead.
     const personaContext = { ...resolverContext, ...(input.context ?? {}) };
     const persona = await loadPersona(
       agent.persona,
@@ -215,8 +223,14 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       personaContext
     );
 
-    // 4c. Build run context preamble (appended to user message, not persona)
-    const contextLines: string[] = [];
+    // 4c. Build run context preamble — placed AFTER the static persona and just
+    // before the user message, so the volatile per-run values (identity, time,
+    // paths) come last and don't bust the cacheable persona prefix.
+    const contextLines: string[] = [
+      `Origin channel: ${input.identity.originChannel}`,
+      `Sender: ${input.identity.senderIdentity}`,
+      `Trust tier: ${input.identity.trustTier}`,
+    ];
 
     // Generated per-run values
     const now = new Date();
@@ -252,17 +266,23 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       }
     }
 
-    // 6. Filter capabilities by trust tier (default-deny: missing tier = guest),
-    // then resolve the survivors into MCP server configs.
-    const trustTier = input.trustTier ?? "guest";
+    // 6. Apply the permission policy (harness/permissions.json) for this run's
+    // trust tier — default-deny. Filter the agent's declared capabilities to the
+    // granted ones, and decide whether built-in Claude Code tools are allowed.
+    const trustTier = input.identity.trustTier;
+    const permissions = await loadPermissions(harnessRoot);
     const trustFiltered = agent.capabilities.length > 0
-      ? await filterCapabilitiesByTrust(agent.capabilities, capabilitiesDir, trustTier)
+      ? filterCapabilitiesByPolicy(agent.capabilities, permissions, trustTier)
       : { kept: [], dropped: [] };
+    const baseToolsAllowed = isAllowed(permissions, trustTier, BASE_TOOLS_KEY);
 
     if (trustFiltered.dropped.length > 0) {
       console.log(
         `[Launcher] Trust tier "${trustTier}" dropped capabilities: ${trustFiltered.dropped.join(", ")}`
       );
+    }
+    if (!baseToolsAllowed) {
+      console.log(`[Launcher] Trust tier "${trustTier}" — built-in tools disabled`);
     }
 
     const resolved = trustFiltered.kept.length > 0
@@ -305,6 +325,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       sessionId: input.sessionId,
       mcpServers,
       enableChrome,
+      disableBuiltinTools: !baseToolsAllowed,
       harnessRoot,
       additionalEnv: input.additionalEnv,
     });

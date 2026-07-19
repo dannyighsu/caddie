@@ -55,7 +55,7 @@ const OUTBOUND_AGENT_ID = "buri";
  * that when the recipient replies — the reply carries the same AgentMail
  * thread id — the shared messaging handler finds the conversation and can
  * supply prior context. Without this, agent-initiated threads (scheduled
- * reminders, gateway notifications) have no local record, so replies land as
+ * reminders, control-API notifications) have no local record, so replies land as
  * brand-new conversations with no history.
  */
 export async function sendEmail(

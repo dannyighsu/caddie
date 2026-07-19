@@ -182,20 +182,21 @@ export async function executeJob(
     const trustTier = job.trustTier ?? "household";
 
     // Attached to any email thread the run creates (via env → email-mcp →
-    // gateway), so a reply can be traced back to this task.
+    // control API), so a reply can be traced back to this task.
     const threadContext = buildThreadContext(job, opts.source);
 
     const launcher = getLauncher();
     const result = await launcher.launch({
       agentId: job.agentId,
       profile: job.profile,
-      trustTier,
-      prompt: (job.params?.prompt as string) ?? "Run.",
-      context: {
-        currentTime: currentTimePST(),
+      identity: {
         trustTier,
         senderIdentity: "Automated run (no external sender)",
         originChannel: opts.source === "trigger" ? "manual-trigger" : "schedule",
+      },
+      prompt: (job.params?.prompt as string) ?? "Run.",
+      context: {
+        currentTime: currentTimePST(),
       },
       additionalEnv: {
         NORTHSTAR_TRACE_ID: traceId,

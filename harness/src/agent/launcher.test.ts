@@ -2,10 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createLauncher } from "./launcher.js";
 import type { AgentRuntime, AgentRuntimeOutput } from "../runtime/types.js";
 import * as fs from "fs/promises";
-import {
-  filterCapabilitiesByTrust,
-  resolveCapabilities,
-} from "../capability/mcp-resolver.js";
+import { resolveCapabilities } from "../capability/mcp-resolver.js";
+import { filterCapabilitiesByPolicy } from "../policy/permissions.js";
 
 vi.mock("fs/promises");
 vi.mock("../capability/mcp-resolver.js", () => ({
@@ -14,10 +12,15 @@ vi.mock("../capability/mcp-resolver.js", () => ({
     flags: [],
     warnings: [],
   }),
-  filterCapabilitiesByTrust: vi.fn(async (names: string[]) => ({
+}));
+vi.mock("../policy/permissions.js", () => ({
+  loadPermissions: vi.fn().mockResolvedValue({ household: {}, guest: {} }),
+  isAllowed: vi.fn().mockReturnValue(true),
+  filterCapabilitiesByPolicy: vi.fn((names: string[]) => ({
     kept: names,
     dropped: [],
   })),
+  BASE_TOOLS_KEY: "base-tools",
 }));
 vi.mock("../resolver/runner.js", () => ({
   runResolvers: vi.fn().mockResolvedValue({}),
@@ -42,6 +45,12 @@ const baseAgentConfig = {
   name: "Test Agent",
   persona: "./persona.md",
   capabilities: [],
+};
+
+const ID = {
+  trustTier: "household" as const,
+  senderIdentity: "test",
+  originChannel: "test",
 };
 
 describe("createLauncher", () => {
@@ -73,6 +82,7 @@ describe("createLauncher", () => {
 
     const result = await launcher.launch({
       agentId: "test-agent",
+      identity: ID,
       prompt: "Do something",
     });
 
@@ -90,6 +100,7 @@ describe("createLauncher", () => {
 
     await launcher.launch({
       agentId: "test-agent",
+      identity: ID,
       prompt: "hello",
       context: { role: "assistant", date: "2025-01-01" },
     });
@@ -107,6 +118,7 @@ describe("createLauncher", () => {
 
     await launcher.launch({
       agentId: "test-agent",
+      identity: ID,
       prompt: "hello",
       context: { role: "bot" }, // date is not provided
     });
@@ -125,12 +137,42 @@ describe("createLauncher", () => {
 
     await launcher.launch({
       agentId: "test-agent",
+      identity: ID,
       prompt: "Do the task",
     });
 
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.prompt).toContain("---");
     expect(call.prompt).toContain("Do the task");
+  });
+
+  it("orders the prompt static-first: persona, then run context (identity), then time, then user message", async () => {
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: { trustTier: "household", senderIdentity: "Danny (owner)", originChannel: "portal" },
+      prompt: "PROMPT_MARKER",
+      context: { currentTime: "2025-01-01 10:00" },
+    });
+
+    const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    const iPersona = prompt.indexOf("You are"); // static persona (mock)
+    const iIdentity = prompt.indexOf("Origin channel: portal");
+    const iTime = prompt.indexOf("[Current time: 2025-01-01 10:00]");
+    const iUser = prompt.indexOf("PROMPT_MARKER");
+
+    // Static persona first, then run-context identity, then volatile time, then the message.
+    expect(iPersona).toBeGreaterThanOrEqual(0);
+    expect(iIdentity).toBeGreaterThan(iPersona);
+    expect(prompt).toContain("Sender: Danny (owner)");
+    expect(prompt).toContain("Trust tier: household");
+    expect(iTime).toBeGreaterThan(iIdentity);
+    expect(iUser).toBeGreaterThan(iTime);
   });
 
   it("skips persona prefix on session resume", async () => {
@@ -142,6 +184,7 @@ describe("createLauncher", () => {
 
     await launcher.launch({
       agentId: "test-agent",
+      identity: ID,
       prompt: "continue working",
       sessionId: "sess-existing",
     });
@@ -160,6 +203,7 @@ describe("createLauncher", () => {
 
     const result = await launcher.launch({
       agentId: "test-agent",
+      identity: ID,
       prompt: "test",
     });
 
@@ -196,6 +240,7 @@ describe("createLauncher", () => {
 
     await launcher.launch({
       agentId: "test-agent",
+      identity: ID,
       prompt: "go",
       profile: "heavy",
     });
@@ -211,13 +256,13 @@ describe("createLauncher", () => {
       capabilitiesDir: "/caps",
     });
 
-    await launcher.launch({ agentId: "test-agent", prompt: "test" });
+    await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "test" });
 
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.maxTurns).toBe(150);
   });
 
-  it("defaults to guest trust tier when none is provided", async () => {
+  it("passes the identity's trust tier (guest) to the capability filter", async () => {
     mockFs.readFile.mockImplementation(async (path: any) => {
       if (String(path).endsWith("agent.json")) {
         return JSON.stringify({ ...baseAgentConfig, capabilities: ["calendar", "web-search"] });
@@ -232,11 +277,15 @@ describe("createLauncher", () => {
       capabilitiesDir: "/caps",
     });
 
-    await launcher.launch({ agentId: "test-agent", prompt: "go" });
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: { trustTier: "guest", senderIdentity: "g", originChannel: "g" },
+      prompt: "go",
+    });
 
-    expect(filterCapabilitiesByTrust).toHaveBeenCalledWith(
+    expect(filterCapabilitiesByPolicy).toHaveBeenCalledWith(
       ["calendar", "web-search"],
-      "/caps",
+      expect.anything(),
       "guest",
     );
   });
@@ -258,13 +307,13 @@ describe("createLauncher", () => {
 
     await launcher.launch({
       agentId: "test-agent",
+      identity: { trustTier: "household", senderIdentity: "h", originChannel: "h" },
       prompt: "go",
-      trustTier: "household",
     });
 
-    expect(filterCapabilitiesByTrust).toHaveBeenCalledWith(
+    expect(filterCapabilitiesByPolicy).toHaveBeenCalledWith(
       ["calendar"],
-      "/caps",
+      expect.anything(),
       "household",
     );
   });
@@ -278,7 +327,7 @@ describe("createLauncher", () => {
       throw new Error(`Unmocked: ${path}`);
     });
 
-    vi.mocked(filterCapabilitiesByTrust).mockResolvedValueOnce({
+    vi.mocked(filterCapabilitiesByPolicy).mockReturnValueOnce({
       kept: ["web-search"],
       dropped: ["calendar"],
     });
@@ -291,8 +340,8 @@ describe("createLauncher", () => {
 
     await launcher.launch({
       agentId: "test-agent",
+      identity: { trustTier: "guest", senderIdentity: "g", originChannel: "g" },
       prompt: "go",
-      trustTier: "guest",
     });
 
     expect(resolveCapabilities).toHaveBeenCalledWith(["web-search"], "/caps");
@@ -305,7 +354,7 @@ describe("createLauncher", () => {
       capabilitiesDir: "/caps",
     });
 
-    await launcher.launch({ agentId: "test-agent", prompt: "test" });
+    await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "test" });
 
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.harnessRoot).toBe("/");

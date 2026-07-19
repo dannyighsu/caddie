@@ -4,10 +4,10 @@
  * Egress MCP Server
  *
  * MCP server for outbound messaging — Slack, email, etc.
- * Proxies through the Northstar gateway notify API.
+ * Proxies through the Northstar control API (/api/control).
  *
  * Env:
- *   NORTHSTAR_URL — Base URL for the Northstar gateway (default: http://localhost:3000)
+ *   NORTHSTAR_URL — Base URL for the Northstar control API (default: http://localhost:3000)
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -267,7 +267,7 @@ async function handlePostToSlack(args) {
     ...(threadTs && { threadTs }),
   };
 
-  const res = await fetch(`${NORTHSTAR_URL}/api/gateway`, {
+  const res = await fetch(`${NORTHSTAR_URL}/api/control`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -289,8 +289,8 @@ async function handlePostToSlack(args) {
 
 // --- Schedule tool handlers ---
 
-async function callGateway(body) {
-  const res = await fetch(`${NORTHSTAR_URL}/api/gateway`, {
+async function callControl(body) {
+  const res = await fetch(`${NORTHSTAR_URL}/api/control`, {
     method: body.action ? "POST" : "GET",
     headers: { "Content-Type": "application/json" },
     body: body.action ? JSON.stringify(body) : undefined,
@@ -298,7 +298,7 @@ async function callGateway(body) {
   return res.json();
 }
 
-function formatGatewayResponse(result, successMessage) {
+function formatControlResponse(result, successMessage) {
   if (!result.success) {
     return {
       content: [{ type: "text", text: `Failed: ${result.error ?? "unknown error"}` }],
@@ -316,7 +316,7 @@ function formatGatewayResponse(result, successMessage) {
 }
 
 async function handleScheduleReminder(args) {
-  const result = await callGateway({
+  const result = await callControl({
     action: "notify",
     message: args.message,
     scheduledFor: args.scheduledFor,
@@ -325,11 +325,11 @@ async function handleScheduleReminder(args) {
     ...(args.notificationRecipient && { notificationRecipient: args.notificationRecipient }),
     ...(args.subject && { subject: args.subject }),
   });
-  return formatGatewayResponse(result, "Reminder scheduled.");
+  return formatControlResponse(result, "Reminder scheduled.");
 }
 
 async function handleScheduleRecurring(args) {
-  const result = await callGateway({
+  const result = await callControl({
     action: "schedule",
     agentId: args.agentId,
     cron: args.cron,
@@ -339,11 +339,11 @@ async function handleScheduleRecurring(args) {
     ...(args.notificationChannel && { notificationChannel: args.notificationChannel }),
     ...(args.notificationRecipient && { notificationRecipient: args.notificationRecipient }),
   });
-  return formatGatewayResponse(result, "Recurring schedule created.");
+  return formatControlResponse(result, "Recurring schedule created.");
 }
 
 async function handleScheduleOneshotRun(args) {
-  const result = await callGateway({
+  const result = await callControl({
     action: "run",
     agentId: args.agentId,
     prompt: args.prompt,
@@ -353,11 +353,11 @@ async function handleScheduleOneshotRun(args) {
     ...(args.notificationChannel && { notificationChannel: args.notificationChannel }),
     ...(args.notificationRecipient && { notificationRecipient: args.notificationRecipient }),
   });
-  return formatGatewayResponse(result, "One-shot run scheduled.");
+  return formatControlResponse(result, "One-shot run scheduled.");
 }
 
 async function handleListSchedules() {
-  const res = await fetch(`${NORTHSTAR_URL}/api/gateway`, { method: "GET" });
+  const res = await fetch(`${NORTHSTAR_URL}/api/control`, { method: "GET" });
   const result = await res.json();
   return {
     content: [
@@ -370,7 +370,7 @@ async function handleListSchedules() {
 }
 
 async function handleUpdateSchedule(args) {
-  const result = await callGateway({
+  const result = await callControl({
     action: "update_schedule",
     jobId: args.jobId,
     ...(args.cron && { cron: args.cron }),
@@ -380,15 +380,15 @@ async function handleUpdateSchedule(args) {
     ...(args.notificationChannel && { notificationChannel: args.notificationChannel }),
     ...(args.notificationRecipient && { notificationRecipient: args.notificationRecipient }),
   });
-  return formatGatewayResponse(result, `Updated job ${args.jobId}.`);
+  return formatControlResponse(result, `Updated job ${args.jobId}.`);
 }
 
 async function handleDeleteSchedule(args) {
-  const result = await callGateway({
+  const result = await callControl({
     action: "schedule",
     jobId: args.jobId,
   });
-  return formatGatewayResponse(result, `Deleted job ${args.jobId}.`);
+  return formatControlResponse(result, `Deleted job ${args.jobId}.`);
 }
 
 const handlers = {

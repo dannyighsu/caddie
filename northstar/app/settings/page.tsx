@@ -49,7 +49,7 @@ export default function SettingsPage() {
   }
 
   if (!loaded) {
-    return <p className="text-gray-500">Loading...</p>;
+    return <p className="text-ink-faint">Loading...</p>;
   }
 
   return (
@@ -60,39 +60,39 @@ export default function SettingsPage() {
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Slack</h2>
 
-        <div className="border border-gray-800 rounded-lg p-4 space-y-4">
+        <div className="border border-line bg-surface rounded-xl p-4 shadow-sm space-y-4">
           <div>
-            <p className="text-sm text-gray-400 mb-1">
+            <p className="text-sm text-ink-soft mb-1">
               Default channel for agent notifications (check-in results, X Manager digests).
             </p>
             {channel ? (
-              <p className="text-sm text-green-400">
+              <p className="text-sm text-good">
                 Connected: {channel.channelName || channel.channelId}
               </p>
             ) : (
-              <p className="text-sm text-gray-500">Not configured</p>
+              <p className="text-sm text-ink-faint">Not configured</p>
             )}
           </div>
 
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-xs text-gray-500 mb-1">Channel ID</label>
+              <label className="block text-xs font-medium text-ink-soft mb-1">Channel ID</label>
               <input
                 value={channelId}
                 onChange={(e) => setChannelId(e.target.value)}
                 placeholder="C0123456789"
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
               />
             </div>
             <div className="flex-1">
-              <label className="block text-xs text-gray-500 mb-1">
+              <label className="block text-xs font-medium text-ink-soft mb-1">
                 Channel Name (optional)
               </label>
               <input
                 value={channelName}
                 onChange={(e) => setChannelName(e.target.value)}
                 placeholder="#general"
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
               />
             </div>
           </div>
@@ -101,14 +101,14 @@ export default function SettingsPage() {
             <button
               onClick={handleSave}
               disabled={saving || !channelId.trim()}
-              className="px-4 py-2 bg-white text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? "Saving..." : "Save"}
             </button>
             {channel && (
               <button
                 onClick={handleDisconnect}
-                className="px-4 py-2 text-red-400 border border-red-800 rounded-lg text-sm hover:bg-red-950 transition-colors"
+                className="px-4 py-2 text-bad border border-bad/40 rounded-lg text-sm hover:bg-bad-soft transition-colors"
               >
                 Remove
               </button>
@@ -154,7 +154,7 @@ function Schedules() {
   const [creating, setCreating] = useState(false);
 
   function refreshJobs() {
-    fetch("/api/gateway")
+    fetch("/api/control")
       .then((r) => r.json())
       .then((data) => {
         setJobs(data.jobs ?? []);
@@ -170,7 +170,7 @@ function Schedules() {
     if (!cron.trim() || !agentId.trim()) return;
     setCreating(true);
     try {
-      await fetch("/api/gateway", {
+      await fetch("/api/control", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -192,7 +192,7 @@ function Schedules() {
   }
 
   async function handleDelete(jobId: string) {
-    await fetch("/api/gateway", {
+    await fetch("/api/control", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "schedule", jobId }),
@@ -214,7 +214,7 @@ function Schedules() {
 
     setRunning(job.id);
     try {
-      const res = await fetch("/api/gateway", {
+      const res = await fetch("/api/control", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "trigger", jobId: job.id }),
@@ -250,48 +250,48 @@ function Schedules() {
       <h2 className="text-lg font-semibold">Schedules</h2>
 
       {/* Active jobs */}
-      <div className="border border-gray-800 rounded-lg p-4">
+      <div className="border border-line bg-surface rounded-xl p-4 shadow-sm">
         {!loaded ? (
-          <p className="text-sm text-gray-500">Loading...</p>
+          <p className="text-sm text-ink-faint">Loading...</p>
         ) : jobs.length === 0 ? (
-          <p className="text-sm text-gray-500">No scheduled jobs.</p>
+          <p className="text-sm text-ink-faint">No scheduled jobs.</p>
         ) : (
           <div className="space-y-2">
             {jobs.map((job) => (
               <div
                 key={job.id}
-                className="flex items-center justify-between text-sm border-b border-gray-800 pb-2 last:border-0 last:pb-0"
+                className="flex items-center justify-between text-sm border-b border-line pb-2 last:border-0 last:pb-0"
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-200">
+                    <span className="font-medium text-ink">
                       {job.agentId}{job.profile ? `:${job.profile}` : ""}
                     </span>
                     {job.cron && (
-                      <span className="text-xs font-mono text-gray-500">{job.cron}</span>
+                      <span className="text-xs font-mono text-ink-faint">{job.cron}</span>
                     )}
                     {!job.cron && (
-                      <span className="text-xs text-gray-500">one-shot</span>
+                      <span className="text-xs text-ink-faint">one-shot</span>
                     )}
                   </div>
                   {job.description && (
-                    <p className="text-xs text-gray-500 mt-0.5">{job.description}</p>
+                    <p className="text-xs text-ink-faint mt-0.5">{job.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`text-xs ${job.enabled ? "text-green-400" : "text-gray-600"}`}>
+                  <span className={`text-xs ${job.enabled ? "text-good" : "text-ink-faint"}`}>
                     {job.enabled ? formatNextRun(job.nextRun) : "disabled"}
                   </span>
                   <button
                     onClick={() => handleRunNow(job)}
                     disabled={running === job.id}
-                    className="text-xs text-gray-600 hover:text-green-400 transition-colors disabled:opacity-50"
+                    className="text-xs text-ink-faint hover:text-good transition-colors disabled:opacity-50"
                   >
                     {running === job.id ? "running..." : "run now"}
                   </button>
                   <button
                     onClick={() => handleDelete(job.id)}
-                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                    className="text-xs text-ink-faint hover:text-bad transition-colors"
                   >
                     delete
                   </button>
@@ -303,58 +303,58 @@ function Schedules() {
       </div>
 
       {/* New job form */}
-      <div className="border border-gray-800 rounded-lg p-4 space-y-3">
-        <p className="text-sm text-gray-400">Create a recurring schedule</p>
+      <div className="border border-line bg-surface rounded-xl p-4 shadow-sm space-y-3">
+        <p className="text-sm text-ink-soft">Create a recurring schedule</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Agent</label>
+            <label className="block text-xs font-medium text-ink-soft mb-1">Agent</label>
             <input
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+              className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Profile</label>
+            <label className="block text-xs font-medium text-ink-soft mb-1">Profile</label>
             <input
               value={profile}
               onChange={(e) => setProfile(e.target.value)}
               placeholder="e.g. xmanager"
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+              className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Cron</label>
+            <label className="block text-xs font-medium text-ink-soft mb-1">Cron</label>
             <input
               value={cron}
               onChange={(e) => setCron(e.target.value)}
               placeholder="0,30 * * * *"
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-gray-500"
+              className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm font-mono text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Prompt</label>
+            <label className="block text-xs font-medium text-ink-soft mb-1">Prompt</label>
             <input
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="/feed-scan"
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+              className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
             />
           </div>
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Description</label>
+          <label className="block text-xs font-medium text-ink-soft mb-1">Description</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Feed scan every 30 min"
-            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+            className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
           />
         </div>
         <button
           onClick={handleCreate}
           disabled={creating || !cron.trim()}
-          className="px-4 py-2 bg-white text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           {creating ? "Creating..." : "Create Schedule"}
         </button>
@@ -396,9 +396,9 @@ function CapabilitiesHealth() {
   }, []);
 
   const statusColor = {
-    ok: "text-green-400",
-    error: "text-red-400",
-    skipped: "text-gray-500",
+    ok: "text-good font-semibold",
+    error: "text-bad font-semibold",
+    skipped: "text-ink-faint",
   };
 
   return (
@@ -408,16 +408,16 @@ function CapabilitiesHealth() {
         <button
           onClick={runChecks}
           disabled={checking}
-          className="text-xs px-3 py-1 bg-gray-800 rounded hover:bg-gray-700 disabled:opacity-40 transition-colors"
+          className="text-xs px-3 py-1 bg-surface-muted text-ink-soft rounded hover:bg-primary-soft hover:text-primary disabled:opacity-40 transition-colors"
         >
           {checking ? "Checking..." : "Re-check"}
         </button>
       </div>
-      <div className="border border-gray-800 rounded-lg p-4">
+      <div className="border border-line bg-surface rounded-xl p-4 shadow-sm">
         {!loaded ? (
-          <p className="text-sm text-gray-500">Running health checks...</p>
+          <p className="text-sm text-ink-faint">Running health checks...</p>
         ) : results.length === 0 ? (
-          <p className="text-sm text-gray-500">No capabilities configured.</p>
+          <p className="text-sm text-ink-faint">No capabilities configured.</p>
         ) : (
           <div className="space-y-2">
             {results.map((r) => (
@@ -426,17 +426,17 @@ function CapabilitiesHealth() {
                   <span className={statusColor[r.status]}>
                     {r.status === "ok" ? "ok" : r.status === "error" ? "err" : "skip"}
                   </span>
-                  <span className="text-gray-300">{r.name}</span>
-                  <span className="text-xs text-gray-600">{r.type}</span>
+                  <span className="text-ink">{r.name}</span>
+                  <span className="text-xs text-ink-faint">{r.type}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {r.message && (
-                    <span className="text-xs text-gray-500 truncate max-w-xs">
+                    <span className="text-xs text-ink-faint truncate max-w-xs">
                       {r.message}
                     </span>
                   )}
                   {r.durationMs !== undefined && (
-                    <span className="text-xs text-gray-600">{r.durationMs}ms</span>
+                    <span className="text-xs text-ink-faint">{r.durationMs}ms</span>
                   )}
                 </div>
               </div>

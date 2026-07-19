@@ -42,27 +42,30 @@ export default async function Dashboard() {
   return (
     <div className="space-y-10">
       <section>
-        <h2 className="text-xl font-semibold mb-4">Agents</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold mb-4">
+          <span className="h-4 w-1.5 rounded-full bg-accent" />
+          Agents
+        </h2>
         {agents.length === 0 ? (
-          <p className="text-gray-500">No agents found.</p>
+          <p className="text-ink-faint">No agents found.</p>
         ) : (
           <div className="grid gap-4">
             {agents.map((agent) => (
               <Link
                 key={agent.id}
                 href={`/agents/${agent.id}`}
-                className="block border border-gray-800 rounded-lg p-4 hover:border-gray-600 transition-colors"
+                className="block border border-line bg-surface rounded-xl p-4 shadow-sm hover:border-primary hover:shadow-md transition-all"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-medium">{agent.name}</h3>
-                    <p className="text-sm text-gray-400 mt-1">
+                    <h3 className="font-semibold text-ink">{agent.name}</h3>
+                    <p className="text-sm text-ink-soft mt-1">
                       {agent.capabilities.join(", ")}
                       {" · "}max {agent.maxTurns ?? 20} turns
                       {agent.mode === "triggered" && " · triggered"}
                     </p>
                   </div>
-                  <span className="text-sm text-gray-500">{agent.id}</span>
+                  <span className="text-xs font-mono text-primary bg-primary-soft rounded-md px-2 py-1">{agent.id}</span>
                 </div>
               </Link>
             ))}
@@ -71,25 +74,28 @@ export default async function Dashboard() {
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold mb-4">Recent Conversations</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold mb-4">
+          <span className="h-4 w-1.5 rounded-full bg-accent" />
+          Recent Conversations
+        </h2>
         {conversations.length === 0 ? (
-          <p className="text-gray-500">No conversations yet.</p>
+          <p className="text-ink-faint">No conversations yet.</p>
         ) : (
           <div className="space-y-2">
             {conversations.map((conv) => (
               <Link
                 key={conv.id}
                 href={`/agents/${conv.agent_id}`}
-                className="block border border-gray-800 rounded-lg p-3 hover:border-gray-600 transition-colors"
+                className="block border border-line bg-surface rounded-xl p-3 shadow-sm hover:border-primary hover:shadow-md transition-all"
               >
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-3">
-                    <span className="font-medium">{conv.agent_id}</span>
-                    <span className="text-gray-400 truncate max-w-md">
+                    <span className="font-medium text-ink">{conv.agent_id}</span>
+                    <span className="text-ink-soft truncate max-w-md">
                       {conv.title || "Untitled"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 text-gray-500">
+                  <div className="flex items-center gap-3 text-ink-faint">
                     <span>{conv.messages.length} msgs</span>
                     <span>
                       {new Date(conv.updated_at).toLocaleDateString()}

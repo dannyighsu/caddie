@@ -24,19 +24,19 @@ interface OutreachEntry {
 }
 
 const MEDIUM_COLORS: Record<string, string> = {
-  phone: "#3b82f6",
+  phone: "#2e5fb0",
   email: "#8b5cf6",
   linkedin: "#22c55e",
-  physical: "#f59e0b",
-  other: "#6b7280",
+  physical: "#f4c025",
+  other: "#8b95ab",
 };
 
 const MEDIUM_BG: Record<string, string> = {
-  phone: "bg-blue-900/40 text-blue-300",
-  email: "bg-purple-900/40 text-purple-300",
-  linkedin: "bg-green-900/40 text-green-300",
-  physical: "bg-amber-900/40 text-amber-300",
-  other: "bg-gray-800 text-gray-400",
+  phone: "bg-blue-100 text-blue-700",
+  email: "bg-purple-100 text-purple-700",
+  linkedin: "bg-green-100 text-green-700",
+  physical: "bg-amber-100 text-amber-700",
+  other: "bg-surface-muted text-ink-soft",
 };
 
 const OUTCOME_LABEL: Record<number, string> = {
@@ -48,11 +48,11 @@ const OUTCOME_LABEL: Record<number, string> = {
 };
 
 const OUTCOME_COLOR: Record<number, string> = {
-  1: "text-red-400",
-  2: "text-orange-400",
-  3: "text-gray-400",
-  4: "text-green-400",
-  5: "text-emerald-400",
+  1: "text-red-600",
+  2: "text-orange-600",
+  3: "text-ink-soft",
+  4: "text-green-600",
+  5: "text-emerald-600",
 };
 
 function currentISOWeek(): string {
@@ -89,7 +89,7 @@ function BarChart({ labels, values, colors }: { labels: string[]; values: number
     const barW = Math.max(4, chartW / values.length - 4);
 
     // Y gridlines
-    ctx.strokeStyle = "#374151";
+    ctx.strokeStyle = "#e3e9f3";
     ctx.lineWidth = 1;
     [0.25, 0.5, 0.75, 1].forEach((frac) => {
       const y = padT + chartH * (1 - frac);
@@ -117,7 +117,7 @@ function BarChart({ labels, values, colors }: { labels: string[]; values: number
       ctx.fill();
 
       // label
-      ctx.fillStyle = "#6b7280";
+      ctx.fillStyle = "#8b95ab";
       ctx.font = `10px system-ui`;
       ctx.textAlign = "center";
       const labelText = labels[i].length > 7 ? labels[i].slice(-5) : labels[i];
@@ -125,7 +125,7 @@ function BarChart({ labels, values, colors }: { labels: string[]; values: number
     });
 
     // Y axis labels
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = "#8b95ab";
     ctx.font = "10px system-ui";
     ctx.textAlign = "right";
     const step = Math.ceil(maxVal / 4);
@@ -170,13 +170,13 @@ function DonutChart({ labels, values, colors }: { labels: string[]; values: numb
       ctx.closePath();
       ctx.fillStyle = colors[i];
       ctx.fill();
-      ctx.strokeStyle = "#030712";
+      ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 2;
       ctx.stroke();
       angle += sweep;
     });
 
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = "#1b2a4a";
     ctx.font = `bold ${size * 0.14}px system-ui`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -233,18 +233,22 @@ export default function OutreachPage() {
   const outcomeCounts = outcomeBins.map((o) => filtered.filter((e) => e.outcome === o).length);
   const outcomeBarColors = ["#ef4444", "#f97316", "#6b7280", "#22c55e", "#16a34a"];
 
-  const selectClass = "bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-gray-500";
+  const selectClass = "bg-surface border border-line-strong rounded-md px-2 py-1 text-xs text-ink-soft focus:outline-none focus:border-primary transition-colors";
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-base font-semibold tracking-tight">Outreach</h1>
-        <span className="text-xs text-gray-500">{thisWeek}</span>
+    <div className="min-h-screen bg-canvas text-ink">
+      <header className="sticky top-0 z-10 border-b border-line bg-surface/85 backdrop-blur px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/buri-icon.png" alt="Buri" className="h-7 w-7" />
+          <h1 className="text-base font-semibold tracking-tight text-ink">Outreach</h1>
+        </div>
+        <span className="text-xs font-medium text-primary bg-primary-soft rounded-md px-2 py-1">{thisWeek}</span>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         {loading ? (
-          <p className="text-gray-500 text-sm">Loading…</p>
+          <p className="text-ink-faint text-sm">Loading…</p>
         ) : (
           <>
             {/* Stat cards */}
@@ -252,27 +256,27 @@ export default function OutreachPage() {
               {[
                 { label: "Total", value: entries.length, sub: `${allWeeks.length} week${allWeeks.length !== 1 ? "s" : ""}` },
                 { label: "This Week", value: thisWeekCount, sub: thisWeek },
-                { label: "Avg Outcome", value: avgOutcome, sub: "out of 5", color: "text-emerald-400" },
-                { label: "Follow-ups", value: followupCount, sub: "pending", color: "text-amber-400" },
+                { label: "Avg Outcome", value: avgOutcome, sub: "out of 5", color: "text-emerald-600" },
+                { label: "Follow-ups", value: followupCount, sub: "pending", color: "text-amber-600" },
               ].map(({ label, value, sub, color }) => (
-                <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                  <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">{label}</div>
+                <div key={label} className="bg-surface border border-line rounded-xl shadow-sm p-4">
+                  <div className="text-xs text-ink-faint uppercase tracking-wider mb-1">{label}</div>
                   <div className={`text-3xl font-bold tracking-tight ${color ?? ""}`}>{value}</div>
-                  <div className="text-xs text-gray-600 mt-1">{sub}</div>
+                  <div className="text-xs text-ink-faint mt-1">{sub}</div>
                 </div>
               ))}
             </div>
 
             {/* Charts */}
             <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-1 bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-4">Per Week</h3>
+              <div className="col-span-1 bg-surface border border-line rounded-xl shadow-sm p-4">
+                <h3 className="text-xs text-ink-faint uppercase tracking-wider mb-4">Per Week</h3>
                 <div style={{ height: 160 }}>
-                  <BarChart labels={allWeeks} values={weekCounts} colors="#3b82f6" />
+                  <BarChart labels={allWeeks} values={weekCounts} colors="#2e5fb0" />
                 </div>
               </div>
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-3">By Medium</h3>
+              <div className="bg-surface border border-line rounded-xl shadow-sm p-4">
+                <h3 className="text-xs text-ink-faint uppercase tracking-wider mb-3">By Medium</h3>
                 <div className="flex items-center gap-4">
                   <div style={{ width: 100, height: 100, flexShrink: 0 }}>
                     <DonutChart
@@ -285,15 +289,15 @@ export default function OutreachPage() {
                     {mediums.map((m, i) => medCounts[i] > 0 && (
                       <div key={m} className="flex items-center gap-2 text-xs">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: MEDIUM_COLORS[m] }} />
-                        <span className="text-gray-400 capitalize">{m}</span>
-                        <span className="text-gray-500 ml-auto">{medCounts[i]}</span>
+                        <span className="text-ink-soft capitalize">{m}</span>
+                        <span className="text-ink-faint ml-auto">{medCounts[i]}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-4">Outcomes</h3>
+              <div className="bg-surface border border-line rounded-xl shadow-sm p-4">
+                <h3 className="text-xs text-ink-faint uppercase tracking-wider mb-4">Outcomes</h3>
                 <div style={{ height: 120 }}>
                   <BarChart labels={["1", "2", "3", "4", "5"]} values={outcomeCounts} colors={outcomeBarColors} />
                 </div>
@@ -301,9 +305,9 @@ export default function OutreachPage() {
             </div>
 
             {/* Table */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800">
-                <h3 className="text-xs text-gray-500 uppercase tracking-wider">Entries</h3>
+            <div className="bg-surface border border-line rounded-xl shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-line">
+                <h3 className="text-xs text-ink-faint uppercase tracking-wider">Entries</h3>
                 <div className="flex items-center gap-2">
                   <select className={selectClass} value={weekFilter} onChange={(e) => setWeekFilter(e.target.value)}>
                     <option value="all">All weeks</option>
@@ -327,11 +331,11 @@ export default function OutreachPage() {
               </div>
 
               {filtered.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-10">No entries.</p>
+                <p className="text-sm text-ink-faint text-center py-10">No entries.</p>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-800 bg-gray-950/50">
+                    <tr className="text-xs text-ink-faint uppercase tracking-wider border-b border-line bg-surface-muted">
                       <th className="text-left px-5 py-2.5">Date</th>
                       <th className="text-left px-5 py-2.5">Medium</th>
                       <th className="text-left px-5 py-2.5">Contact</th>
@@ -342,8 +346,8 @@ export default function OutreachPage() {
                   </thead>
                   <tbody>
                     {[...filtered].reverse().map((e) => (
-                      <tr key={e.id} className="border-b border-gray-800/60 hover:bg-gray-800/30 transition-colors">
-                        <td className="px-5 py-3 text-gray-500 text-xs whitespace-nowrap">
+                      <tr key={e.id} className="border-b border-line hover:bg-primary-soft/50 transition-colors">
+                        <td className="px-5 py-3 text-ink-faint text-xs whitespace-nowrap">
                           {new Date(e.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </td>
                         <td className="px-5 py-3">
@@ -352,27 +356,27 @@ export default function OutreachPage() {
                           </span>
                         </td>
                         <td className="px-5 py-3">
-                          <div className="font-medium text-gray-200">{e.contact?.name || "—"}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="font-medium text-ink">{e.contact?.name || "—"}</div>
+                          <div className="text-xs text-ink-faint">
                             {[e.contact?.company, e.contact?.role].filter(Boolean).join(" · ")}
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-gray-400 text-xs max-w-xs truncate">{e.summary}</td>
+                        <td className="px-5 py-3 text-ink-soft text-xs max-w-xs truncate">{e.summary}</td>
                         <td className="px-5 py-3">
                           <div className="flex flex-wrap gap-1">
                             {(e.needs || []).map((n, i) => (
-                              <span key={i} className="text-xs bg-blue-950/60 text-blue-400 px-1.5 py-0.5 rounded">{n}</span>
+                              <span key={i} className="text-xs bg-primary-soft text-primary px-1.5 py-0.5 rounded">{n}</span>
                             ))}
                           </div>
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
-                            <span className={`font-semibold ${OUTCOME_COLOR[e.outcome] ?? "text-gray-400"}`}>
+                            <span className={`font-semibold ${OUTCOME_COLOR[e.outcome] ?? "text-ink-soft"}`}>
                               {e.outcome}
                             </span>
-                            <span className="text-xs text-gray-600">{OUTCOME_LABEL[e.outcome]}</span>
+                            <span className="text-xs text-ink-faint">{OUTCOME_LABEL[e.outcome]}</span>
                             {e.follow_up && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" title="Follow-up needed" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" title="Follow-up needed" />
                             )}
                           </div>
                         </td>

@@ -48,24 +48,24 @@ export default function AgentPage() {
   }, [agentId]);
 
   if (!agent) {
-    return <p className="text-gray-500">Loading...</p>;
+    return <p className="text-ink-faint">Loading...</p>;
   }
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       <div className="mb-4">
         <h1 className="text-xl font-semibold">{agent.name}</h1>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-ink-faint mt-1">
           {agent.capabilities.join(", ")}
           {" · "}Max {agent.maxTurns ?? 20} turns
         </p>
-        <div className="flex gap-4 mt-3 border-b border-gray-800">
+        <div className="flex gap-4 mt-3 border-b border-line">
           <button
             onClick={() => setTab("main")}
             className={`pb-2 text-sm font-medium transition-colors ${
               tab === "main"
-                ? "text-white border-b-2 border-white"
-                : "text-gray-500 hover:text-gray-300"
+                ? "text-primary border-b-2 border-primary"
+                : "text-ink-faint hover:text-ink"
             }`}
           >
             Conversations
@@ -74,8 +74,8 @@ export default function AgentPage() {
             onClick={() => setTab("config")}
             className={`pb-2 text-sm font-medium transition-colors ${
               tab === "config"
-                ? "text-white border-b-2 border-white"
-                : "text-gray-500 hover:text-gray-300"
+                ? "text-primary border-b-2 border-primary"
+                : "text-ink-faint hover:text-ink"
             }`}
           >
             Config
@@ -181,12 +181,12 @@ function ConversationsView({ agentId }: { agentId: string }) {
     <div className="flex gap-6 h-full">
       <div className="w-64 flex-shrink-0 flex flex-col">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
+          <h2 className="text-sm font-semibold text-ink-soft uppercase tracking-wide">
             History
           </h2>
           <button
             onClick={() => { setActiveConversation(null); setPrompt(""); }}
-            className="text-xs px-2 py-1 bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+            className="text-xs px-2 py-1 bg-surface-muted text-ink-soft rounded hover:bg-primary-soft hover:text-primary transition-colors"
           >
             + New
           </button>
@@ -198,19 +198,19 @@ function ConversationsView({ agentId }: { agentId: string }) {
               onClick={() => loadConversation(conv.id)}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                 activeConversation?.id === conv.id
-                  ? "bg-gray-800 text-white"
-                  : "text-gray-400 hover:bg-gray-900 hover:text-gray-200"
+                  ? "bg-primary-soft text-primary"
+                  : "text-ink-soft hover:bg-surface-muted hover:text-ink"
               }`}
             >
               <p className="truncate">{conv.title || "Untitled"}</p>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-ink-faint mt-0.5">
                 {conv.messages.length} messages ·{" "}
                 {new Date(conv.updated_at).toLocaleDateString()}
               </p>
             </button>
           ))}
           {conversations.length === 0 && (
-            <p className="text-xs text-gray-600 px-3 py-2">No conversations yet</p>
+            <p className="text-xs text-ink-faint px-3 py-2">No conversations yet</p>
           )}
         </div>
       </div>
@@ -225,12 +225,12 @@ function ConversationsView({ agentId }: { agentId: string }) {
               <div
                 className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
                   msg.role === "user"
-                    ? "bg-blue-900/40 text-blue-100"
-                    : "bg-gray-800 text-gray-200"
+                    ? "bg-primary text-white"
+                    : "bg-surface border border-line text-ink shadow-sm"
                 }`}
               >
                 <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs opacity-60 mt-2">
                   {new Date(msg.timestamp).toLocaleTimeString()}
                 </p>
               </div>
@@ -238,13 +238,13 @@ function ConversationsView({ agentId }: { agentId: string }) {
           ))}
           {running && (
             <div className="flex justify-start">
-              <div className="bg-gray-800 rounded-lg px-4 py-3 text-sm text-gray-400">
+              <div className="bg-surface border border-line shadow-sm rounded-lg px-4 py-3 text-sm text-ink-soft">
                 Thinking...
               </div>
             </div>
           )}
           {!activeConversation && !running && (
-            <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
+            <div className="flex-1 flex items-center justify-center text-ink-faint text-sm">
               Start a new conversation or select one from the sidebar.
             </div>
           )}
@@ -260,7 +260,7 @@ function ConversationsView({ agentId }: { agentId: string }) {
                 ? "Continue the conversation..."
                 : "Start a new conversation..."
             }
-            className="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm resize-none h-20 focus:outline-none focus:border-gray-500"
+            className="flex-1 bg-surface-muted border border-line-strong rounded-lg p-3 text-sm resize-none h-20 focus:outline-none focus:border-primary focus:bg-surface"
             onKeyDown={(e) => {
               if (e.key === "Enter" && e.metaKey) handleSend();
             }}
@@ -268,7 +268,7 @@ function ConversationsView({ agentId }: { agentId: string }) {
           <button
             onClick={handleSend}
             disabled={running || !prompt.trim()}
-            className="px-4 self-end bg-white text-gray-900 rounded-lg text-sm font-medium h-10 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-4 self-end bg-primary text-white rounded-lg text-sm font-medium h-10 hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {running ? "..." : "Send"}
           </button>
@@ -362,8 +362,8 @@ function ConfigView({ agentId }: { agentId: string }) {
           onClick={() => selectFile(file)}
           className={`flex-1 text-left px-3 py-2 rounded-lg text-sm transition-colors ${
             activeFile?.name === file.name
-              ? "bg-gray-800 text-white"
-              : "text-gray-400 hover:bg-gray-900 hover:text-gray-200"
+              ? "bg-primary-soft text-primary"
+              : "text-ink-soft hover:bg-surface-muted hover:text-ink"
           }`}
         >
           {file.category === "skill" ? file.name.split("/")[1] : file.name}
@@ -371,7 +371,7 @@ function ConfigView({ agentId }: { agentId: string }) {
         {deletable && (
           <button
             onClick={() => handleDelete(file.name)}
-            className="px-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+            className="px-2 text-ink-faint hover:text-bad opacity-0 group-hover:opacity-100 transition-opacity text-xs"
           >
             x
           </button>
@@ -386,7 +386,7 @@ function ConfigView({ agentId }: { agentId: string }) {
         <div className="flex-1 overflow-y-auto space-y-4">
           {personaFiles.length > 0 && (
             <div>
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 px-3">
+              <h2 className="text-xs font-semibold text-ink-faint uppercase tracking-wide mb-1 px-3">
                 Persona
               </h2>
               {personaFiles.map((f) => <FileEntry key={f.name} file={f} />)}
@@ -395,7 +395,7 @@ function ConfigView({ agentId }: { agentId: string }) {
 
           {skillFiles.length > 0 && (
             <div>
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 px-3">
+              <h2 className="text-xs font-semibold text-ink-faint uppercase tracking-wide mb-1 px-3">
                 Skills
               </h2>
               {skillFiles.map((f) => <FileEntry key={f.name} file={f} />)}
@@ -403,12 +403,12 @@ function ConfigView({ agentId }: { agentId: string }) {
           )}
 
           <div>
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 px-3">
+            <h2 className="text-xs font-semibold text-ink-faint uppercase tracking-wide mb-1 px-3">
               Config
             </h2>
             {configFiles.map((f) => <FileEntry key={f.name} file={f} deletable />)}
             {configFiles.length === 0 && (
-              <p className="text-xs text-gray-600 px-3 py-2">No config files yet</p>
+              <p className="text-xs text-ink-faint px-3 py-2">No config files yet</p>
             )}
           </div>
         </div>
@@ -417,13 +417,13 @@ function ConfigView({ agentId }: { agentId: string }) {
             value={newFileName}
             onChange={(e) => setNewFileName(e.target.value)}
             placeholder="new_config_file.md"
-            className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-gray-500"
+            className="flex-1 bg-surface-muted border border-line-strong rounded px-2 py-1 text-xs focus:outline-none focus:border-primary focus:bg-surface"
             onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
           />
           <button
             onClick={handleCreate}
             disabled={!newFileName.trim()}
-            className="px-2 py-1 bg-gray-800 rounded text-xs hover:bg-gray-700 disabled:opacity-40 transition-colors"
+            className="px-2 py-1 bg-surface-muted text-ink-soft rounded text-xs hover:bg-primary-soft hover:text-primary disabled:opacity-40 transition-colors"
           >
             +
           </button>
@@ -434,11 +434,11 @@ function ConfigView({ agentId }: { agentId: string }) {
         {activeFile ? (
           <>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-300">{activeFile.name}</span>
+              <span className="text-sm font-medium text-ink">{activeFile.name}</span>
               <button
                 onClick={handleSave}
                 disabled={saving || !hasChanges}
-                className="px-3 py-1 bg-white text-gray-900 rounded text-xs font-medium hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1 bg-primary text-white rounded text-xs font-medium hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {saving ? "Saving..." : hasChanges ? "Save" : "Saved"}
               </button>
@@ -446,14 +446,14 @@ function ConfigView({ agentId }: { agentId: string }) {
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm font-mono resize-none focus:outline-none focus:border-gray-500"
+              className="flex-1 bg-surface-muted border border-line-strong rounded-lg p-3 text-sm font-mono resize-none focus:outline-none focus:border-primary focus:bg-surface"
               onKeyDown={(e) => {
                 if (e.key === "s" && e.metaKey) { e.preventDefault(); handleSave(); }
               }}
             />
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
+          <div className="flex-1 flex items-center justify-center text-ink-faint text-sm">
             Select a file to edit.
           </div>
         )}

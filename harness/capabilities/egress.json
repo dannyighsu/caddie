@@ -1,6 +1,6 @@
 {
   "name": "egress",
-  "description": "Outbound messaging (Slack, email, etc.) via Northstar gateway",
+  "description": "Outbound messaging (Slack, email, etc.) via the Northstar control API",
   "server": {
     "command": "node",
     "args": ["${HARNESS_ROOT}/tools/egress-mcp.mjs"]

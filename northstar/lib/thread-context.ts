@@ -2,7 +2,7 @@
  * Thread Context ("source task frontmatter")
  *
  * A small block of factual metadata about the task run that created an outbound
- * email thread. It rides the run env → email-mcp → gateway → conversation
+ * email thread. It rides the run env → email-mcp → control API → conversation
  * record, and is replayed to whoever handles a reply so the agent knows where
  * the thread came from (and can act on it — e.g. stop a recurring reminder).
  *

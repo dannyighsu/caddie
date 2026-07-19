@@ -43,10 +43,10 @@ AGENTMAIL_SIGNING_SECRET=whsec_xxxxx      # printed by the setup script
 - Emails from the inbox's own address are ignored (no loops)
 - No routing confirmation emails are sent (too noisy)
 
-## Sending via gateway
+## Sending via the control API
 
 ```bash
-curl -X POST localhost:3000/api/gateway \
+curl -X POST localhost:3000/api/control \
   -H 'Content-Type: application/json' \
   -d '{"action":"notify","channel":"email","to":"user@example.com","subject":"Hello","message":"Hi there"}'
 ```

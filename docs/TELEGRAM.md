@@ -69,7 +69,7 @@ curl -X POST localhost:3000/api/settings/telegram \
 ## Sending messages
 
 ```bash
-curl -X POST localhost:3000/api/gateway \
+curl -X POST localhost:3000/api/control \
   -H 'Content-Type: application/json' \
   -d '{"action":"notify","channel":"telegram","to":"123456789","message":"Hello"}'
 ```

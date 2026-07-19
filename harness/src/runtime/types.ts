@@ -27,6 +27,12 @@ export interface AgentRuntimeInput {
   mcpServers?: Record<string, MCPServerConfig>;
   /** Whether to enable Chrome browser automation. */
   enableChrome?: boolean;
+  /**
+   * If true, disable ALL built-in Claude Code tools (Bash, Read, Write, Edit,
+   * WebFetch, ...) for this run. MCP tools (mounted via mcpServers) are
+   * unaffected. Driven by the `base-tools` permission for the run's trust tier.
+   */
+  disableBuiltinTools?: boolean;
   /** Absolute path to the harness root directory (for hook scripts). */
   harnessRoot?: string;
   /** Runtime-specific additional arguments (escape hatch). */

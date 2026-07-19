@@ -114,6 +114,12 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       args.push("--chrome");
     }
 
+    if (input.disableBuiltinTools) {
+      // Empty tool list disables all built-in tools; MCP tools (mounted via
+      // --mcp-config) are governed separately and unaffected.
+      args.push("--tools", "");
+    }
+
     if (input.additionalArgs) {
       args.push(...input.additionalArgs);
     }

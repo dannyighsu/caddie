@@ -20,8 +20,8 @@ import { classifyMessage } from "./classifier";
 import { currentTimePST } from "./helpers";
 import { renderThreadContext } from "./thread-context";
 import {
-  describeSender,
   toTrustTier,
+  toRunIdentity,
   type ResolvedIdentity,
 } from "./identity";
 import {
@@ -90,7 +90,6 @@ export async function handleInboundMessage(
   const { text, externalId, traceName, traceMetadata, replyFn, context, attachments, identity } = params;
 
   const trustTier = toTrustTier(identity);
-  const senderIdentity = describeSender(identity);
 
   const traceId = createTraceId();
   await createTrace(traceId, traceName, {
@@ -146,12 +145,10 @@ export async function handleInboundMessage(
     const result = await launcher.launch({
       agentId: conversation.agent_id,
       profile,
-      trustTier,
+      identity: toRunIdentity(identity),
       prompt: fullPrompt,
       context: {
         currentTime: currentTimePST(),
-        senderIdentity,
-        trustTier,
         ...context,
       },
       additionalEnv: { NORTHSTAR_TRACE_ID: traceId },

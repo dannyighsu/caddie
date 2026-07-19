@@ -16,7 +16,7 @@ shopt -s nocasematch
 case "$TOOL_NAME" in
   Cron*|Schedule*|RemoteTrigger)
     cat <<EOJSON
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"The built-in ${TOOL_NAME} tool is blocked. ALWAYS use the manage-schedules skill instead — it calls the Northstar gateway API at http://localhost:3000/api/gateway, which has no plan limits, persists across restarts, and integrates with the rest of the system. Read the manage-schedules skill for the exact curl commands to use for scheduling."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"The built-in ${TOOL_NAME} tool is blocked. ALWAYS use the manage-schedules skill instead — it calls the Northstar control API at http://localhost:3000/api/control, which has no plan limits, persists across restarts, and integrates with the rest of the system. Read the manage-schedules skill for the exact curl commands to use for scheduling."}}
 EOJSON
     ;;
   *)

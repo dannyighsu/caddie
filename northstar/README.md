@@ -1,11 +1,13 @@
-# Northstar
+# Buri Agent Portal
 
-Control plane and API gateway for the agints agent system. Built with Next.js.
+Control plane for the Buri agent system. Built with Next.js.
 
 ## Roles
 
-- **API Gateway** -- triggers agent executions, routes Slack messages, manages scheduling
+- **Control API** (`/api/control`) -- triggers agent executions, sends outbound notifications, manages scheduling
 - **Control Plane UI** -- dashboard for agents, conversations, config editing, settings
+
+See [BACKEND.md](../docs/BACKEND.md) for the API server's client classes and endpoint groups.
 
 ## Running
 
@@ -33,37 +35,37 @@ Connects via Socket Mode (outbound WebSocket -- no public URL or tunnel needed).
 
 Setup: Enable Socket Mode in your Slack app settings, generate an App-Level Token (`xapp-...`), subscribe to `message.im` and `app_mention` events. Connection starts automatically when the server boots.
 
-### Gateway API
+### Control API
 
-Single entry point for all agent executions, notifications, and scheduling. Used by the control plane UI, Slack handler, external scripts, and other Claude Code instances.
+The control-plane command surface for agent executions, notifications, and scheduling. Called by the portal UI and by the agent's own tools/skills — **not** by external senders (inbound channel traffic arrives at the `/api/*/webhook` routes instead). See [BACKEND.md](../docs/BACKEND.md) for the client classes.
 
 ```bash
 # Run an agent (default profile)
-curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri"}'
+curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri"}'
 
 # Run with a specific profile
-curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"writer","prompt":"Draft a summary"}'
+curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"writer","prompt":"Draft a summary"}'
 
 # Send to Slack
-curl -X POST localhost:3000/api/gateway -d '{
+curl -X POST localhost:3000/api/control -d '{
   "action": "notify", "channel": "slack",
   "message": "Found 3 vulnerabilities", "from": "sandcastle"
 }'
 
 # Schedule for later (works with both notify and run)
-curl -X POST localhost:3000/api/gateway -d '{
+curl -X POST localhost:3000/api/control -d '{
   "action": "run", "agentId": "buri", "profile": "xmanager",
   "scheduledFor": "2026-03-28T09:00:00Z"
 }'
 
 # Create a recurring schedule
-curl -X POST localhost:3000/api/gateway -d '{
+curl -X POST localhost:3000/api/control -d '{
   "action": "schedule", "agentId": "buri", "profile": "xmanager",
   "cron": "0,30 * * * *", "description": "Feed scan every 30 min"
 }'
 
 # Check pending scheduled jobs
-curl localhost:3000/api/gateway
+curl localhost:3000/api/control
 ```
 
 | Field | Actions | Description |

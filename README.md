@@ -12,7 +12,7 @@ agints/
 │   ├── capabilities/     # MCP server configs (JSON files)
 │   ├── resolvers/        # Pre-run data fetchers (e.g., Google Calendar)
 │   └── scripts/run.ts    # CLI smoke test
-├── northstar/            # Control plane + gateway (Next.js)
+├── northstar/            # Control plane + API server (Next.js)
 ├── workspace/            # Agent working directories (gitignored)
 └── sandcastle/           # Security investigation project
 ```
@@ -83,16 +83,16 @@ Profiles are capability sets. They control which MCP servers and resolvers are l
 
 ```bash
 # Run with the writer profile (notion + web-search)
-curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"writer","prompt":"Draft a post about AI agents"}'
+curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"writer","prompt":"Draft a post about AI agents"}'
 
 # Run with xmanager profile (chrome — can browse X)
-curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"xmanager","prompt":"/feed-scan"}'
+curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"xmanager","prompt":"/feed-scan"}'
 
 # Run with no profile (default: notion + google-calendar)
-curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","prompt":"Do a check-in"}'
+curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","prompt":"Do a check-in"}'
 
 # Schedule xmanager to run every 30 minutes
-curl -X POST localhost:3000/api/gateway -d '{"action":"schedule","agentId":"buri","profile":"xmanager","cron":"0,30 * * * *","prompt":"/feed-scan"}'
+curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","profile":"xmanager","cron":"0,30 * * * *","prompt":"/feed-scan"}'
 ```
 
 All profiles share the same workspace at `workspace/buri/`.
@@ -131,6 +131,8 @@ The agent auto-appears in the Northstar dashboard.
 ## Adding a Capability
 
 Capabilities are MCP server configurations. Each is a JSON file in `harness/capabilities/` that agents reference by name.
+
+> A new capability is **denied by default** for every trust tier until you grant it in `harness/permissions.json`. Permissions (which tier gets which capabilities and the built-in tools) live in one place — see [docs/PERMISSIONS.md](docs/PERMISSIONS.md).
 
 ### MCP server capability
 
@@ -191,7 +193,7 @@ Reference in agent.json: `"resolvers": ["google-calendar"]`
 ┌─────────────────────────────────────────────────────┐
 │  Northstar (Next.js)                                │
 │  ┌──────────┐  ┌───────────┐  ┌──────────────────┐ │
-│  │ Dashboard │  │ Gateway   │  │ Postgres + Redis │ │
+│  │ Dashboard │  │ Control   │  │ Postgres + Redis │ │
 │  │ (React)   │  │ API       │  │                  │ │
 │  └──────────┘  └─────┬─────┘  └──────────────────┘ │
 │                       │                              │
@@ -225,11 +227,11 @@ Reference in agent.json: `"resolvers": ["google-calendar"]`
 - `createRuntime()` -- instantiates an `AgentRuntime`
 - `createLauncher(runtime, config)` -- returns `{ launch }` bound to agent and capability directories
 
-**Northstar** imports the harness as a workspace dependency. The gateway API (`/api/gateway`) is the single entry point for running agents, sending notifications, and managing schedules. Agents with orchestration logic have dedicated orchestrators that handle Slack posting, scheduling, and multi-step execution.
+**Northstar** imports the harness as a workspace dependency. The control API (`/api/control`) is the command surface for running agents, sending notifications, and managing schedules. Agents with orchestration logic have dedicated orchestrators that handle Slack posting, scheduling, and multi-step execution. See [docs/BACKEND.md](docs/BACKEND.md) for the API server's client classes and endpoint groups.
 
 ### Execution flow
 
-1. Gateway receives a request (action + agent ID + optional profile)
+1. The control API receives a request (action + agent ID + optional profile)
 2. If agent/profile has an orchestrator, it handles the full lifecycle (run lock, launch, Slack, scheduling)
 3. Launcher loads `agent.json`, applies profile overrides, symlinks skills/hooks, runs resolvers, interpolates persona, resolves capabilities
 4. Runtime spawns `claude` CLI with the prompt + MCP configs
@@ -290,6 +292,52 @@ cd harness && pnpm smoke -- --agent buri --prompt "..."       # specify agent an
 the noise with `make debug 2>&1 | grep ' server '`. Snapshots land in
 `northstar/` (`*.heapsnapshot`, gitignored) — open them in Chrome DevTools →
 Memory.
+
+## Network exposure
+
+`make run` splits the control plane's network surface in two, enforced by
+**Tailscale before any request reaches Next**:
+
+| Reachable from | How | What's exposed |
+|---|---|---|
+| **Public internet** | Tailscale **Funnel** on `:443` | Only the ingress webhooks: `/api/telegram/webhook`, `/api/email/webhook` |
+| **Your tailnet + this machine** | Tailscale **Serve** on `:8443` | The full control plane — dashboards, control API, all other endpoints |
+| **This machine only** | direct | `http://localhost:3000` |
+
+Third-party services (Telegram, AgentMail) can only reach the two webhook paths.
+Every other route — the dashboards, the control API, agent config, settings — is
+invisible to the public internet and reachable only from devices on your
+Tailscale network (at `https://<node>.<tailnet>.ts.net:8443`) or locally. The
+boundary is enforced at the Tailscale proxy, so a public request to any
+non-webhook path is rejected before it ever hits the app.
+
+### Why two ports
+
+Tailscale's Funnel (public) switch is **per-port, not per-path** — every mount on
+a Funnel-enabled port is public. So the public webhooks get their own port
+(`:443`) with nothing else mounted there, and the full app is served to the
+tailnet on a separate port (`:8443`).
+
+### Commands
+
+```bash
+make run        # build → configure exposure → start the server
+make expose     # (re)configure Tailscale serve/funnel only — idempotent
+make unexpose   # tear down all serve/funnel config for this node
+```
+
+Exposure config persists (via `tailscale ... --bg`) across app restarts until you
+run `make unexpose`. It requires the `tailscale` CLI and a tailnet with
+[Funnel enabled](https://tailscale.com/kb/1223/funnel); if `tailscale` isn't
+installed, `make run` still starts the server localhost-only (webhooks just won't
+be reachable from the internet). Tune via make variables `FUNNEL_PATHS`,
+`TAILNET_PORT`, `NORTHSTAR_PORT`. Verify the live config with
+`tailscale serve status`.
+
+> To add a public endpoint, append its path to `FUNNEL_PATHS` in the `Makefile` —
+> that list is the entire public attack surface, so keep it minimal. The Next.js
+> middleware (`northstar/middleware.ts`) keeps a coarse host-based allow-list as a
+> secondary backstop, but Tailscale is now the primary gate.
 
 ## Prerequisites
 

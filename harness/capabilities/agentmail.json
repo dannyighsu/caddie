@@ -1,7 +1,6 @@
 {
   "name": "agentmail",
   "description": "Read-only access to the agent's AgentMail inbox — search messages and read threads (not the user's personal Gmail). Sending is handled by the `email` capability so outbound threads are recorded for reply continuity.",
-  "trust": "household",
   "server": {
     "command": "npx",
     "args": [

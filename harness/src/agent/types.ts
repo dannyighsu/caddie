@@ -8,14 +8,29 @@
 import type { TriggerContext } from "../trigger/types.js";
 
 /**
- * Trust tier for an agent run. `household` unlocks capabilities tagged
- * `trust: "household"` in the capability JSON (private data sources like
- * calendar, gmail, internal Notion). `guest` filters them out.
+ * Trust tier for an agent run. The permission policy (harness/permissions.json)
+ * grants each tier a set of capabilities plus the built-in tools; see
+ * ../policy/permissions.ts and docs/PERMISSIONS.md. `guest` is default-deny
+ * (nothing granted).
  *
  * Resolved by the caller (e.g. northstar's messaging layer) from the inbound
  * sender's identity — never from message content.
  */
 export type TrustTier = "household" | "guest";
+
+/**
+ * The origin identity of a run. Trust and "who" travel together as one object
+ * so a caller can't supply one without the other. The caller (e.g. northstar)
+ * derives this from a resolved sender identity.
+ */
+export interface RunIdentity {
+  /** Permission tier — selects capabilities + built-in tools via permissions.json. */
+  trustTier: TrustTier;
+  /** Human-readable "who" for the persona. Rendered as {{senderIdentity}}. */
+  senderIdentity: string;
+  /** Where the run originated (e.g. "email", "portal", "schedule"). {{originChannel}}. */
+  originChannel: string;
+}
 
 /**
  * Static agent configuration, loaded from agent.json.
@@ -59,11 +74,11 @@ export interface AgentInput {
   /** Which profile to use (overrides base capabilities). */
   profile?: string;
   /**
-   * Trust tier for this run. Defaults to "guest" if omitted — callers must
-   * opt in to authenticated trust explicitly. Filters out capabilities tagged
-   * `trust: "household"` for guests.
+   * Origin identity for this run — trust tier, sender, and origin channel,
+   * bundled so they always travel together. Required: every entry point must
+   * state who is driving the run and at what trust.
    */
-  trustTier?: TrustTier;
+  identity: RunIdentity;
   /** The user's message or task prompt. */
   prompt: string;
   /** Resume a prior session for conversation continuation. */

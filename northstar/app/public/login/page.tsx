@@ -34,7 +34,7 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="password" className="block text-sm text-gray-400 mb-1">
+        <label htmlFor="password" className="block text-sm font-medium text-ink-soft mb-1">
           Password
         </label>
         <input
@@ -43,15 +43,15 @@ function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoFocus
-          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-gray-500"
+          className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
           placeholder="Enter password"
         />
       </div>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-bad">{error}</p>}
       <button
         type="submit"
         disabled={loading || !password}
-        className="w-full bg-white text-gray-900 font-medium text-sm py-2 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        className="w-full bg-primary text-white font-medium text-sm py-2.5 rounded-lg hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
         {loading ? "Signing in…" : "Continue"}
       </button>
@@ -61,12 +61,19 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="text-lg font-semibold text-gray-100 mb-6">Sign in</h1>
-        <Suspense>
-          <LoginForm />
-        </Suspense>
+        <div className="flex flex-col items-center mb-6 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/buri-icon.png" alt="Buri" className="h-16 w-16 mb-3" />
+          <h1 className="text-lg font-semibold text-ink">Buri Agent Portal</h1>
+          <p className="text-sm text-ink-faint mt-0.5">Sign in to continue</p>
+        </div>
+        <div className="bg-surface border border-line rounded-2xl shadow-sm p-6">
+          <Suspense>
+            <LoginForm />
+          </Suspense>
+        </div>
       </div>
     </div>
   );

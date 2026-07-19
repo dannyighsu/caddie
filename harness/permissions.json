@@ -1,0 +1,29 @@
+{
+  "_doc": "Single source of truth for what each trust tier may do. Keyed by trust tier → permission key → allowed. Keys are capability names (see capabilities/) plus 'base-tools' (the built-in Claude Code tools: Bash, Read, Write, Edit, WebFetch, ...). DEFAULT-DENY: anything not explicitly true is denied, so a new capability is off until granted here. See docs/PERMISSIONS.md.",
+
+  "household": {
+    "agentmail": true,
+    "browser": true,
+    "chrome": true,
+    "egress": true,
+    "email": true,
+    "google-calendar": true,
+    "google-gmail": true,
+    "notion": true,
+    "web-search": true,
+    "base-tools": true
+  },
+
+  "guest": {
+    "agentmail": false,
+    "browser": false,
+    "chrome": false,
+    "egress": false,
+    "email": false,
+    "google-calendar": false,
+    "google-gmail": false,
+    "notion": false,
+    "web-search": false,
+    "base-tools": false
+  }
+}

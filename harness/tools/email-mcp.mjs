@@ -3,8 +3,8 @@
 /**
  * Email Egress MCP Server
  *
- * Outbound email for the agent, proxied through the Northstar gateway
- * (`notify` action, `email` channel). Routing sends through the gateway —
+ * Outbound email for the agent, proxied through the Northstar control API
+ * (`notify` action, `email` channel). Routing sends through the control API —
  * rather than calling AgentMail directly — means every send is recorded as a
  * local conversation keyed by its AgentMail thread id, so when the recipient
  * replies the shared messaging handler finds the thread and supplies prior
@@ -15,7 +15,7 @@
  * sending mail as the household must stay gated to authenticated senders.
  *
  * Env:
- *   NORTHSTAR_URL — Base URL for the Northstar gateway (default: http://localhost:3000)
+ *   NORTHSTAR_URL — Base URL for the Northstar control API (default: http://localhost:3000)
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -70,14 +70,14 @@ async function handleSendEmail(args) {
 
   // If this run was launched by a task, the harness passes the source-task facts
   // via NORTHSTAR_THREAD_CONTEXT (inherited from the run env). Forward them so
-  // the gateway can attach them to the created thread for reply continuity.
+  // the control API can attach them to the created thread for reply continuity.
   let threadContext;
   const rawCtx = process.env.NORTHSTAR_THREAD_CONTEXT;
   if (rawCtx) {
     try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
   }
 
-  const res = await fetch(`${NORTHSTAR_URL}/api/gateway`, {
+  const res = await fetch(`${NORTHSTAR_URL}/api/control`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

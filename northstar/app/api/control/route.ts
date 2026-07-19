@@ -1,7 +1,11 @@
 /**
- * Gateway API
+ * Control API — /api/control
  *
- * Single entry point for triggering agent executions and sending notifications.
+ * The control-plane command surface: an internal API for triggering agent
+ * executions, sending notifications, and managing scheduled jobs. Called by the
+ * portal UI and by the agent's own tools/skills (never by external senders —
+ * inbound channel traffic arrives at the webhook routes instead). See
+ * docs/BACKEND.md for the API server's client classes.
  *
  * Actions:
  *   notify  — Send a message to Slack, Telegram, or email (immediately or scheduled)
@@ -12,12 +16,12 @@
  * or `cron` for recurring jobs.
  *
  * Examples:
- *   curl -X POST localhost:3000/api/gateway -d '{"action":"notify","channel":"slack","message":"done"}'
- *   curl -X POST localhost:3000/api/gateway -d '{"action":"notify","channel":"telegram","to":"123456789","message":"done"}'
- *   curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri"}'
- *   curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","profile":"xmanager"}'
- *   curl -X POST localhost:3000/api/gateway -d '{"action":"run","agentId":"buri","scheduledFor":"2026-03-28T09:00:00Z"}'
- *   curl -X POST localhost:3000/api/gateway -d '{"action":"schedule","agentId":"buri","profile":"xmanager","cron":"0,30 * * * *","description":"Feed scan every 30 min"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"notify","channel":"slack","message":"done"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"notify","channel":"telegram","to":"123456789","message":"done"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"xmanager"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","scheduledFor":"2026-03-28T09:00:00Z"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","profile":"xmanager","cron":"0,30 * * * *","description":"Feed scan every 30 min"}'
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -25,7 +29,7 @@ import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
-import type { TrustTier } from "@/lib/identity";
+import { portalIdentity, toRunIdentity, parsePortalOwner, type TrustTier, type UserId } from "@/lib/identity";
 import type { ThreadContext } from "@/lib/thread-context";
 import { getLauncher } from "@/lib/harness";
 import { getSetting } from "@/lib/db";
@@ -34,7 +38,7 @@ import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, del
 import { executeJob, isJobActive } from "@/lib/scheduler";
 import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 
-interface GatewayRequest {
+interface ControlRequest {
   action: "notify" | "run" | "schedule" | "update_schedule" | "trigger";
 
   // --- notify fields ---
@@ -84,12 +88,12 @@ interface GatewayRequest {
 
 // --- Action execution ---
 
-async function executeAction(req: GatewayRequest): Promise<Record<string, unknown>> {
+async function executeAction(req: ControlRequest, portalOwner: UserId): Promise<Record<string, unknown>> {
   switch (req.action) {
     case "notify":
       return executeNotify(req);
     case "run":
-      return executeRun(req);
+      return executeRun(req, portalOwner);
     case "schedule":
       return executeSchedule(req);
     case "update_schedule":
@@ -112,7 +116,7 @@ async function executeAction(req: GatewayRequest): Promise<Record<string, unknow
  * If a run for the same agent is already in progress, the job is not run and
  * the caller is told to retry later.
  */
-async function executeTrigger(req: GatewayRequest): Promise<Record<string, unknown>> {
+async function executeTrigger(req: ControlRequest): Promise<Record<string, unknown>> {
   if (!req.jobId) {
     return { success: false, error: "jobId is required for trigger" };
   }
@@ -148,7 +152,7 @@ async function executeTrigger(req: GatewayRequest): Promise<Record<string, unkno
   executeJob(job, { source: "trigger" })
     .then(async (result) => {
       if (result.skipped) {
-        console.log(`[Gateway] Trigger ${job.id} skipped: ${result.error}`);
+        console.log(`[Control] Trigger ${job.id} skipped: ${result.error}`);
         return;
       }
       if (consumed) {
@@ -157,13 +161,13 @@ async function executeTrigger(req: GatewayRequest): Promise<Record<string, unkno
     })
     .catch((err) => {
       const error = err instanceof Error ? err.message : String(err);
-      console.error(`[Gateway] Trigger ${job.id} failed:`, error);
+      console.error(`[Control] Trigger ${job.id} failed:`, error);
     });
 
   return { success: true, started: true, recurring: !!job.cron, consumed };
 }
 
-async function executeNotify(req: GatewayRequest): Promise<Record<string, unknown>> {
+async function executeNotify(req: ControlRequest): Promise<Record<string, unknown>> {
   if (!req.message) {
     return { success: false, error: "message is required" };
   }
@@ -271,7 +275,7 @@ async function executeNotify(req: GatewayRequest): Promise<Record<string, unknow
   return { success: false, error: `Unsupported channel: ${req.channel}` };
 }
 
-async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>> {
+async function executeRun(req: ControlRequest, portalOwner: UserId): Promise<Record<string, unknown>> {
   if (!req.agentId) {
     return { success: false, error: "agentId is required" };
   }
@@ -295,7 +299,7 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
 
   const traceId = createTraceId();
   await createTrace(traceId, req.agentId, {
-    trigger: "gateway",
+    trigger: "control",
     profile: req.profile,
   });
 
@@ -303,6 +307,10 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
   const result = await launcher.launch({
     agentId: req.agentId,
     profile: req.profile,
+    // An immediate run through the control API is owner-initiated from the
+    // portal (the endpoint is network-gated to localhost/tailnet), so it runs
+    // as the selected household owner.
+    identity: toRunIdentity(portalIdentity(portalOwner)),
     prompt: req.prompt ?? "Run.",
     context: {
       currentTime: currentTimePST(),
@@ -323,7 +331,7 @@ async function executeRun(req: GatewayRequest): Promise<Record<string, unknown>>
   };
 }
 
-async function executeSchedule(req: GatewayRequest): Promise<Record<string, unknown>> {
+async function executeSchedule(req: ControlRequest): Promise<Record<string, unknown>> {
   // Delete a job
   if (req.jobId && !req.cron && !req.agentId) {
     await deleteJob(req.jobId);
@@ -360,7 +368,7 @@ async function executeSchedule(req: GatewayRequest): Promise<Record<string, unkn
   }
 }
 
-async function executeUpdateSchedule(req: GatewayRequest): Promise<Record<string, unknown>> {
+async function executeUpdateSchedule(req: ControlRequest): Promise<Record<string, unknown>> {
   if (!req.jobId) {
     return { success: false, error: "jobId is required for update_schedule" };
   }
@@ -414,7 +422,7 @@ async function executeUpdateSchedule(req: GatewayRequest): Promise<Record<string
 // --- Route handler ---
 
 export async function POST(request: NextRequest) {
-  const req = (await request.json()) as GatewayRequest;
+  const req = (await request.json()) as ControlRequest;
 
   if (!req.action) {
     return NextResponse.json(
@@ -423,13 +431,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const portalOwner = parsePortalOwner(request.cookies.get("portal_owner")?.value);
+
   try {
-    const result = await executeAction(req);
+    const result = await executeAction(req, portalOwner);
     const status = result.success ? 200 : 400;
     return NextResponse.json(result, { status });
   } catch (err) {
     const error = err instanceof Error ? err.message : "Unknown error";
-    console.error("[Gateway] Action failed:", error);
+    console.error("[Control] Action failed:", error);
     return NextResponse.json({ success: false, error }, { status: 500 });
   }
 }

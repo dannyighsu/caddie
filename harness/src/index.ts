@@ -22,11 +22,21 @@ export { ClaudeCodeRuntime, type ClaudeCodeRuntimeOptions } from "./runtime/clau
 export { createRuntime, type RuntimeConfig } from "./runtime/factory.js";
 
 // Agent
-export type { AgentConfig, AgentInput, AgentResult, TrustTier } from "./agent/types.js";
+export type { AgentConfig, AgentInput, AgentResult, TrustTier, RunIdentity } from "./agent/types.js";
 export { createLauncher, type LauncherConfig } from "./agent/launcher.js";
 
 // Capability
 export { resolveCapabilities, type ResolveResult } from "./capability/mcp-resolver.js";
+
+// Permission policy (single source of truth: harness/permissions.json)
+export {
+  loadPermissions,
+  isAllowed,
+  filterCapabilitiesByPolicy,
+  BASE_TOOLS_KEY,
+  type PermissionPolicy,
+  type CapabilityFilterResult,
+} from "./policy/permissions.js";
 
 // Resolver
 export type {

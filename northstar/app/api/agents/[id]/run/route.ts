@@ -7,6 +7,7 @@ import {
   type Message,
 } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
+import { portalIdentity, toRunIdentity, parsePortalOwner } from "@/lib/identity";
 
 export async function POST(
   request: NextRequest,
@@ -62,9 +63,14 @@ export async function POST(
       conversation = await createConversation(id, title);
     }
 
+    // The agent page is the owner console (network-gated), so runs execute as
+    // the selected household owner.
+    const portalOwner = parsePortalOwner(request.cookies.get("portal_owner")?.value);
+
     const launcher = getLauncher();
     const result = await launcher.launch({
       agentId: id,
+      identity: toRunIdentity(portalIdentity(portalOwner)),
       prompt,
       sessionId,
       context: resolvedContext,
@@ -72,7 +78,12 @@ export async function POST(
 
     const now = new Date().toISOString();
     const newMessages: Message[] = [
-      { role: "user", content: prompt, timestamp: now },
+      {
+        role: "user",
+        content: prompt,
+        timestamp: now,
+        sender: { kind: "authenticated", userId: portalOwner },
+      },
     ];
     if (result.rawText) {
       newMessages.push({

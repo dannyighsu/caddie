@@ -46,6 +46,11 @@ async function main() {
 
   const result = await launcher.launch({
     agentId,
+    identity: {
+      trustTier: "household",
+      senderIdentity: "CLI (smoke test)",
+      originChannel: "cli",
+    },
     prompt,
     context: {
       currentTime: new Date().toLocaleString("en-US", {

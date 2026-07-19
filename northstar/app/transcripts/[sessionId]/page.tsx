@@ -30,14 +30,14 @@ export default function TranscriptPage() {
       .finally(() => setLoading(false));
   }, [params.sessionId, agentId]);
 
-  if (loading) return <p className="text-gray-500">Loading transcript...</p>;
-  if (error) return <p className="text-red-400">Error: {error}</p>;
+  if (loading) return <p className="text-ink-faint">Loading transcript...</p>;
+  if (error) return <p className="text-bad">Error: {error}</p>;
 
   const typeStyles: Record<string, string> = {
-    text: "bg-gray-800 text-gray-200",
-    tool_use: "bg-blue-950/40 text-blue-200 border-l-2 border-blue-700",
-    tool_result: "bg-gray-900 text-gray-400 border-l-2 border-gray-700",
-    thinking: "bg-purple-950/30 text-purple-300 border-l-2 border-purple-700",
+    text: "bg-surface border border-line text-ink shadow-sm",
+    tool_use: "bg-primary-soft text-primary border-l-2 border-primary",
+    tool_result: "bg-surface-muted text-ink-soft border-l-2 border-line-strong",
+    thinking: "bg-[#f3edfb] text-[#6d4aa8] border-l-2 border-[#b499dd]",
   };
 
   const typeLabels: Record<string, string> = {
@@ -51,26 +51,29 @@ export default function TranscriptPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Transcript</h1>
-          <p className="text-xs text-gray-500 mt-1">
+          <h1 className="flex items-center gap-2 text-xl font-semibold">
+            <span className="h-4 w-1.5 rounded-full bg-accent" />
+            Transcript
+          </h1>
+          <p className="text-xs text-ink-faint mt-1">
             Session: {params.sessionId.substring(0, 12)}... | Agent: {agentId}
           </p>
         </div>
-        <span className="text-xs text-gray-500">{steps.length} steps</span>
+        <span className="text-xs text-ink-faint">{steps.length} steps</span>
       </div>
 
       <div className="space-y-2">
         {steps.map((step, i) => (
-          <div key={i} className={`rounded-lg px-4 py-3 text-sm ${typeStyles[step.type] ?? "bg-gray-800"}`}>
+          <div key={i} className={`rounded-lg px-4 py-3 text-sm ${typeStyles[step.type] ?? "bg-surface border border-line"}`}>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-medium text-gray-500">
+              <span className="text-xs font-semibold text-ink-soft">
                 {step.role === "assistant" ? "Agent" : "System"}
               </span>
               {typeLabels[step.type] && (
-                <span className="text-xs text-gray-600">{typeLabels[step.type]}</span>
+                <span className="text-xs text-ink-faint">{typeLabels[step.type]}</span>
               )}
               {step.toolName && step.type === "tool_use" && (
-                <span className="text-xs font-mono text-blue-400">{step.toolName}</span>
+                <span className="text-xs font-mono text-primary">{step.toolName}</span>
               )}
             </div>
             <pre className="whitespace-pre-wrap font-sans text-sm max-h-64 overflow-y-auto">

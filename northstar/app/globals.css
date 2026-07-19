@@ -1,1 +1,63 @@
 @import "tailwindcss";
+
+/* ==========================================================================
+   Buri Agent Portal — design tokens
+   Palette derived from the app icon: cobalt-blue headphones, golden-yellow
+   smiley, and light sky-blue accents on a soft off-white ground.
+   ========================================================================== */
+@theme {
+  /* Surfaces */
+  --color-canvas: #f4f7fc; /* page background — faint blue-tinted white */
+  --color-surface: #ffffff; /* cards, panels */
+  --color-surface-muted: #eef3fa; /* inputs, secondary fills */
+
+  /* Ink (navy family, from the icon outline) */
+  --color-ink: #1b2a4a; /* primary text */
+  --color-ink-soft: #536078; /* secondary text */
+  --color-ink-faint: #8b95ab; /* tertiary / meta text */
+
+  /* Lines */
+  --color-line: #e3e9f3; /* default borders */
+  --color-line-strong: #cdd8ea; /* input borders, dividers */
+
+  /* Primary — cobalt blue (headphone band) */
+  --color-primary: #2e5fb0;
+  --color-primary-hover: #244a8c;
+  --color-primary-soft: #e8f0fb; /* tinted fill for active / tags */
+  --color-primary-sky: #a9cff0; /* light ear-cup blue */
+
+  /* Accent — golden yellow (smiley + sparkles) */
+  --color-accent: #f4c025;
+  --color-accent-strong: #e0a90c;
+  --color-accent-soft: #fdf3d3;
+
+  /* Status */
+  --color-good: #1f9d57;
+  --color-good-soft: #e4f5ec;
+  --color-warn: #d98207;
+  --color-warn-soft: #fdefd6;
+  --color-bad: #d64545;
+  --color-bad-soft: #fbe6e6;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Native form controls follow the light theme */
+select,
+input,
+textarea {
+  color-scheme: light;
+}
+
+/* Focus ring using the brand cobalt */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}

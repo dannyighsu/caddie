@@ -1,5 +1,5 @@
 /**
- * Shared helpers for agent execution paths (gateway, scheduler, messaging).
+ * Shared helpers for agent execution paths (control API, scheduler, messaging).
  */
 
 /**

@@ -2,7 +2,7 @@
  * Notification Channels
  *
  * Shared type and dispatcher for sending notifications across channels.
- * Used by the scheduler and gateway to route messages to Slack, Telegram, or email.
+ * Used by the scheduler and control API to route messages to Slack, Telegram, or email.
  */
 
 import { sendMessage, isSlackConfigured } from "./slack";

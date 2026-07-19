@@ -1,4 +1,12 @@
-.PHONY: run dev debug debug-snapshot build build-harness install smoke google-auth
+.PHONY: run dev debug debug-snapshot build build-harness install smoke google-auth expose unexpose
+
+# Network exposure (see the "Network exposure" section in README.md).
+NORTHSTAR_PORT ?= 3000
+TAILNET_PORT   ?= 8443
+# Paths reachable from the PUBLIC internet via Tailscale Funnel. Everything else
+# is served to the tailnet + localhost only. Keep this list minimal — it is the
+# entire public attack surface.
+FUNNEL_PATHS := /api/telegram/webhook /api/email/webhook
 
 # Start the Northstar control plane in PRODUCTION mode (next build + next start).
 # Use this for the long-lived process: `next start` has no Turbopack dev
@@ -6,11 +14,39 @@
 # compiled-module strings over long uptime — see northstar/scripts/mem-logger.cjs.
 # Override workspace: make run WORKSPACE_ROOT=/path/to/workspace
 run: build
-	@if command -v tailscale >/dev/null 2>&1; then \
-		tailscale funnel 3000 &\
-		echo "[Funnel] Exposing localhost:3000 via Tailscale Funnel"; \
-	fi
+	@$(MAKE) --no-print-directory expose
 	cd northstar && WORKSPACE_ROOT=$(or $(WORKSPACE_ROOT),$(CURDIR)/workspace) pnpm start
+
+# Configure the network surface via Tailscale, enforced at the proxy BEFORE any
+# request reaches Next:
+#   • PUBLIC internet → only FUNNEL_PATHS (ingress webhooks), Funnel on :443
+#   • TAILNET + local → the full control plane, Serve on :$(TAILNET_PORT)
+# localhost:$(NORTHSTAR_PORT) is always reachable directly on this machine.
+# Idempotent; config persists (Tailscale --bg) until `make unexpose`.
+expose:
+	@if ! command -v tailscale >/dev/null 2>&1; then \
+		echo "[expose] tailscale not found — control plane stays localhost-only; webhooks unreachable from the internet."; \
+		exit 0; \
+	fi
+	@echo "[expose] Clearing previous serve/funnel config…"
+	@tailscale serve reset >/dev/null 2>&1 || true
+	@echo "[expose] Tailnet-only (private): full control plane on :$(TAILNET_PORT)"
+	@tailscale serve --bg --https=$(TAILNET_PORT) http://127.0.0.1:$(NORTHSTAR_PORT) >/dev/null \
+		|| echo "[expose] WARN: serve setup failed."
+	@for p in $(FUNNEL_PATHS); do \
+		echo "[expose] Public (Funnel :443): $$p"; \
+		tailscale funnel --bg --yes --https=443 --set-path=$$p http://127.0.0.1:$(NORTHSTAR_PORT)$$p >/dev/null \
+			|| echo "[expose] WARN: funnel failed for $$p — is Funnel enabled for this node? https://tailscale.com/kb/1223/funnel"; \
+	done
+	@echo "[expose] Public surface = $(FUNNEL_PATHS); everything else is tailnet-only."
+
+# Tear down all Tailscale serve/funnel exposure for this node.
+unexpose:
+	@if command -v tailscale >/dev/null 2>&1; then \
+		tailscale serve reset && echo "[unexpose] Cleared all serve/funnel config for this node."; \
+	else \
+		echo "[unexpose] tailscale not found; nothing to clear."; \
+	fi
 
 # Start the Northstar control plane with the Next dev server (hot reload).
 # For active development only — do NOT leave running for hours; the Turbopack

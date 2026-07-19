@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import OwnerSelector from "./owner-selector";
 
 export const metadata: Metadata = {
-  title: "Northstar",
-  description: "Agent workflow gateway and control plane",
+  title: "Buri Agent Portal",
+  description: "Agent control plane",
 };
 
 export default function RootLayout({
@@ -13,16 +14,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-gray-950 text-gray-100 min-h-screen">
-        <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-          <a href="/" className="text-lg font-semibold tracking-tight">
-            Northstar
+      <body className="bg-canvas text-ink min-h-screen">
+        <header className="sticky top-0 z-10 border-b border-line bg-surface/85 backdrop-blur px-6 py-3 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-ink">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/buri-icon.png" alt="Buri" className="h-8 w-8" />
+            Buri Agent Portal
           </a>
-          <div className="flex items-center gap-4">
-            <a href="/transcripts" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+          <div className="flex items-center gap-3">
+            <OwnerSelector />
+            <span className="h-5 w-px bg-line" />
+            <a href="/transcripts" className="text-sm text-ink-soft hover:text-primary hover:bg-primary-soft rounded-md px-3 py-1.5 transition-colors">
               Traces
             </a>
-            <a href="/settings" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+            <a href="/settings" className="text-sm text-ink-soft hover:text-primary hover:bg-primary-soft rounded-md px-3 py-1.5 transition-colors">
               Settings
             </a>
           </div>
