@@ -139,13 +139,22 @@ server.tool(
       .array(z.string())
       .optional()
       .describe("List of attendee email addresses"),
+    addMeet: z
+      .boolean()
+      .optional()
+      .describe(
+        "Add a Google Meet video link. Defaults to true for group meetings (2+ attendees) and false otherwise. Set explicitly to force it on or off (e.g. false for an in-person event)."
+      ),
     calendarId: z
       .string()
       .optional()
       .describe("Calendar ID. Defaults to 'primary'."),
   },
-  async ({ summary, startTime, endTime, description, location, attendees, calendarId }) => {
+  async ({ summary, startTime, endTime, description, location, attendees, addMeet, calendarId }) => {
     const calendar = await getAuthenticatedClient();
+
+    // Group meetings (2+ attendees) get a Google Meet link by default; overridable via addMeet.
+    const wantMeet = addMeet ?? (attendees?.length ?? 0) >= 2;
 
     const event = {
       summary,
@@ -154,12 +163,27 @@ server.tool(
       description: description || undefined,
       location: location || undefined,
       attendees: attendees?.map((email) => ({ email })),
+      // Every event is editable by its attendees — defaulted here in the tool so
+      // it always applies and never needs to be a caller/agent concern.
+      guestsCanModify: true,
     };
+
+    if (wantMeet) {
+      event.conferenceData = {
+        createRequest: {
+          // Unique per request; Google echoes it back to correlate the conference it creates.
+          requestId: `meet-${Date.now()}-${Math.floor(Math.random() * 1e9)}`,
+          conferenceSolutionKey: { type: "hangoutsMeet" },
+        },
+      };
+    }
 
     const response = await calendar.events.insert({
       calendarId: calendarId ?? "primary",
       requestBody: event,
       sendUpdates: attendees?.length ? "all" : "none",
+      // Must be 1 for Google to honor conferenceData.createRequest and mint a Meet link.
+      conferenceDataVersion: wantMeet ? 1 : 0,
     });
 
     return {
@@ -173,6 +197,8 @@ server.tool(
               start: response.data.start,
               end: response.data.end,
               htmlLink: response.data.htmlLink,
+              hangoutLink: response.data.hangoutLink || undefined,
+              guestsCanModify: response.data.guestsCanModify ?? undefined,
               attendees: response.data.attendees?.map((a) => ({
                 email: a.email,
                 responseStatus: a.responseStatus,
