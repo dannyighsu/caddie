@@ -11,11 +11,14 @@ import { handleInboundMessage } from "./messaging";
 import {
   normalizeMessage,
   fetchMessage,
+  fetchRfcMessageId,
   replyToEmail,
   getFromRawAddress,
   resolveEmailIdentity,
   type ReceivedEmail,
 } from "./email";
+import { getConversationByExternalId, addSeenChannelIds } from "./db";
+import { selectInboundBody, isForwardedMessage } from "./email-threading";
 
 export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
   let email: ReceivedEmail;
@@ -47,16 +50,30 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
   }
 
   // The webhook offloads the body for all but the smallest messages: text/html
-  // are absent and only `preview` + a short-lived `body_url` are sent. When the
-  // inlined body is empty, fetch the full message by id and use that instead.
-  let body = email.extractedText.trim();
-  if (!body) {
+  // are absent and only `preview` + a short-lived `body_url` are sent. When
+  // nothing inlined arrived at all, fetch the full message by id and use that.
+  if (!email.extractedText.trim() && !email.fullText.trim()) {
     const full = await fetchMessage(email.messageId);
-    if (full) {
-      email = full;
-      body = email.extractedText.trim();
-    }
+    if (full) email = full;
   }
+
+  const externalId = `email:${email.threadId}`;
+  const existing = await getConversationByExternalId(externalId);
+
+  // Choose the body. Normally the quoted-history-stripped text (the agent
+  // already holds prior turns); but the FULL body *with* quoted history when
+  // this message loops the agent into context it hasn't seen — a forward, a
+  // reply into a thread we hold no record of, or a reply whose parent arrived
+  // off our inbox (a side conversation). See ./email-threading.
+  const selection = selectInboundBody({
+    extractedText: email.extractedText,
+    fullText: email.fullText,
+    isForward: isForwardedMessage(email.subject, email.fullText),
+    inReplyTo: email.inReplyTo,
+    threadKnownLocally: !!existing,
+    knownMessageIds: new Set(existing?.seen_channel_ids ?? []),
+  });
+  const body = selection.body.trim();
   if (!body) {
     console.log(
       `[Email Handler] Skipping message: empty body from=${email.from} thread=${email.threadId} ` +
@@ -71,11 +88,14 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
       (identity.kind === "authenticated" ? ` userId=${identity.userId}` : "") +
       ` rawSender=${identity.rawSender}`,
   );
+  console.log(
+    `[Email Handler] Body selected: reason=${selection.reason} ` +
+      `includedHistory=${selection.includedHistory} threadKnown=${!!existing}`,
+  );
 
-  const externalId = `email:${email.threadId}`;
-
+  let replyAgentMessageId: string | undefined;
   try {
-    await handleInboundMessage({
+    const result = await handleInboundMessage({
       text: body,
       externalId,
       traceName: "email-message",
@@ -89,9 +109,21 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
       context: { originChannel: "email" },
       replyFn: async (replyText) => {
         const cleaned = replyText.replace(/\nhttps?:\/\/[^\s]+$/, "").trim();
-        await replyToEmail(email.messageId, cleaned);
+        const sent = await replyToEmail(email.messageId, cleaned);
+        replyAgentMessageId = sent.messageId;
       },
     });
+
+    // Record the RFC Message-IDs now seen on this thread — the inbound message
+    // and our own reply — so a future reply to either is recognized as a direct
+    // continuation rather than a side-conversation gap.
+    const seen: string[] = [];
+    if (email.rfcMessageId) seen.push(email.rfcMessageId);
+    if (replyAgentMessageId) {
+      const replyRfcId = await fetchRfcMessageId(replyAgentMessageId);
+      if (replyRfcId) seen.push(replyRfcId);
+    }
+    if (seen.length > 0) await addSeenChannelIds(result.conversationId, seen);
   } catch (err) {
     console.error("[Email Handler] Error:", err);
   }

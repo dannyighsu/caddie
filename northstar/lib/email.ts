@@ -12,7 +12,6 @@
  *   AGENTMAIL_SIGNING_SECRET — Svix-format signing secret ("whsec_...")
  */
 
-import { randomUUID } from "node:crypto";
 import { AgentMailClient } from "agentmail";
 import { Webhook } from "svix";
 import type { ResolvedIdentity, UserId } from "./identity";
@@ -20,10 +19,11 @@ import {
   createConversation,
   getConversationByExternalId,
   appendMessages,
+  addSeenChannelIds,
   type Message,
 } from "./db";
 import type { ThreadContext } from "./thread-context";
-import { buildEventInvite } from "./ics";
+import { parseMessageRefs, normalizeMessageId } from "./email-threading";
 
 // --- Config ---
 
@@ -77,7 +77,13 @@ export async function sendEmail(
 
   // Best-effort: a failed record must not fail the send itself.
   try {
-    await recordOutboundThread(result.threadId, subject, text, opts?.threadContext);
+    await recordOutboundThread(
+      result.threadId,
+      subject,
+      text,
+      opts?.threadContext,
+      result.messageId,
+    );
   } catch (err) {
     console.error(
       `[Email] Sent to ${to} (thread ${result.threadId}) but failed to record local conversation:`,
@@ -99,6 +105,7 @@ async function recordOutboundThread(
   subject: string,
   body: string,
   threadContext?: ThreadContext,
+  sentMessageId?: string,
 ): Promise<void> {
   const externalId = `email:${threadId}`;
   const existing = await getConversationByExternalId(externalId);
@@ -121,109 +128,44 @@ async function recordOutboundThread(
     timestamp: new Date().toISOString(),
   };
   await appendMessages(conversationId, [message]);
-}
 
-export interface CalendarInviteInput {
-  /** Email addresses to invite. Also the message recipients. */
-  attendees: string[];
-  summary: string;
-  /** ISO 8601 start, e.g. "2026-07-25T10:00:00-07:00". */
-  startTime: string;
-  /** ISO 8601 end. */
-  endTime: string;
-  description?: string;
-  location?: string;
+  // Record our own outbound RFC Message-ID as "seen" so a reply to this message
+  // is recognized as a direct continuation, not a side-conversation gap.
+  if (sentMessageId) {
+    const rfcId = await fetchRfcMessageId(sentMessageId);
+    if (rfcId) await addSeenChannelIds(conversationId, [rfcId]);
+  }
 }
 
 /**
- * Send a calendar invite from the AgentMail inbox. The inbox is the organizer;
- * `attendees` are both the ICS attendees and the email recipients. Recipients
- * see a native invitation (Yes/No/Maybe) rendered from the attached
- * `text/calendar` (METHOD:REQUEST) part.
- *
- * Like `sendEmail`, the resulting thread is recorded locally so RSVP replies —
- * which arrive as ordinary emails on the same AgentMail thread — reconnect to
- * this send with context.
+ * Reply to an inbound message and return AgentMail's id for the sent reply. The
+ * caller records that id (via its RFC `Message-ID`) as "seen" so a later reply
+ * to it is recognized as a direct continuation rather than a side-conversation
+ * gap. See {@link fetchRfcMessageId}.
  */
-export async function sendCalendarInvite(
-  input: CalendarInviteInput,
-  opts?: { threadContext?: ThreadContext },
-): Promise<{ messageId: string; threadId: string }> {
-  if (input.attendees.length === 0) {
-    throw new Error("sendCalendarInvite requires at least one attendee");
-  }
-
-  const client = getClient();
-  const organizer = getInboxId();
-  const domain = organizer.split("@")[1] ?? "agentmail.to";
-
-  const ics = buildEventInvite({
-    uid: `${randomUUID()}@${domain}`,
-    summary: input.summary,
-    startTime: input.startTime,
-    endTime: input.endTime,
-    description: input.description,
-    location: input.location,
-    organizer,
-    attendees: input.attendees,
-  });
-
-  const subject = `Invitation: ${input.summary}`;
-  const text = buildInviteBody(input);
-
-  const res = await client.inboxes.messages.send(organizer, {
-    to: input.attendees,
-    subject,
-    text,
-    attachments: [
-      {
-        filename: "invite.ics",
-        // METHOD in the content-type is what makes clients treat this as an
-        // invitation to act on rather than a file to download.
-        contentType: "text/calendar; method=REQUEST; charset=UTF-8",
-        content: Buffer.from(ics, "utf8").toString("base64"),
-      },
-    ],
-  });
-
-  const result = { messageId: res.messageId, threadId: res.threadId };
-
-  // Best-effort: a failed record must not fail the send itself.
-  try {
-    await recordOutboundThread(result.threadId, subject, text, opts?.threadContext);
-  } catch (err) {
-    console.error(
-      `[Email] Sent invite to ${input.attendees.join(", ")} (thread ${result.threadId}) but failed to record local conversation:`,
-      err,
-    );
-  }
-
-  return result;
-}
-
-/** Human-readable fallback body for clients that don't render the ICS part. */
-function buildInviteBody(input: CalendarInviteInput): string {
-  const fmt = (iso: string): string => {
-    const d = new Date(iso);
-    return isNaN(d.getTime()) ? iso : d.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }) + " PT";
-  };
-  const lines = [
-    `You're invited: ${input.summary}`,
-    "",
-    `When: ${fmt(input.startTime)} – ${fmt(input.endTime)}`,
-    ...(input.location ? [`Where: ${input.location}`] : []),
-    ...(input.description ? ["", input.description] : []),
-  ];
-  return lines.join("\n");
-}
-
 export async function replyToEmail(
   messageId: string,
   text: string,
-): Promise<void> {
+): Promise<{ messageId: string }> {
   if (!messageId) throw new Error("replyToEmail: messageId is empty");
   const client = getClient();
-  await client.inboxes.messages.reply(getInboxId(), messageId, { text });
+  const res = await client.inboxes.messages.reply(getInboxId(), messageId, { text });
+  return { messageId: res.messageId };
+}
+
+/**
+ * Best-effort lookup of an outbound message's RFC 5322 `Message-ID` from its
+ * AgentMail message id. The send/reply responses expose only AgentMail's own
+ * ids, but threading (`In-Reply-To`) is done in RFC `Message-ID` space, so we
+ * fetch the message to read its header. Returns undefined on any failure — a
+ * missing id only costs a one-time, safe over-inclusion of quoted history.
+ */
+export async function fetchRfcMessageId(
+  agentMailMessageId: string,
+): Promise<string | undefined> {
+  if (!agentMailMessageId) return undefined;
+  const full = await fetchMessage(agentMailMessageId);
+  return full?.rfcMessageId;
 }
 
 // --- Receive ---
@@ -236,8 +178,24 @@ export interface ReceivedEmail {
   html: string;
   /** Body with quoted reply history stripped (preferred for agent context). */
   extractedText: string;
+  /**
+   * Full body *including* quoted/forwarded history. Preferred over
+   * `extractedText` when a message loops the agent into context it hasn't seen
+   * (a forward or a reply from an off-inbox side conversation).
+   */
+  fullText: string;
   messageId: string;
   threadId: string;
+  /**
+   * Normalized RFC 5322 `Message-ID` of this message (bracket-stripped), from
+   * the `Message-ID` header. Distinct from AgentMail's `messageId`. Undefined if
+   * the header is absent.
+   */
+  rfcMessageId?: string;
+  /** Normalized RFC `Message-ID` this message replies to (`In-Reply-To`). */
+  inReplyTo?: string;
+  /** Normalized RFC `Message-ID` ancestry chain (`References`), oldest→newest. */
+  references: string[];
   /** Raw RFC 5322 headers from the inbound message (header name → value). */
   headers: Record<string, string>;
 }
@@ -287,6 +245,17 @@ export function normalizeMessage(input: unknown): ReceivedEmail {
     stripHtml(html),
   );
 
+  // Full body *with* quoted history — the opposite preference from
+  // `extractedText`: keep the whole thread when it's the payload (forwards,
+  // loop-ins), falling back to the stripped variants only if nothing else.
+  const fullText = firstNonEmpty(text, stripHtml(html), extractedText);
+
+  const { inReplyTo, references } = parseMessageRefs(headers);
+  const rawMessageIdHeader = getHeader(headers, "Message-ID");
+  const rfcMessageId = rawMessageIdHeader
+    ? normalizeMessageId(rawMessageIdHeader)
+    : undefined;
+
   return {
     from,
     to,
@@ -294,8 +263,12 @@ export function normalizeMessage(input: unknown): ReceivedEmail {
     text,
     html,
     extractedText,
+    fullText,
     messageId: pick<string>("message_id", "messageId") ?? "",
     threadId: pick<string>("thread_id", "threadId") ?? "",
+    rfcMessageId,
+    inReplyTo,
+    references,
     headers,
   };
 }

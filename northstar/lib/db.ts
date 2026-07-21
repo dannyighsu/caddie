@@ -41,6 +41,14 @@ export interface Conversation {
    * inbound-initiated or ad-hoc threads.
    */
   thread_context: ThreadContext | null;
+  /**
+   * RFC 5322 `Message-ID`s (normalized, bracket-stripped) the agent has seen or
+   * sent in this thread. Used by the email channel to tell a direct reply apart
+   * from a reply whose parent arrived off our inbox (a side conversation), so
+   * quoted history is surfaced only when it carries something new. Empty for
+   * non-email threads and for threads predating this tracking.
+   */
+  seen_channel_ids: string[];
   created_at: string;
   updated_at: string;
 }
@@ -71,6 +79,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   external_id TEXT,
   messages JSONB DEFAULT '[]'::jsonb,
   thread_context JSONB,
+  seen_channel_ids TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -109,6 +118,15 @@ DO $$ BEGIN
     WHERE table_name = 'conversations' AND column_name = 'thread_context'
   ) THEN
     ALTER TABLE conversations ADD COLUMN thread_context JSONB;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'conversations' AND column_name = 'seen_channel_ids'
+  ) THEN
+    ALTER TABLE conversations ADD COLUMN seen_channel_ids TEXT[] NOT NULL DEFAULT '{}';
   END IF;
 END $$;
 
@@ -232,6 +250,30 @@ export async function appendMessages(
   );
 }
 
+/**
+ * Union `ids` into a conversation's `seen_channel_ids` (deduplicated). Blank ids
+ * are dropped and a no-op call short-circuits. Idempotent: re-adding a known id
+ * changes nothing. Used by the email channel to record the RFC `Message-ID`s of
+ * inbound messages and the agent's own replies.
+ */
+export async function addSeenChannelIds(
+  conversationId: string,
+  ids: string[]
+): Promise<void> {
+  const clean = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (clean.length === 0) return;
+  await ensureSchema();
+  await getPool().query(
+    `UPDATE conversations
+     SET seen_channel_ids = ARRAY(
+           SELECT DISTINCT unnest(COALESCE(seen_channel_ids, '{}') || $1::text[])
+         ),
+         updated_at = now()
+     WHERE id = $2`,
+    [clean, conversationId]
+  );
+}
+
 export async function updateSessionId(
   conversationId: string,
   sessionId: string
@@ -349,6 +391,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
       : typeof row.thread_context === "string"
         ? JSON.parse(row.thread_context)
         : row.thread_context) as ThreadContext | null,
+    seen_channel_ids: (row.seen_channel_ids as string[] | null) ?? [],
     created_at: (row.created_at as Date).toISOString(),
     updated_at: (row.updated_at as Date).toISOString(),
   };

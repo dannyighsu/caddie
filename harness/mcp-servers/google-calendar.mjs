@@ -1,8 +1,8 @@
 /**
  * Google Calendar MCP Server
  *
- * Minimal MCP server exposing list_events and create_event tools.
- * Reuses the existing OAuth2 tokens from harness/credentials/.
+ * Minimal MCP server exposing list_events, create_event, update_event, and
+ * delete_event tools. Reuses the existing OAuth2 tokens from harness/credentials/.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -181,6 +181,109 @@ server.tool(
             null,
             2
           ),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "update_event",
+  "Update an existing Google Calendar event. Only the fields you provide are changed; omitted fields are left as-is. Attendees are automatically re-notified of the change.",
+  {
+    eventId: z
+      .string()
+      .describe("The id of the event to update (returned by create_event or list_events)."),
+    summary: z.string().optional().describe("New event title."),
+    startTime: z
+      .string()
+      .optional()
+      .describe("New start time in ISO 8601 format (e.g. 2026-07-25T10:00:00-07:00)."),
+    endTime: z.string().optional().describe("New end time in ISO 8601 format."),
+    description: z.string().optional().describe("New event description."),
+    location: z.string().optional().describe("New event location."),
+    attendees: z
+      .array(z.string())
+      .optional()
+      .describe("Replacement list of attendee email addresses. Replaces the existing list entirely."),
+    calendarId: z
+      .string()
+      .optional()
+      .describe("Calendar ID. Defaults to 'primary'."),
+  },
+  async ({ eventId, summary, startTime, endTime, description, location, attendees, calendarId }) => {
+    const calendar = await getAuthenticatedClient();
+
+    // Build a partial requestBody: only include fields the caller provided so
+    // events.patch leaves everything else untouched.
+    const requestBody = {};
+    if (summary !== undefined) requestBody.summary = summary;
+    if (startTime !== undefined) requestBody.start = { dateTime: startTime };
+    if (endTime !== undefined) requestBody.end = { dateTime: endTime };
+    if (description !== undefined) requestBody.description = description;
+    if (location !== undefined) requestBody.location = location;
+    if (attendees !== undefined) requestBody.attendees = attendees.map((email) => ({ email }));
+
+    const response = await calendar.events.patch({
+      calendarId: calendarId ?? "primary",
+      eventId,
+      requestBody,
+      // Always notify attendees of updates — that's the point of a managed event.
+      sendUpdates: "all",
+    });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              id: response.data.id,
+              summary: response.data.summary,
+              start: response.data.start,
+              end: response.data.end,
+              htmlLink: response.data.htmlLink,
+              attendees: response.data.attendees?.map((a) => ({
+                email: a.email,
+                responseStatus: a.responseStatus,
+              })),
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "delete_event",
+  "Delete (cancel) a Google Calendar event. Attendees are automatically sent a cancellation notice.",
+  {
+    eventId: z
+      .string()
+      .describe("The id of the event to delete (returned by create_event or list_events)."),
+    calendarId: z
+      .string()
+      .optional()
+      .describe("Calendar ID. Defaults to 'primary'."),
+  },
+  async ({ eventId, calendarId }) => {
+    const calendar = await getAuthenticatedClient();
+
+    await calendar.events.delete({
+      calendarId: calendarId ?? "primary",
+      eventId,
+      // Notify attendees so the event is removed from their calendars too.
+      sendUpdates: "all",
+    });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ deleted: true, eventId }, null, 2),
         },
       ],
     };
