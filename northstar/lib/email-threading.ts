@@ -151,6 +151,58 @@ export function isForwardedMessage(subject: string, body: string): boolean {
   return FORWARD_BODY_MARKERS.some((re) => re.test(b));
 }
 
+// --- Envelope summary (recipient/role context for the agent) ---
+
+/** Extract the bare address from a "Name <addr>" field, lowercased. */
+export function bareEmail(field: string): string {
+  const match = field.match(/<([^>]+)>/);
+  return (match ? match[1] : field).trim().toLowerCase();
+}
+
+export interface EnvelopeInput {
+  from: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  /** The agent's own inbox address (used to compute its role on the thread). */
+  self: string;
+}
+
+/**
+ * Human-readable envelope summary: who's on the thread and whether the agent was
+ * addressed directly (To) or merely copied (Cc). Pure — the caller supplies the
+ * agent's own address. Lets the agent judge whether a reply is warranted (e.g.
+ * stay quiet on a group thread it wasn't really addressed on).
+ */
+export function summarizeEnvelope(e: EnvelopeInput): string {
+  const self = bareEmail(e.self);
+  const inTo = e.to.some((a) => bareEmail(a) === self);
+  const inCc = e.cc.some((a) => bareEmail(a) === self);
+  const role = inTo
+    ? "You are a direct (To) recipient."
+    : inCc
+      ? "You are only a Cc recipient — copied, not directly addressed."
+      : "You are not listed in To or Cc (blind-copied or via a list).";
+  const recipientCount = new Set(
+    [...e.to, ...e.cc].map(bareEmail).filter(Boolean),
+  ).size;
+  const group =
+    recipientCount > 1
+      ? `This is a group thread with ${recipientCount} recipients.`
+      : "This is a direct 1:1 thread.";
+  const others = [...e.to, ...e.cc].filter((a) => bareEmail(a) !== self);
+
+  return [
+    "Email envelope (context — not part of the message body):",
+    `- Subject: ${e.subject}`,
+    `- From: ${e.from}`,
+    `- To: ${e.to.join(", ") || "(none)"}`,
+    ...(e.cc.length > 0 ? [`- Cc: ${e.cc.join(", ")}`] : []),
+    `- ${group} ${role}`,
+    ...(others.length > 0 ? [`- Other participants: ${others.join(", ")}`] : []),
+  ].join("\n");
+}
+
 /** First argument with non-whitespace content, else "". */
 function firstNonEmpty(...vals: (string | undefined)[]): string {
   for (const v of vals) {

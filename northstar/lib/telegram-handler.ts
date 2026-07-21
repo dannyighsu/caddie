@@ -224,6 +224,15 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
       traceMetadata: { chatId, senderId, senderName, chatType: msg.chat.type },
       context: { originChannel: "telegram" },
       attachments: allChatAttachments.length > 0 ? allChatAttachments : undefined,
+      // Inbound conversations respond via the `reply` tool (with the escape
+      // hatch); only direct portal runs auto-deliver final text.
+      deliveryMode: "tool",
+      replyTarget: {
+        channel: "telegram",
+        externalId,
+        telegram: { chatId, replyToMessageId: msg.message_id },
+      },
+      // Used only for the error-notice path in tool mode.
       replyFn: async (replyText) => {
         await sendTelegramMessage(chatId, replyText, {
           replyToMessageId: msg.message_id,

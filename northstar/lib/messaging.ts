@@ -32,6 +32,25 @@ import {
   isTracingEnabled,
 } from "./tracing";
 
+/**
+ * Where an agent's `reply()` tool should deliver, injected into the run as
+ * `NORTHSTAR_REPLY_TARGET` so the tool (and the control API behind it) can send
+ * into the *current* conversation without the agent supplying — or being able to
+ * change — the target. Channel-specific handles carry what each channel needs to
+ * deliver and thread correctly.
+ */
+export interface ReplyTarget {
+  channel: "email" | "slack" | "telegram";
+  /** Conversation key, e.g. `email:<threadId>` — where the assistant turn is recorded. */
+  externalId: string;
+  /** Email: the inbound message to reply to (preserves In-Reply-To threading). */
+  email?: { messageId: string };
+  /** Slack: the channel and thread to reply in. */
+  slack?: { channel: string; threadTs: string };
+  /** Telegram: the chat and (optionally) the message to reply to. */
+  telegram?: { chatId: string; replyToMessageId?: number };
+}
+
 /** A file attachment from any channel, already downloaded to the workspace. */
 export interface Attachment {
   /** Absolute path to the downloaded file in the workspace artifacts directory */
@@ -60,10 +79,31 @@ export interface InboundMessageParams {
   identity: ResolvedIdentity;
   /** Trace metadata (channel-specific context) */
   traceMetadata?: Record<string, string>;
-  /** Send a reply back to the originating channel */
+  /**
+   * Send a reply back to the originating channel. In `deliveryMode: "auto"` this
+   * delivers the agent's final text. In `"tool"` mode it is used only for the
+   * error path (delivering a failure notice) — normal replies go out via the
+   * agent's `reply()` tool instead.
+   */
   replyFn: (text: string) => Promise<void>;
   /** Optional: additional context to pass to the agent prompt */
   context?: Record<string, string>;
+  /**
+   * Optional per-run context block injected into the prompt just before the
+   * current message (e.g. the email envelope). NOT persisted to history.
+   */
+  promptContext?: string;
+  /**
+   * How the agent's response reaches the user:
+   *   - "auto" (default): the harness delivers the final text and records it as
+   *     the assistant turn. Used by Slack/Telegram.
+   *   - "tool": the agent must call its `reply()` tool to respond; final text is
+   *     trace-only and the assistant turn is recorded at send time (by the
+   *     control `reply` action), not here. Requires `replyTarget`.
+   */
+  deliveryMode?: "auto" | "tool";
+  /** Where `reply()` delivers; required (and only used) in "tool" mode. */
+  replyTarget?: ReplyTarget;
   /** Optional: file attachments, already downloaded to the workspace */
   attachments?: Attachment[];
 }
@@ -87,7 +127,19 @@ export interface InboundMessageResult {
 export async function handleInboundMessage(
   params: InboundMessageParams
 ): Promise<InboundMessageResult> {
-  const { text, externalId, traceName, traceMetadata, replyFn, context, attachments, identity } = params;
+  const {
+    text,
+    externalId,
+    traceName,
+    traceMetadata,
+    replyFn,
+    context,
+    promptContext,
+    attachments,
+    identity,
+    replyTarget,
+  } = params;
+  const deliveryMode = params.deliveryMode ?? "auto";
 
   const trustTier = toTrustTier(identity);
 
@@ -134,7 +186,20 @@ export async function handleInboundMessage(
     const taskPreamble = conversation.thread_context
       ? renderThreadContext(conversation.thread_context) + "\n\n---\n\n"
       : "";
-    const fullPrompt = taskPreamble + buildPromptWithHistory(
+    // Make the delivery contract explicit for this run rather than leaving the
+    // agent to infer it — driven by the same `deliveryMode` flag that actually
+    // governs delivery, so instruction and behavior can't drift. Only emitted in
+    // "tool" mode; "auto" runs (portal, Slack, Telegram) deliver the final text.
+    const deliveryPreamble =
+      deliveryMode === "tool"
+        ? "This is an inbound-message run: respond with the `reply` tool (your final " +
+          "text is not delivered), or stay silent by not calling it if no reply is " +
+          "warranted.\n\n---\n\n"
+        : "";
+    // Channel run-context (e.g. the email envelope) sits between any task
+    // preamble and the conversation history. It's prompt-only — never persisted.
+    const channelPreamble = promptContext ? promptContext + "\n\n---\n\n" : "";
+    const fullPrompt = taskPreamble + deliveryPreamble + channelPreamble + buildPromptWithHistory(
       conversation.messages,
       text,
       identity,
@@ -151,12 +216,23 @@ export async function handleInboundMessage(
         currentTime: currentTimePST(),
         ...context,
       },
-      additionalEnv: { NORTHSTAR_TRACE_ID: traceId },
+      additionalEnv: {
+        NORTHSTAR_TRACE_ID: traceId,
+        // In "tool" mode, tell the agent's reply() tool which conversation it's
+        // in. Injected by the harness (not agent-supplied) so replies can only
+        // land in the current thread.
+        ...(deliveryMode === "tool" && replyTarget
+          ? { NORTHSTAR_REPLY_TARGET: JSON.stringify(replyTarget) }
+          : {}),
+      },
     });
 
     const rawText = result.rawText;
 
-    // Record messages
+    // Record the inbound turn. The assistant turn is recorded here only in
+    // "auto" mode; in "tool" mode the agent's `reply()` tool records what it
+    // actually sent (via the control `reply` action), so history always mirrors
+    // the real, user-visible conversation rather than the trace-only final text.
     const now = new Date().toISOString();
     const userMessage: Message = {
       role: "user",
@@ -168,7 +244,7 @@ export async function handleInboundMessage(
           : { kind: "guest" },
     };
     const newMessages: Message[] = [userMessage];
-    if (rawText) {
+    if (deliveryMode === "auto" && rawText) {
       newMessages.push({
         role: "assistant",
         content: rawText,
@@ -177,8 +253,10 @@ export async function handleInboundMessage(
     }
     await appendMessages(conversation.id, newMessages);
 
-    // Reply
-    if (rawText) {
+    // Deliver. In "auto" mode the final text IS the reply. In "tool" mode the
+    // agent already delivered (or deliberately stayed silent) via `reply()`, and
+    // the final text is trace-only — so we send nothing here.
+    if (deliveryMode === "auto" && rawText) {
       const traceUrl = isTracingEnabled() ? getTraceUrl(traceId) : null;
       const traceLink = traceUrl ? `\n${traceUrl}` : "";
       await replyFn(rawText + traceLink);

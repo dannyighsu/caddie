@@ -18,6 +18,7 @@ import {
   parseMessageRefs,
   isForwardedMessage,
   selectInboundBody,
+  summarizeEnvelope,
   type InboundBodyInput,
   type InboundBodyReason,
 } from "./email-threading.ts";
@@ -228,6 +229,61 @@ test("scenario Branch B: forwarded loop-back that lands as a new thread → hist
     selectInboundBody(base({ threadKnownLocally: false, inReplyTo: "ext@mail.com" })).reason,
     "loop-in",
   );
+});
+
+// --- summarizeEnvelope ---
+
+const SELF = "buri@agentmail.to";
+
+test("summarizeEnvelope: direct 1:1 recipient", () => {
+  const s = summarizeEnvelope({
+    from: "danny@example.com",
+    to: ["buri@agentmail.to"],
+    cc: [],
+    subject: "quick q",
+    self: SELF,
+  });
+  assert.match(s, /direct 1:1 thread/);
+  assert.match(s, /direct \(To\) recipient/);
+  assert.match(s, /Subject: quick q/);
+});
+
+test("summarizeEnvelope: cc'd on a group thread is flagged as copied, not addressed", () => {
+  const s = summarizeEnvelope({
+    from: "danny@example.com",
+    to: ["alice@example.com", "bob@example.com"],
+    cc: ["Buri <buri@agentmail.to>"],
+    subject: "planning",
+    self: SELF,
+  });
+  assert.match(s, /group thread with 3 recipients/);
+  assert.match(s, /only a Cc recipient/);
+  assert.match(s, /Other participants: alice@example.com, bob@example.com/);
+  assert.match(s, /Cc: Buri <buri@agentmail.to>/);
+});
+
+test("summarizeEnvelope: not in To or Cc (bcc / list)", () => {
+  const s = summarizeEnvelope({
+    from: "danny@example.com",
+    to: ["alice@example.com"],
+    cc: [],
+    subject: "fyi",
+    self: SELF,
+  });
+  assert.match(s, /not listed in To or Cc/);
+});
+
+test("summarizeEnvelope: address matching is case-insensitive and bracket-tolerant", () => {
+  const s = summarizeEnvelope({
+    from: "d@x.com",
+    to: ['"Buri" <BURI@AgentMail.To>'],
+    cc: [],
+    subject: "s",
+    self: SELF,
+  });
+  assert.match(s, /direct \(To\) recipient/);
+  // Buri itself is not listed as an "other participant".
+  assert.doesNotMatch(s, /Other participants/);
 });
 
 // --- Stress test: invariants over seeded-random inputs ---

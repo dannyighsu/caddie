@@ -15,6 +15,7 @@ import {
   replyToEmail,
   getFromRawAddress,
   resolveEmailIdentity,
+  describeEnvelope,
   type ReceivedEmail,
 } from "./email";
 import { getConversationByExternalId, addSeenChannelIds } from "./db";
@@ -93,6 +94,10 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
       `includedHistory=${selection.includedHistory} threadKnown=${!!existing}`,
   );
 
+  // Every email run responds via the `reply` tool — giving it the "no reply
+  // necessary" escape hatch and history-from-sends. The tool is a minimal,
+  // channel-agnostic capability granted at every trust tier (a guest can only
+  // answer its own thread, never reach anyone new), so there's no per-tier split.
   let replyAgentMessageId: string | undefined;
   try {
     const result = await handleInboundMessage({
@@ -107,6 +112,13 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
         threadId: email.threadId,
       },
       context: { originChannel: "email" },
+      // Envelope (recipients, To vs Cc, group size, subject) so the agent can
+      // judge whether a reply is warranted. Prompt-only; never stored.
+      promptContext: describeEnvelope(email),
+      deliveryMode: "tool",
+      replyTarget: { channel: "email", externalId, email: { messageId: email.messageId } },
+      // Used only for the error-notice path in tool mode (normal replies go out
+      // via the agent's `reply` tool).
       replyFn: async (replyText) => {
         const cleaned = replyText.replace(/\nhttps?:\/\/[^\s]+$/, "").trim();
         const sent = await replyToEmail(email.messageId, cleaned);

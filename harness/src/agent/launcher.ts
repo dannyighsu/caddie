@@ -253,6 +253,31 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       // preferences.md doesn't exist yet
     }
 
+    // Household directory — the people Buri serves and how to reach them, built
+    // from the same env vars that drive inbound email identity (DANNY_EMAIL /
+    // BETTY_EMAIL), so the addresses the agent invites match the ones the auth
+    // gate trusts. Each var is a comma-separated list; the first entry is the
+    // primary address. Injected ONLY for household-tier runs — a guest run must
+    // never receive these private addresses.
+    if (input.identity.trustTier === "household") {
+      const household: string[] = [];
+      const addMember = (name: string, envValue: string | undefined): void => {
+        const emails = (envValue ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+        if (emails.length === 0) return;
+        const [primary, ...alts] = emails;
+        const altNote = alts.length > 0 ? ` (also: ${alts.join(", ")})` : "";
+        household.push(`- ${name}: ${primary}${altNote}`);
+      };
+      addMember("Danny", process.env.DANNY_EMAIL);
+      addMember("Betty", process.env.BETTY_EMAIL);
+      if (household.length > 0) {
+        contextLines.push(
+          `Household directory (the people you serve — to put an event on someone's ` +
+            `calendar, invite their primary email as an attendee):\n${household.join("\n")}`
+        );
+      }
+    }
+
     // Profile/agent config files
     if (agent.configFiles) {
       for (const [key, relPath] of Object.entries(agent.configFiles)) {

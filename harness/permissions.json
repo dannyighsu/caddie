@@ -10,6 +10,7 @@
     "google-calendar": true,
     "google-gmail": true,
     "notion": true,
+    "reply": true,
     "web-search": true,
     "base-tools": true
   },
@@ -23,6 +24,7 @@
     "google-calendar": false,
     "google-gmail": false,
     "notion": false,
+    "reply": true,
     "web-search": false,
     "base-tools": false
   }

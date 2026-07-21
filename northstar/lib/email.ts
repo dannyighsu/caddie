@@ -3,8 +3,10 @@
  *
  * Outbound: sends via AgentMail API.
  * Inbound: AgentMail receives emails and POSTs webhook events to /api/email/webhook.
- *          The webhook payload already includes the full message (with `extracted_text`
- *          stripped of quoted history), so no follow-up fetch is needed.
+ *          The webhook carries the new message plus `extracted_text` (quoted
+ *          history stripped). We follow up with a fetch only when needed — the
+ *          body was offloaded (empty), or we need a message's RFC Message-ID for
+ *          threading (see fetchMessage / fetchRfcMessageId).
  *
  * Env vars:
  *   AGENTMAIL_API_KEY        — AgentMail API key
@@ -19,11 +21,12 @@ import {
   createConversation,
   getConversationByExternalId,
   appendMessages,
+  appendAssistantReply,
   addSeenChannelIds,
   type Message,
 } from "./db";
 import type { ThreadContext } from "./thread-context";
-import { parseMessageRefs, normalizeMessageId } from "./email-threading";
+import { parseMessageRefs, normalizeMessageId, summarizeEnvelope } from "./email-threading";
 
 // --- Config ---
 
@@ -168,11 +171,34 @@ export async function fetchRfcMessageId(
   return full?.rfcMessageId;
 }
 
+/**
+ * Record an agent reply that was just delivered into an existing thread: append
+ * it as an assistant turn on the local conversation (so replayed history mirrors
+ * the real, user-visible thread) and register its RFC `Message-ID` as seen (so a
+ * later reply to it isn't mistaken for a side-conversation gap). Called from the
+ * control `reply` action after `replyToEmail` succeeds.
+ */
+export async function recordEmailReply(
+  externalId: string,
+  sentMessageId: string,
+  replyText: string,
+): Promise<void> {
+  const conversationId = await appendAssistantReply(externalId, replyText);
+  if (!conversationId) {
+    console.warn(`[Email] recordEmailReply: no conversation for ${externalId}`);
+    return;
+  }
+  const rfcId = await fetchRfcMessageId(sentMessageId);
+  if (rfcId) await addSeenChannelIds(conversationId, [rfcId]);
+}
+
 // --- Receive ---
 
 export interface ReceivedEmail {
   from: string;
   to: string[];
+  /** Cc recipients (addresses). Empty when none / not surfaced. */
+  cc: string[];
   subject: string;
   text: string;
   html: string;
@@ -221,6 +247,10 @@ export function normalizeMessage(input: unknown): ReceivedEmail {
   const to = (Array.isArray(toField) ? toField : []).map((t) =>
     typeof t === "string" ? t : ((t as { address?: string })?.address ?? ""),
   );
+  const ccField = pick<unknown[]>("cc") ?? [];
+  const cc = (Array.isArray(ccField) ? ccField : [])
+    .map((t) => (typeof t === "string" ? t : ((t as { address?: string })?.address ?? "")))
+    .filter(Boolean);
 
   const rawHeaders = pick<unknown>("headers");
   const headers: Record<string, string> = {};
@@ -259,6 +289,7 @@ export function normalizeMessage(input: unknown): ReceivedEmail {
   return {
     from,
     to,
+    cc,
     subject: pick<string>("subject") ?? "(no subject)",
     text,
     html,
@@ -320,6 +351,25 @@ function stripHtml(html: string | undefined): string {
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+// --- Envelope description (agent run context) ---
+
+/**
+ * Human-readable envelope summary for the agent's run context: who else is on
+ * the thread and whether Buri was addressed directly (To) or merely copied (Cc).
+ * Gives the agent the facts to judge whether a reply is warranted — e.g. to stay
+ * quiet on a group thread it wasn't really asked to answer. This is run context,
+ * NOT stored in conversation history.
+ */
+export function describeEnvelope(email: ReceivedEmail): string {
+  return summarizeEnvelope({
+    from: email.from,
+    to: email.to,
+    cc: email.cc,
+    subject: email.subject,
+    self: getInboxId(),
+  });
 }
 
 // --- Identity resolution ---

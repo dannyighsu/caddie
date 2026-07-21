@@ -28,13 +28,19 @@ export const handleSlackMessage: SlackMessageHandler = async ({
       ` rawSender=${identity.rawSender}`,
   );
 
+  const externalId = `slack:${channel}:${conversationThreadTs}`;
   await handleInboundMessage({
     text,
-    externalId: `slack:${channel}:${conversationThreadTs}`,
+    externalId,
     traceName: "slack-message",
     identity,
     traceMetadata: { channel, text: text.substring(0, 100) },
     context: { originChannel: "slack" },
+    // Inbound conversations respond via the `reply` tool (with the escape hatch);
+    // only direct portal runs auto-deliver final text.
+    deliveryMode: "tool",
+    replyTarget: { channel: "slack", externalId, slack: { channel, threadTs: conversationThreadTs } },
+    // Used only for the error-notice path in tool mode.
     replyFn: async (replyText) => {
       // Format trace links as Slack mrkdwn
       const formatted = replyText.replace(

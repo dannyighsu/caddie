@@ -274,6 +274,26 @@ export async function addSeenChannelIds(
   );
 }
 
+/**
+ * Append an assistant turn to the conversation identified by `externalId`, at
+ * the moment a reply is actually delivered. Returns the conversation id (so
+ * callers can do channel-specific follow-up like recording seen message-ids), or
+ * null if no conversation exists for that key. This is the "history-from-sends"
+ * write path shared by every external channel: replayed history stays a faithful
+ * copy of what was really sent into the thread.
+ */
+export async function appendAssistantReply(
+  externalId: string,
+  content: string
+): Promise<string | null> {
+  const conversation = await getConversationByExternalId(externalId);
+  if (!conversation) return null;
+  await appendMessages(conversation.id, [
+    { role: "assistant", content, timestamp: new Date().toISOString() },
+  ]);
+  return conversation.id;
+}
+
 export async function updateSessionId(
   conversationId: string,
   sessionId: string

@@ -124,7 +124,7 @@ server.tool(
 
 server.tool(
   "create_event",
-  "Create a new Google Calendar event.",
+  "Create a new Google Calendar event on YOUR OWN calendar. To also place it on someone else's calendar (e.g. a household member's), add their email to `attendees` — they receive an invitation that, once accepted, puts the event on their calendar. Without attendees, the event lives only on your calendar.",
   {
     summary: z.string().describe("Event title"),
     startTime: z

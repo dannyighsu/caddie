@@ -27,19 +27,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
-import { sendEmail, isEmailConfigured } from "@/lib/email";
+import { sendEmail, replyToEmail, recordEmailReply, isEmailConfigured } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
+import type { ReplyTarget } from "@/lib/messaging";
 import { portalIdentity, toRunIdentity, parsePortalOwner, type TrustTier, type UserId } from "@/lib/identity";
 import type { ThreadContext } from "@/lib/thread-context";
 import { getLauncher } from "@/lib/harness";
-import { getSetting } from "@/lib/db";
+import { getSetting, appendAssistantReply } from "@/lib/db";
 import { currentTimePST } from "@/lib/helpers";
 import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, deleteJob, getJob, upsertJob } from "@/lib/redis";
 import { executeJob, isJobActive } from "@/lib/scheduler";
 import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 
 interface ControlRequest {
-  action: "notify" | "run" | "schedule" | "update_schedule" | "trigger";
+  action: "notify" | "reply" | "run" | "schedule" | "update_schedule" | "trigger";
+
+  // --- reply fields ---
+  /**
+   * Where to deliver the reply, injected into the run as NORTHSTAR_REPLY_TARGET
+   * and forwarded verbatim by the reply MCP tool. Not agent-supplied, so a reply
+   * can only land in the current conversation. Uses `message` for the body.
+   */
+  replyTarget?: ReplyTarget;
 
   // --- notify fields ---
   channel?: NotificationChannel;
@@ -92,6 +101,8 @@ async function executeAction(req: ControlRequest, portalOwner: UserId): Promise<
   switch (req.action) {
     case "notify":
       return executeNotify(req);
+    case "reply":
+      return executeReply(req);
     case "run":
       return executeRun(req, portalOwner);
     case "schedule":
@@ -102,6 +113,66 @@ async function executeAction(req: ControlRequest, portalOwner: UserId): Promise<
       return executeTrigger(req);
     default:
       return { success: false, error: `Unknown action: ${req.action}` };
+  }
+}
+
+/**
+ * Deliver an agent's reply into the current conversation.
+ *
+ * Unlike `notify`/`send_email` (which start or address arbitrary threads), reply
+ * targets the exact conversation the run is handling — the target is injected by
+ * the harness (NORTHSTAR_REPLY_TARGET), not chosen by the agent, so a reply can
+ * only land where the inbound message came from. On success it records the sent
+ * turn locally so replayed history mirrors the real thread.
+ */
+async function executeReply(req: ControlRequest): Promise<Record<string, unknown>> {
+  const target = req.replyTarget;
+  const message = req.message;
+  if (!target || !message) {
+    return { success: false, error: "reply requires `replyTarget` and `message`" };
+  }
+
+  // Best-effort local record — a failed record must not fail the delivery.
+  const record = async (fn: () => Promise<unknown>): Promise<void> => {
+    try {
+      await fn();
+    } catch (err) {
+      console.error(`[Control] reply delivered but failed to record locally:`, err);
+    }
+  };
+
+  switch (target.channel) {
+    case "email": {
+      if (!isEmailConfigured()) return { success: false, error: "email is not configured" };
+      if (!target.email?.messageId) {
+        return { success: false, error: "reply target is missing email.messageId" };
+      }
+      const sent = await replyToEmail(target.email.messageId, message);
+      await record(() => recordEmailReply(target.externalId, sent.messageId, message));
+      return { success: true, messageId: sent.messageId };
+    }
+    case "slack": {
+      if (!isSlackConfigured()) return { success: false, error: "slack is not configured" };
+      if (!target.slack) return { success: false, error: "reply target is missing slack handle" };
+      await replyInThread(target.slack.channel, target.slack.threadTs, message);
+      await record(() => appendAssistantReply(target.externalId, message));
+      return { success: true };
+    }
+    case "telegram": {
+      if (!isTelegramConfigured()) return { success: false, error: "telegram is not configured" };
+      if (!target.telegram) return { success: false, error: "reply target is missing telegram handle" };
+      await sendTelegramMessage(
+        target.telegram.chatId,
+        message,
+        target.telegram.replyToMessageId
+          ? { replyToMessageId: target.telegram.replyToMessageId }
+          : undefined,
+      );
+      await record(() => appendAssistantReply(target.externalId, message));
+      return { success: true };
+    }
+    default:
+      return { success: false, error: `reply not supported for channel: ${target.channel}` };
   }
 }
 

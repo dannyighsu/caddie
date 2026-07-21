@@ -65,10 +65,6 @@ Before starting the scan, read these files from the working directory using the 
 
 Use the content of these files to guide your scanning and filtering.
 
-## Temporary Files
-
-If you need to save intermediate data during a run (DOM snapshots, page content, etc.), write them to the `artifacts/` directory alongside the run record file. For example, if your run record path is `runs/2026-04/15_tuesday/run-record-<ts>.jsonl`, write temporary files to `runs/2026-04/15_tuesday/artifacts/`. Create the directory if needed. **Never write files outside the working directory.**
-
 ## Recording
 
 Record each opportunity to the run record file as JSONL. The run record path will be provided by the user. Create the directory if needed.

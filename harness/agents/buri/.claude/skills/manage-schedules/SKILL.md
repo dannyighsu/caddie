@@ -40,11 +40,7 @@ Examples:
 
 ## Notification channel
 
-By default, all reminders and scheduled run results are delivered on **Slack**. The user can override this by explicitly asking (e.g., "remind me on Telegram", "email me the result").
-
-When the user does NOT specify a channel, set `notificationChannel` to match the **`originChannel`** from your run context — i.e., reach the user back on the same channel they contacted you on. This ensures someone who emailed you gets reminded by email, not Slack.
-
-Override only when the user explicitly asks for a different channel.
+When the user doesn't specify a channel, set `notificationChannel` to match the **`originChannel`** in your run context — reach them back on the channel they contacted you on (someone who emailed you gets reminded by email). Override only when they explicitly ask for a different channel (e.g., "remind me on Telegram", "email me the result").
 
 ## Cron expressions (for `schedule_recurring`)
 
