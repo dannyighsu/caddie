@@ -27,7 +27,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
-import { sendEmail, isEmailConfigured } from "@/lib/email";
+import { sendEmail, sendCalendarInvite, isEmailConfigured } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
 import { portalIdentity, toRunIdentity, parsePortalOwner, type TrustTier, type UserId } from "@/lib/identity";
 import type { ThreadContext } from "@/lib/thread-context";
@@ -39,7 +39,7 @@ import { executeJob, isJobActive } from "@/lib/scheduler";
 import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 
 interface ControlRequest {
-  action: "notify" | "run" | "schedule" | "update_schedule" | "trigger";
+  action: "notify" | "run" | "schedule" | "update_schedule" | "trigger" | "invite";
 
   // --- notify fields ---
   channel?: NotificationChannel;
@@ -51,6 +51,18 @@ interface ControlRequest {
   to?: string;
   /** Email subject line */
   subject?: string;
+
+  // --- invite fields (calendar; sent from the AgentMail inbox as organizer) ---
+  /** Attendee email addresses to invite. */
+  attendees?: string[];
+  /** Event title. */
+  summary?: string;
+  /** ISO 8601 start, e.g. "2026-07-25T10:00:00-07:00". */
+  startTime?: string;
+  /** ISO 8601 end. */
+  endTime?: string;
+  /** Event location. */
+  location?: string;
   /**
    * Source-task facts to attach to the email thread this send creates (email
    * channel only). Forwarded by email-mcp from the run's NORTHSTAR_THREAD_CONTEXT.
@@ -92,6 +104,8 @@ async function executeAction(req: ControlRequest, portalOwner: UserId): Promise<
   switch (req.action) {
     case "notify":
       return executeNotify(req);
+    case "invite":
+      return executeInvite(req);
     case "run":
       return executeRun(req, portalOwner);
     case "schedule":
@@ -273,6 +287,44 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
   }
 
   return { success: false, error: `Unsupported channel: ${req.channel}` };
+}
+
+/**
+ * Send a calendar invite (.ics) from the AgentMail inbox. The inbox is the
+ * organizer; `attendees` receive a native invitation. The event `description`
+ * is carried in the `message` field. Sent immediately — invites are not
+ * schedulable through this action.
+ */
+async function executeInvite(req: ControlRequest): Promise<Record<string, unknown>> {
+  if (!isEmailConfigured()) {
+    return { success: false, error: "Email not configured (missing AGENTMAIL_API_KEY or AGENTMAIL_INBOX_ID)" };
+  }
+  if (!req.attendees?.length) {
+    return { success: false, error: "At least one attendee is required" };
+  }
+  if (!req.summary) {
+    return { success: false, error: "summary is required" };
+  }
+  if (!req.startTime || !req.endTime) {
+    return { success: false, error: "startTime and endTime are required" };
+  }
+
+  try {
+    const { messageId, threadId } = await sendCalendarInvite(
+      {
+        attendees: req.attendees,
+        summary: req.summary,
+        startTime: req.startTime,
+        endTime: req.endTime,
+        description: req.message,
+        location: req.location,
+      },
+      { threadContext: req.threadContext },
+    );
+    return { success: true, channel: "email", attendees: req.attendees, messageId, threadId };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 async function executeRun(req: ControlRequest, portalOwner: UserId): Promise<Record<string, unknown>> {

@@ -12,6 +12,7 @@
  *   AGENTMAIL_SIGNING_SECRET — Svix-format signing secret ("whsec_...")
  */
 
+import { randomUUID } from "node:crypto";
 import { AgentMailClient } from "agentmail";
 import { Webhook } from "svix";
 import type { ResolvedIdentity, UserId } from "./identity";
@@ -22,6 +23,7 @@ import {
   type Message,
 } from "./db";
 import type { ThreadContext } from "./thread-context";
+import { buildEventInvite } from "./ics";
 
 // --- Config ---
 
@@ -119,6 +121,100 @@ async function recordOutboundThread(
     timestamp: new Date().toISOString(),
   };
   await appendMessages(conversationId, [message]);
+}
+
+export interface CalendarInviteInput {
+  /** Email addresses to invite. Also the message recipients. */
+  attendees: string[];
+  summary: string;
+  /** ISO 8601 start, e.g. "2026-07-25T10:00:00-07:00". */
+  startTime: string;
+  /** ISO 8601 end. */
+  endTime: string;
+  description?: string;
+  location?: string;
+}
+
+/**
+ * Send a calendar invite from the AgentMail inbox. The inbox is the organizer;
+ * `attendees` are both the ICS attendees and the email recipients. Recipients
+ * see a native invitation (Yes/No/Maybe) rendered from the attached
+ * `text/calendar` (METHOD:REQUEST) part.
+ *
+ * Like `sendEmail`, the resulting thread is recorded locally so RSVP replies —
+ * which arrive as ordinary emails on the same AgentMail thread — reconnect to
+ * this send with context.
+ */
+export async function sendCalendarInvite(
+  input: CalendarInviteInput,
+  opts?: { threadContext?: ThreadContext },
+): Promise<{ messageId: string; threadId: string }> {
+  if (input.attendees.length === 0) {
+    throw new Error("sendCalendarInvite requires at least one attendee");
+  }
+
+  const client = getClient();
+  const organizer = getInboxId();
+  const domain = organizer.split("@")[1] ?? "agentmail.to";
+
+  const ics = buildEventInvite({
+    uid: `${randomUUID()}@${domain}`,
+    summary: input.summary,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    description: input.description,
+    location: input.location,
+    organizer,
+    attendees: input.attendees,
+  });
+
+  const subject = `Invitation: ${input.summary}`;
+  const text = buildInviteBody(input);
+
+  const res = await client.inboxes.messages.send(organizer, {
+    to: input.attendees,
+    subject,
+    text,
+    attachments: [
+      {
+        filename: "invite.ics",
+        // METHOD in the content-type is what makes clients treat this as an
+        // invitation to act on rather than a file to download.
+        contentType: "text/calendar; method=REQUEST; charset=UTF-8",
+        content: Buffer.from(ics, "utf8").toString("base64"),
+      },
+    ],
+  });
+
+  const result = { messageId: res.messageId, threadId: res.threadId };
+
+  // Best-effort: a failed record must not fail the send itself.
+  try {
+    await recordOutboundThread(result.threadId, subject, text, opts?.threadContext);
+  } catch (err) {
+    console.error(
+      `[Email] Sent invite to ${input.attendees.join(", ")} (thread ${result.threadId}) but failed to record local conversation:`,
+      err,
+    );
+  }
+
+  return result;
+}
+
+/** Human-readable fallback body for clients that don't render the ICS part. */
+function buildInviteBody(input: CalendarInviteInput): string {
+  const fmt = (iso: string): string => {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? iso : d.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }) + " PT";
+  };
+  const lines = [
+    `You're invited: ${input.summary}`,
+    "",
+    `When: ${fmt(input.startTime)} – ${fmt(input.endTime)}`,
+    ...(input.location ? [`Where: ${input.location}`] : []),
+    ...(input.description ? ["", input.description] : []),
+  ];
+  return lines.join("\n");
 }
 
 export async function replyToEmail(

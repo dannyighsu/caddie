@@ -7,8 +7,9 @@
 
 import { resolve } from "path";
 import { createRuntime, createLauncher } from "@agints/harness";
-import type { AgentConfig } from "@agints/harness";
+import type { AgentConfig, AgentInput, AgentResult } from "@agints/harness";
 import { readdir, readFile } from "fs/promises";
+import { alertOwnerOnApiFailure } from "./run-alerts";
 
 // The harness package lives alongside northstar in the monorepo
 const repoRoot = resolve(process.cwd(), "..");
@@ -23,7 +24,7 @@ export const agentsDir = resolve(harnessRoot, "agents");
 
 let launcherInstance: ReturnType<typeof createLauncher> | null = null;
 
-export function getLauncher() {
+function getRawLauncher() {
   if (!launcherInstance) {
     const runtime = createRuntime({
       options: {
@@ -46,6 +47,25 @@ export function getLauncher() {
     });
   }
   return launcherInstance;
+}
+
+/**
+ * The shared launcher, wrapped so that every launch site — inbound channel
+ * messages, the console run route, the control API, and the scheduler — routes
+ * through one chokepoint that alerts the owner on any API-layer failure. Keeps
+ * "detect a failed run and email danny" in a single place instead of scattered
+ * across callers where a new entry point could silently skip it.
+ */
+export function getLauncher() {
+  const launcher = getRawLauncher();
+  return {
+    async launch(input: AgentInput): Promise<AgentResult> {
+      const result = await launcher.launch(input);
+      // Best-effort and no-op unless this was an API-layer failure.
+      await alertOwnerOnApiFailure(input.agentId, result);
+      return result;
+    },
+  };
 }
 
 /**

@@ -128,6 +128,65 @@ export async function readTranscript(
   return steps;
 }
 
+export interface ApiError {
+  /** Machine error code Claude Code assigns, e.g. "authentication_failed". */
+  type: string;
+  /** Human-readable text from the synthetic error message. */
+  message: string;
+}
+
+/**
+ * Detect an API-layer failure in a session transcript.
+ *
+ * When the Claude API call itself fails — expired OAuth, rate limit, overload —
+ * Claude Code appends a synthetic assistant entry stamped
+ * `isApiErrorMessage: true` (with `model: "<synthetic>"`) carrying an `error`
+ * code. That is categorically different from an agent that ran and returned an
+ * error on its task: the run never got off the ground, and the cause is
+ * infrastructure the household owner must fix (usually re-auth). Returns the
+ * last such error found, or null if the session had none / can't be read.
+ */
+export async function getApiError(
+  agentId: string,
+  sessionId: string
+): Promise<ApiError | null> {
+  const projectDir = getProjectDir(agentId);
+  const transcriptPath = resolve(projectDir, `${sessionId}.jsonl`);
+
+  let content: string;
+  try {
+    content = await readFile(transcriptPath, "utf-8");
+  } catch {
+    return null; // No transcript on disk — nothing to inspect.
+  }
+
+  const lines = content.trim().split("\n").filter(Boolean);
+  let found: ApiError | null = null;
+
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line) as TranscriptEntry & {
+        isApiErrorMessage?: boolean;
+        error?: string;
+      };
+      if (entry.isApiErrorMessage === true) {
+        const text = entry.message?.content
+          ?.map((b) => (b.type === "text" ? b.text ?? "" : ""))
+          .join("")
+          .trim();
+        found = {
+          type: entry.error ?? "api_error",
+          message: text || entry.error || "API-layer failure",
+        };
+      }
+    } catch {
+      // Skip unparseable lines
+    }
+  }
+
+  return found;
+}
+
 /**
  * List available session transcripts for an agent.
  */

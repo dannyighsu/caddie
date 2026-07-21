@@ -184,7 +184,14 @@ export async function handleInboundMessage(
       await replyFn(rawText + traceLink);
     }
 
-    await completeTrace(traceId, { agentId: conversation.agent_id, success: true });
+    // Reflect the run's actual outcome — an API-layer failure returns no
+    // rawText and populates `error`, and must not be recorded as a success.
+    // (The owner is alerted about API-layer failures via the launcher wrapper.)
+    await completeTrace(traceId, {
+      agentId: conversation.agent_id,
+      success: result.success,
+      error: result.error,
+    });
 
     return {
       rawText,
