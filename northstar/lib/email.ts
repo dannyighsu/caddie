@@ -145,14 +145,23 @@ async function recordOutboundThread(
  * caller records that id (via its RFC `Message-ID`) as "seen" so a later reply
  * to it is recognized as a direct continuation rather than a side-conversation
  * gap. See {@link fetchRfcMessageId}.
+ *
+ * Defaults to reply-all: AgentMail reconstructs the original recipient set
+ * (To + Cc, excluding our own inbox) from the referenced message, so a group
+ * thread stays a group thread. This never reaches anyone new — only people
+ * already on the thread. Pass `replyAll: false` to answer just the sender
+ * (e.g. a deliberately private reply); single-recipient threads are unaffected
+ * either way, since reply-all degrades to a plain reply when nobody else is on.
  */
 export async function replyToEmail(
   messageId: string,
   text: string,
+  opts?: { replyAll?: boolean },
 ): Promise<{ messageId: string }> {
   if (!messageId) throw new Error("replyToEmail: messageId is empty");
+  const replyAll = opts?.replyAll ?? true;
   const client = getClient();
-  const res = await client.inboxes.messages.reply(getInboxId(), messageId, { text });
+  const res = await client.inboxes.messages.reply(getInboxId(), messageId, { text, replyAll });
   return { messageId: res.messageId };
 }
 

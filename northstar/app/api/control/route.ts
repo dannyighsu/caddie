@@ -49,6 +49,12 @@ interface ControlRequest {
    * can only land in the current conversation. Uses `message` for the body.
    */
   replyTarget?: ReplyTarget;
+  /**
+   * Email reply scope. Defaults to reply-all (true) when omitted, so group
+   * threads stay group threads; the agent sets `false` to answer just the
+   * sender. Ignored for non-email channels, which have no CC concept.
+   */
+  replyAll?: boolean;
 
   // --- notify fields ---
   channel?: NotificationChannel;
@@ -147,7 +153,9 @@ async function executeReply(req: ControlRequest): Promise<Record<string, unknown
       if (!target.email?.messageId) {
         return { success: false, error: "reply target is missing email.messageId" };
       }
-      const sent = await replyToEmail(target.email.messageId, message);
+      const sent = await replyToEmail(target.email.messageId, message, {
+        replyAll: req.replyAll,
+      });
       await record(() => recordEmailReply(target.externalId, sent.messageId, message));
       return { success: true, messageId: sent.messageId };
     }

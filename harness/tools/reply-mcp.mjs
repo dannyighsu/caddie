@@ -51,6 +51,13 @@ const tools = [
           type: "string",
           description: "The message body to send into the current thread.",
         },
+        replyAll: {
+          type: "boolean",
+          description:
+            "Email threads only: whether to reply to everyone already on the thread (original To + Cc) rather than just the sender. " +
+            "Defaults to true, so a group thread stays a group thread. This never reaches anyone new — only people already copied on the thread. " +
+            "Set false to answer only the person who wrote in (e.g. a deliberately private reply). Ignored on non-email channels.",
+        },
       },
       required: ["message"],
     },
@@ -58,7 +65,7 @@ const tools = [
 ];
 
 async function handleReply(args) {
-  const { message } = args;
+  const { message, replyAll } = args;
 
   if (!message) {
     return {
@@ -96,7 +103,7 @@ async function handleReply(args) {
   const res = await fetch(`${NORTHSTAR_URL}/api/control`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "reply", replyTarget, message }),
+    body: JSON.stringify({ action: "reply", replyTarget, message, replyAll }),
   });
 
   const result = await res.json();
