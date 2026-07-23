@@ -31,10 +31,24 @@ import {
   createTrace,
   completeTrace,
 } from "./tracing";
+import {
+  beginRun,
+  finishRun,
+  finishFromResult,
+  finishSkipped,
+  failOrchestration,
+  reapOrphans,
+  evictOldRuns,
+  type RunEnvelope,
+} from "./job-ledger";
 import type { ThreadContext } from "./thread-context";
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
+// Run eviction roughly hourly rather than every poll — it's a cheap DELETE but
+// there's no need to issue it twice a minute.
+const EVICT_EVERY_N_POLLS = Math.round((60 * 60 * 1000) / POLL_INTERVAL_MS);
 let running = false;
+let pollCount = 0;
 
 /**
  * Start the scheduler polling loop.
@@ -47,6 +61,26 @@ export function startScheduler(): void {
   console.log(`[Scheduler] Started (polling every ${POLL_INTERVAL_MS / 1000}s)`);
 
   setInterval(async () => {
+    // Ledger maintenance runs every poll regardless of due jobs: the orphan
+    // reaper is the only thing that catches a run whose process died mid-flight
+    // (no code path survives to call finishRun), and eviction keeps the 7-day
+    // window. Both are best-effort — a failure here must not stop the poller.
+    try {
+      const reaped = await reapOrphans();
+      if (reaped > 0) console.log(`[Scheduler] Reaped ${reaped} orphaned run(s)`);
+    } catch (err) {
+      console.error("[Scheduler] Orphan reap error:", err);
+    }
+    if (pollCount % EVICT_EVERY_N_POLLS === 0) {
+      try {
+        const evicted = await evictOldRuns();
+        if (evicted > 0) console.log(`[Scheduler] Evicted ${evicted} old run(s)`);
+      } catch (err) {
+        console.error("[Scheduler] Run eviction error:", err);
+      }
+    }
+    pollCount++;
+
     try {
       const dueJobs = await getDueJobs();
       if (dueJobs.length === 0) return;
@@ -93,6 +127,8 @@ export interface ExecuteJobResult {
    * caller should treat this as "try again later".
    */
   skipped?: boolean;
+  /** The job-run ledger id for this execution (for linking replays). */
+  runId?: string;
 }
 
 /** Active-run lock key: one in-flight agent run per agent+profile. */
@@ -150,29 +186,57 @@ function buildThreadContext(job: ScheduledJob, source: JobSource): ThreadContext
  */
 export async function executeJob(
   job: ScheduledJob,
-  opts: { source: JobSource }
+  opts: { source: JobSource; replayOf?: string }
 ): Promise<ExecuteJobResult> {
-  if (job.action === "notify") {
-    return executeNotifyJob(job, opts.source);
-  }
-
-  const lockKey = runLockKey(job);
-  const acquired = await acquireActiveRun(lockKey);
-  if (!acquired) {
-    return {
-      success: false,
-      skipped: true,
-      error: `A run is already in progress for ${lockKey}`,
-    };
-  }
+  // Open the ledger row before anything runs, carrying the full job snapshot as
+  // the replay envelope — so this occurrence is replayable even if the process
+  // dies mid-run (the reaper will later flip it to failed/orphaned). The trace
+  // id is stamped now too so hook activity can renew the run's lease.
+  const traceId = createTraceId();
+  const envelope: RunEnvelope = { source: opts.source, job };
+  const runId = await beginRun(envelope, {
+    agentId: job.agentId,
+    profile: job.profile,
+    label: jobLabel(job),
+    traceId,
+    replayOf: opts.replayOf,
+  });
 
   try {
-    const traceId = createTraceId();
-    await createTrace(traceId, job.agentId, {
-      trigger: opts.source,
-      jobId: job.id,
-      profile: job.profile,
-    });
+    if (job.action === "notify") {
+      const result = await executeNotifyJob(job, opts.source);
+      if (result.success) {
+        await finishRun(runId, { status: "succeeded" });
+      } else {
+        await finishRun(runId, {
+          status: "failed",
+          failureClass: "orchestration",
+          error: result.error,
+        });
+      }
+      return { ...result, runId };
+    }
+
+    const lockKey = runLockKey(job);
+    const acquired = await acquireActiveRun(lockKey);
+    if (!acquired) {
+      // A one-shot (no cron) occurrence is lost when skipped, so it's recorded
+      // as a replayable failure; a recurring one just fires again next tick.
+      await finishSkipped(runId, !job.cron);
+      return {
+        success: false,
+        skipped: true,
+        error: `A run is already in progress for ${lockKey}`,
+        runId,
+      };
+    }
+
+    try {
+      await createTrace(traceId, job.agentId, {
+        trigger: opts.source,
+        jobId: job.id,
+        profile: job.profile,
+      });
 
     // Scheduled/triggered runs are the household's own automations (the
     // initiator is the authenticated owner, not an external sender), so they
@@ -230,10 +294,34 @@ export async function executeJob(
       await notifyFailure(job, result.error || "Unknown error");
     }
 
-    return { success: result.success, rawText: result.rawText, error: result.error };
-  } finally {
-    await clearActiveRun(lockKey);
+    await finishFromResult(runId, job.agentId, result);
+
+    return {
+      success: result.success,
+      rawText: result.rawText,
+      error: result.error,
+      runId,
+    };
+    } finally {
+      await clearActiveRun(lockKey);
+    }
+  } catch (err) {
+    // A throw around the launch (createTrace, launcher, DB) — record it as an
+    // orchestration failure so the occurrence is still visible and replayable.
+    const error = err instanceof Error ? err.message : String(err);
+    await failOrchestration(runId, error);
+    throw err;
   }
+}
+
+/** One-liner label for the Runs list. */
+function jobLabel(job: ScheduledJob): string {
+  return (
+    job.description ??
+    `${job.agentId}${job.profile ? `:${job.profile}` : ""}${
+      job.action === "notify" ? " (notify)" : ""
+    }`
+  );
 }
 
 /**

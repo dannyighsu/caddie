@@ -31,6 +31,11 @@ import {
   getTraceUrl,
   isTracingEnabled,
 } from "./tracing";
+import {
+  beginRun,
+  finishFromResult,
+  failOrchestration,
+} from "./job-ledger";
 
 /**
  * Where an agent's `reply()` tool should deliver, injected into the run as
@@ -113,6 +118,8 @@ export interface InboundMessageResult {
   conversationId: string;
   agentId: string;
   profile?: string;
+  /** The job-run ledger id for this execution (for linking replays). */
+  runId?: string;
 }
 
 /**
@@ -125,7 +132,8 @@ export interface InboundMessageResult {
  * 5. Reply via the provided replyFn
  */
 export async function handleInboundMessage(
-  params: InboundMessageParams
+  params: InboundMessageParams,
+  opts: { replayOf?: string } = {}
 ): Promise<InboundMessageResult> {
   const {
     text,
@@ -150,6 +158,11 @@ export async function handleInboundMessage(
     identityUser: identity.kind === "authenticated" ? identity.userId : "guest",
     trustTier,
   });
+
+  // Assigned once the conversation (and thus the agent) is known, right before
+  // the launch. A throw before that point predates any job identity and is
+  // handled by the outer catch's channel reply; it isn't ledgered.
+  let runId: string | undefined;
 
   try {
     let conversation = await getConversationByExternalId(externalId);
@@ -204,6 +217,22 @@ export async function handleInboundMessage(
       text,
       identity,
       attachments,
+    );
+
+    // Open the ledger row before launching, with the full inbound params (minus
+    // the non-serializable replyFn closure) as the replay envelope. If the
+    // process dies mid-run, the reaper flips this to failed/orphaned; either
+    // way the message is replayable from the portal.
+    const { replyFn: _replyFn, ...serializableParams } = params;
+    runId = await beginRun(
+      { source: "inbound", params: serializableParams },
+      {
+        agentId: conversation.agent_id,
+        profile,
+        label: `${traceName}: ${text.substring(0, 60)}${text.length > 60 ? "..." : ""}`,
+        traceId,
+        replayOf: opts.replayOf,
+      }
     );
 
     const launcher = getLauncher();
@@ -271,11 +300,17 @@ export async function handleInboundMessage(
       error: result.error,
     });
 
+    // Record the run's outcome in the ledger — an API-layer failure returns no
+    // rawText and populates `error`, and is classified apart from an agent-task
+    // error so the Runs list shows why it failed.
+    await finishFromResult(runId, conversation.agent_id, result);
+
     return {
       rawText,
       conversationId: conversation.id,
       agentId: conversation.agent_id,
       profile,
+      runId,
     };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err) || "Unknown error";
@@ -283,6 +318,10 @@ export async function handleInboundMessage(
     if (err instanceof Error && err.stack) {
       console.error(`[Messaging] Stack:`, err.stack);
     }
+
+    // If the row was opened before the throw, close it as an orchestration
+    // failure so the message stays visible and replayable.
+    if (runId) await failOrchestration(runId, error);
 
     await completeTrace(traceId, { success: false, error });
 

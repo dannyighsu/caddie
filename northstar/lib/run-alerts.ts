@@ -13,27 +13,8 @@
  */
 
 import type { AgentResult } from "@agints/harness";
-import { getApiError } from "./transcripts";
+import { classifyRunFailure } from "./failure-classifier";
 import { sendEmail, isEmailConfigured } from "./email";
-
-// Fallback signatures for when the run died before a session transcript existed
-// (no sessionId to inspect). Matched case-insensitively against result.error.
-const API_ERROR_SIGNATURES = [
-  "authentication_failed",
-  "failed to authenticate",
-  "oauth",
-  "overloaded",
-  "rate limit",
-  "rate_limit",
-  "usage limit",
-  "credit balance",
-];
-
-function matchesApiSignature(error: string | undefined): boolean {
-  if (!error) return false;
-  const e = error.toLowerCase();
-  return API_ERROR_SIGNATURES.some((sig) => e.includes(sig));
-}
 
 function transcriptUrl(agentId: string, sessionId: string): string {
   const base = process.env.NORTHSTAR_BASE_URL ?? "http://localhost:3000";
@@ -50,23 +31,11 @@ export async function alertOwnerOnApiFailure(
 ): Promise<void> {
   if (result.success) return;
 
-  // Canonical signal: the transcript's synthetic API-error entry. Fall back to
-  // matching the error string when no session transcript is available (e.g. the
-  // process died before the session envelope was written).
-  let code = "api_error";
-  let detail: string | null = null;
-
-  if (result.sessionId) {
-    const apiErr = await getApiError(agentId, result.sessionId).catch(() => null);
-    if (apiErr) {
-      code = apiErr.type;
-      detail = apiErr.message;
-    }
-  }
-  if (!detail && matchesApiSignature(result.error)) {
-    detail = result.error ?? "Unknown API-layer error";
-  }
-  if (!detail) return; // Not an API-layer failure — leave to normal error paths.
+  // Only API-layer failures alert the owner; ordinary agent-task errors surface
+  // through each channel's normal error path.
+  const classified = await classifyRunFailure(agentId, result);
+  if (!classified || classified.failureClass !== "api") return;
+  const { code, detail } = classified;
 
   const to = process.env.DANNY_EMAIL;
   if (!to || !isEmailConfigured()) {

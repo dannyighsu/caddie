@@ -57,7 +57,12 @@ export interface Conversation {
 
 let pool: pg.Pool | null = null;
 
-function getPool(): pg.Pool {
+/**
+ * The shared Postgres pool. Exported so sibling modules (e.g. the job-run
+ * ledger) run against the same connection pool and the same ensured schema
+ * rather than opening their own.
+ */
+export function getPool(): pg.Pool {
   if (!pool) {
     const connectionString = process.env.POSTGRES_URL;
     if (!connectionString) {
@@ -157,6 +162,42 @@ CREATE TABLE IF NOT EXISTS telegram_messages (
 
 CREATE INDEX IF NOT EXISTS idx_telegram_messages_chat
   ON telegram_messages(chat_id, timestamp DESC);
+
+-- Durable per-execution ledger for every agent job (inbound message, scheduled,
+-- triggered, or portal run). A row is written BEFORE the run launches, carrying
+-- the full replay envelope, so a job can be re-run from the portal even if the
+-- process that started it dies mid-run. See lib/job-ledger.ts.
+CREATE TABLE IF NOT EXISTS job_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- If this run is a replay of an earlier one, the id of that run. SET NULL on
+  -- delete so eviction of the original doesn't cascade away the replay history.
+  replay_of UUID REFERENCES job_runs(id) ON DELETE SET NULL,
+  -- 'inbound' | 'scheduler' | 'trigger' | 'portal'
+  source TEXT NOT NULL,
+  agent_id TEXT NOT NULL,
+  profile TEXT,
+  -- Human-readable one-liner for the Runs list (job description, message preview).
+  label TEXT,
+  -- 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped'
+  status TEXT NOT NULL DEFAULT 'pending',
+  -- Only set when status='failed': 'api' | 'agent' | 'orchestration' | 'orphaned' | 'dropped'
+  failure_class TEXT,
+  error TEXT,
+  -- Everything needed to re-run this exact job (shape depends on source).
+  envelope JSONB NOT NULL,
+  -- Orchestrator trace id, so the /api/traces hook stream can renew the lease.
+  trace_id TEXT,
+  session_id TEXT,
+  -- A run past this instant with a non-terminal status is treated as orphaned
+  -- (crashed/hung) and reaped to failed. Renewed by hook activity.
+  lease_expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_runs_status ON job_runs(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_job_runs_agent ON job_runs(agent_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_job_runs_trace ON job_runs(trace_id) WHERE trace_id IS NOT NULL;
 `;
 
 let schemaEnsured = false;

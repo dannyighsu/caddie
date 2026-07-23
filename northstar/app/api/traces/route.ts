@@ -8,6 +8,7 @@
  */
 
 import { processHookEvent } from "@/lib/tracing";
+import { renewLeaseByTrace } from "@/lib/job-ledger";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -21,6 +22,12 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Hook activity means the run is alive — extend its ledger lease so a long
+  // (but healthy) run isn't reaped as orphaned. Best-effort; never blocks.
+  renewLeaseByTrace(resolvedTraceId).catch((err) =>
+    console.error("[Traces] Lease renewal failed:", err instanceof Error ? err.message : err)
+  );
 
   try {
     await processHookEvent(resolvedTraceId, body);

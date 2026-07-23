@@ -1,0 +1,8 @@
+{
+  "name": "email-household",
+  "description": "Email the household members (Danny/Betty) and only them — the recipient is resolved by the harness from DANNY_EMAIL/BETTY_EMAIL, never chosen by the agent. Minimal-privilege escalation path granted at every trust tier (including guest) so Buri can loop the household in without being able to mail anyone new. Sending arbitrary outbound mail stays on the household-only `email` capability.",
+  "server": {
+    "command": "node",
+    "args": ["${HARNESS_ROOT}/tools/email-household-mcp.mjs"]
+  }
+}

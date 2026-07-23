@@ -24,6 +24,9 @@ export default function RootLayout({
           <div className="flex items-center gap-3">
             <OwnerSelector />
             <span className="h-5 w-px bg-line" />
+            <a href="/runs" className="text-sm text-ink-soft hover:text-primary hover:bg-primary-soft rounded-md px-3 py-1.5 transition-colors">
+              Runs
+            </a>
             <a href="/transcripts" className="text-sm text-ink-soft hover:text-primary hover:bg-primary-soft rounded-md px-3 py-1.5 transition-colors">
               Traces
             </a>
