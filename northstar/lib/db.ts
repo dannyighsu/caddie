@@ -188,6 +188,9 @@ CREATE TABLE IF NOT EXISTS job_runs (
   -- Orchestrator trace id, so the /api/traces hook stream can renew the lease.
   trace_id TEXT,
   session_id TEXT,
+  -- Total tokens (input + output + cache) for the run, from the agent result
+  -- usage. Null for runs with no usage (e.g. notify jobs) or that predate this.
+  tokens BIGINT,
   -- A run past this instant with a non-terminal status is treated as orphaned
   -- (crashed/hung) and reaped to failed. Renewed by hook activity.
   lease_expires_at TIMESTAMPTZ,
@@ -195,9 +198,19 @@ CREATE TABLE IF NOT EXISTS job_runs (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'job_runs' AND column_name = 'tokens'
+  ) THEN
+    ALTER TABLE job_runs ADD COLUMN tokens BIGINT;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_job_runs_status ON job_runs(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_job_runs_agent ON job_runs(agent_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_job_runs_trace ON job_runs(trace_id) WHERE trace_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_job_runs_created ON job_runs(created_at DESC);
 `;
 
 let schemaEnsured = false;

@@ -72,9 +72,30 @@ export interface JobRun {
   envelope: RunEnvelope;
   trace_id: string | null;
   session_id: string | null;
+  /** Total tokens (input + output + cache) for the run, or null if unknown. */
+  tokens: number | null;
   lease_expires_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Sum the token counts from an agent result's `usage` blob into a single total
+ * (input + output + cache read/creation). Robust to missing fields and to the
+ * shape varying: any numeric property whose name ends in `_tokens` is counted.
+ * Returns null when there's no usable usage, so we store NULL rather than 0.
+ */
+export function sumUsageTokens(usage: unknown): number | null {
+  if (!usage || typeof usage !== "object") return null;
+  let total = 0;
+  let found = false;
+  for (const [key, value] of Object.entries(usage as Record<string, unknown>)) {
+    if (key.endsWith("_tokens") && typeof value === "number" && Number.isFinite(value)) {
+      total += value;
+      found = true;
+    }
+  }
+  return found ? total : null;
 }
 
 // --- Write path ---
@@ -130,6 +151,8 @@ export async function finishRun(
     failureClass?: FailureClass;
     error?: string;
     sessionId?: string;
+    /** Total tokens for the run; only overwrites the stored value when provided. */
+    tokens?: number | null;
   }
 ): Promise<void> {
   await getPool().query(
@@ -138,6 +161,7 @@ export async function finishRun(
            failure_class = $3,
            error = $4,
            session_id = COALESCE($5, session_id),
+           tokens = COALESCE($6, tokens),
            lease_expires_at = NULL,
            updated_at = now()
      WHERE id = $1`,
@@ -147,21 +171,24 @@ export async function finishRun(
       fields.failureClass ?? null,
       fields.error ? fields.error.substring(0, 4000) : null,
       fields.sessionId ?? null,
+      fields.tokens ?? null,
     ]
   );
 }
 
 /**
  * Finish from an agent launch result, classifying an API-layer failure apart
- * from an ordinary agent-task error.
+ * from an ordinary agent-task error. Records token usage when the result carries
+ * it (a failed run may still have spent tokens before erroring).
  */
 export async function finishFromResult(
   id: string,
   agentId: string,
-  result: { success: boolean; error?: string; sessionId?: string }
+  result: { success: boolean; error?: string; sessionId?: string; usage?: unknown }
 ): Promise<void> {
+  const tokens = sumUsageTokens(result.usage);
   if (result.success) {
-    await finishRun(id, { status: "succeeded", sessionId: result.sessionId });
+    await finishRun(id, { status: "succeeded", sessionId: result.sessionId, tokens });
     return;
   }
   const classified = await classifyRunFailure(agentId, result);
@@ -170,6 +197,7 @@ export async function finishFromResult(
     failureClass: classified?.failureClass ?? "agent",
     error: classified?.detail ?? result.error ?? "Unknown error",
     sessionId: result.sessionId,
+    tokens,
   });
 }
 
@@ -392,6 +420,7 @@ function rowToJobRun(row: Record<string, unknown>): JobRun {
       : envelope) as RunEnvelope,
     trace_id: (row.trace_id as string | null) ?? null,
     session_id: (row.session_id as string | null) ?? null,
+    tokens: row.tokens == null ? null : Number(row.tokens),
     lease_expires_at: row.lease_expires_at
       ? (row.lease_expires_at as Date).toISOString()
       : null,
