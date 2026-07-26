@@ -1,13 +1,13 @@
 /**
  * Email threading heuristics (pure, dependency-free).
  *
- * The AgentMail webhook delivers a single inbound message plus thread metadata —
- * never the full thread. It also offers `extracted_text`, the message body with
- * quoted/forwarded history stripped. That stripping is the right default for an
- * ongoing back-and-forth (the agent already holds the prior turns), but it is
- * exactly wrong when a message *carries* history the agent has not otherwise
- * seen — a forward, or a reply that loops the agent into a conversation that
- * happened off its inbox.
+ * The Gmail poller delivers one inbound message at a time. We compute two bodies
+ * locally: the quote-stripped `extractedText` and the `fullText` with quoted/
+ * forwarded history intact. Stripping is the right default for an ongoing
+ * back-and-forth (the agent already holds the prior turns), but it is exactly
+ * wrong when a message *carries* history the agent has not otherwise seen — a
+ * forward, or a reply that loops the agent into a conversation that happened off
+ * its inbox.
  *
  * This module decides, per inbound message, whether to feed the agent the
  * stripped body (`extracted`) or the full body *with* quoted history. It is
@@ -16,7 +16,7 @@
  *
  * Identifier note: threading here works in RFC 5322 `Message-ID` space
  * (`<local@domain>`) — the ids carried by `In-Reply-To`/`References` — NOT
- * AgentMail's opaque `message_id`. The two are different id spaces; callers MUST
+ * Gmail's message/thread ids. The two are different id spaces; callers MUST
  * populate `knownMessageIds` from RFC `Message-ID` header values (normalized via
  * {@link normalizeMessageId}) for gap detection to be meaningful.
  */
@@ -30,7 +30,7 @@ export type InboundBodyReason =
   | "empty";
 
 export interface InboundBodyInput {
-  /** Body with quoted reply history stripped (AgentMail `extracted_text`). */
+  /** Body with quoted reply history stripped. */
   extractedText: string;
   /** Full body *including* any quoted/forwarded history. */
   fullText: string;

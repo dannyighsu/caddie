@@ -15,18 +15,21 @@ The three client classes map onto the three network-exposure tiers (see
 
 | Client | What it is | Reaches | Network tier |
 |---|---|---|---|
-| **External services** | Telegram & AgentMail POSTing inbound messages | `/api/*/webhook` **only** | **Public** — Tailscale Funnel `:443` |
+| **External services** | Telegram POSTing inbound messages | `/api/telegram/webhook` **only** | **Public** — Tailscale Funnel `:443` |
 | **Portal frontend** | the dashboard in a browser (client-side `fetch`) | read/CRUD APIs + the control API | **Tailnet + local** — Serve `:8443` |
 | **Agent run** | a run's MCP tools, `bash` (via skills), and lifecycle hooks | the control API + `/api/traces` | **Local** — from inside runs on the box |
 
-> **Slack is not an HTTP client.** It connects over Socket Mode (an *outbound*
-> WebSocket), so there is no Slack webhook route — unlike Telegram and email.
+> **Slack and email are not inbound HTTP clients.** Slack connects over Socket
+> Mode (an *outbound* WebSocket); email is pulled by an in-process Gmail poller
+> (`lib/gmail/poller`) rather than pushed to a webhook. Only Telegram POSTs
+> inbound to a webhook route.
 
 ## Endpoint groups
 
-- **Webhooks** — `/api/telegram/webhook`, `/api/email/webhook`. Inbound external
-  messages; the *only* routes exposed to the public internet. Sender identity and
-  trust tier are resolved here, at the boundary.
+- **Webhooks** — `/api/telegram/webhook`. Inbound external messages; the *only*
+  route exposed to the public internet. Sender identity and trust tier are
+  resolved here, at the boundary. (Email inbound is polled from Gmail in-process,
+  not a webhook; its identity/trust is resolved in `lib/email` all the same.)
 - **Control API** — `/api/control` (plus `/api/agents/[id]/run`). The imperative
   command surface: run agents, send notifications, and create / trigger / update
   / delete scheduled jobs. Called by the portal and by the agent's own

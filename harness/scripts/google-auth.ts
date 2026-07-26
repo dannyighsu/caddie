@@ -46,7 +46,10 @@ async function main() {
     access_type: "offline",
     scope: [
       "https://www.googleapis.com/auth/calendar",
-      "https://www.googleapis.com/auth/gmail.readonly",
+      // gmail.modify covers read + send + label changes (mark-as-read), which the
+      // Gmail email transport (send/reply + inbound poll) needs. It supersedes the
+      // old gmail.readonly scope; re-run `make google-auth` to re-consent.
+      "https://www.googleapis.com/auth/gmail.modify",
     ],
     prompt: "consent",
   });

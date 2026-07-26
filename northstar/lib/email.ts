@@ -1,21 +1,16 @@
 /**
- * Email Channel — AgentMail (send + receive)
+ * Email Channel — Gmail (send + receive)
  *
- * Outbound: sends via AgentMail API.
- * Inbound: AgentMail receives emails and POSTs webhook events to /api/email/webhook.
- *          The webhook carries the new message plus `extracted_text` (quoted
- *          history stripped). We follow up with a fetch only when needed — the
- *          body was offloaded (empty), or we need a message's RFC Message-ID for
- *          threading (see fetchMessage / fetchRfcMessageId).
+ * Outbound: sends via the Gmail API (see ./gmail/transport).
+ * Inbound: the Gmail poller (./gmail/poller) lists INBOX+UNREAD each tick, builds
+ *          a {@link ReceivedEmail} via {@link receivedFromGmail}, and hands it to
+ *          the shared handler. Both message bodies are computed locally —
+ *          `fullText` keeps quoted history; `extractedText` is the quote-stripped
+ *          visible reply.
  *
- * Env vars:
- *   AGENTMAIL_API_KEY        — AgentMail API key
- *   AGENTMAIL_INBOX_ID       — the inbox to send/receive on (e.g. "agent@agentmail.to")
- *   AGENTMAIL_SIGNING_SECRET — Svix-format signing secret ("whsec_...")
+ * Auth reuses the shared Google OAuth token (Calendar + Gmail) — see ./gmail/client.
  */
 
-import { AgentMailClient } from "agentmail";
-import { Webhook } from "svix";
 import type { ResolvedIdentity, UserId } from "./identity";
 import {
   createConversation,
@@ -27,25 +22,26 @@ import {
 } from "./db";
 import type { ThreadContext } from "./thread-context";
 import { parseMessageRefs, normalizeMessageId, summarizeEnvelope } from "./email-threading";
+import { isGmailConfigured, getSelfAddress } from "./gmail/client";
+import {
+  sendNewEmail,
+  sendReply,
+  getRfcMessageId,
+  getInboundMessage,
+  type GmailInbound,
+} from "./gmail/transport";
+import { stripQuotedReply } from "./gmail/strip";
 
 // --- Config ---
 
+/** Configured when Gmail creds + the shared token file are present. */
 export function isEmailConfigured(): boolean {
-  return !!(process.env.AGENTMAIL_API_KEY && process.env.AGENTMAIL_INBOX_ID);
+  return isGmailConfigured();
 }
 
-function getClient(): AgentMailClient {
-  return new AgentMailClient({ apiKey: process.env.AGENTMAIL_API_KEY! });
-}
-
-function getInboxId(): string {
-  const id = process.env.AGENTMAIL_INBOX_ID;
-  if (!id) throw new Error("AGENTMAIL_INBOX_ID is not set");
-  return id;
-}
-
-export function getFromRawAddress(): string {
-  return getInboxId();
+/** The agent's own Gmail address (the send/receive identity). */
+export async function getFromRawAddress(): Promise<string> {
+  return getSelfAddress();
 }
 
 // --- Send ---
@@ -69,14 +65,8 @@ export async function sendEmail(
   text: string,
   opts?: { threadContext?: ThreadContext },
 ): Promise<{ messageId: string; threadId: string }> {
-  const client = getClient();
-  const res = await client.inboxes.messages.send(getInboxId(), {
-    to,
-    subject,
-    text,
-  });
-
-  const result = { messageId: res.messageId, threadId: res.threadId };
+  const self = await getSelfAddress();
+  const result = await sendNewEmail(self, to, subject, text);
 
   // Best-effort: a failed record must not fail the send itself.
   try {
@@ -160,8 +150,8 @@ export async function replyToEmail(
 ): Promise<{ messageId: string }> {
   if (!messageId) throw new Error("replyToEmail: messageId is empty");
   const replyAll = opts?.replyAll ?? true;
-  const client = getClient();
-  const res = await client.inboxes.messages.reply(getInboxId(), messageId, { text, replyAll });
+  const self = await getSelfAddress();
+  const res = await sendReply(self, messageId, text, replyAll);
   return { messageId: res.messageId };
 }
 
@@ -173,11 +163,11 @@ export async function replyToEmail(
  * missing id only costs a one-time, safe over-inclusion of quoted history.
  */
 export async function fetchRfcMessageId(
-  agentMailMessageId: string,
+  messageId: string,
 ): Promise<string | undefined> {
-  if (!agentMailMessageId) return undefined;
-  const full = await fetchMessage(agentMailMessageId);
-  return full?.rfcMessageId;
+  if (!messageId) return undefined;
+  const raw = await getRfcMessageId(messageId);
+  return raw ? normalizeMessageId(raw) : undefined;
 }
 
 /**
@@ -219,12 +209,14 @@ export interface ReceivedEmail {
    * (a forward or a reply from an off-inbox side conversation).
    */
   fullText: string;
+  /** Gmail message id. */
   messageId: string;
+  /** Gmail thread id (stable; used to key the local conversation). */
   threadId: string;
   /**
    * Normalized RFC 5322 `Message-ID` of this message (bracket-stripped), from
-   * the `Message-ID` header. Distinct from AgentMail's `messageId`. Undefined if
-   * the header is absent.
+   * the `Message-ID` header. Distinct from Gmail's `messageId`. Undefined if the
+   * header is absent.
    */
   rfcMessageId?: string;
   /** Normalized RFC `Message-ID` this message replies to (`In-Reply-To`). */
@@ -233,84 +225,6 @@ export interface ReceivedEmail {
   references: string[];
   /** Raw RFC 5322 headers from the inbound message (header name → value). */
   headers: Record<string, string>;
-}
-
-// AgentMail webhook JSON is snake_case on the wire. The SDK's typed responses
-// are camelCase. Read both so this works for either source.
-export function normalizeMessage(input: unknown): ReceivedEmail {
-  const msg = input as Record<string, unknown>;
-  const pick = <T = string>(...keys: string[]): T | undefined => {
-    for (const k of keys) {
-      const v = msg[k];
-      if (v !== undefined && v !== null) return v as T;
-    }
-    return undefined;
-  };
-
-  const fromField = pick<unknown>("from");
-  const from =
-    typeof fromField === "string"
-      ? fromField
-      : ((fromField as { address?: string } | undefined)?.address ?? "");
-  const toField = pick<unknown[]>("to") ?? [];
-  const to = (Array.isArray(toField) ? toField : []).map((t) =>
-    typeof t === "string" ? t : ((t as { address?: string })?.address ?? ""),
-  );
-  const ccField = pick<unknown[]>("cc") ?? [];
-  const cc = (Array.isArray(ccField) ? ccField : [])
-    .map((t) => (typeof t === "string" ? t : ((t as { address?: string })?.address ?? "")))
-    .filter(Boolean);
-
-  const rawHeaders = pick<unknown>("headers");
-  const headers: Record<string, string> = {};
-  if (rawHeaders && typeof rawHeaders === "object" && !Array.isArray(rawHeaders)) {
-    for (const [k, v] of Object.entries(rawHeaders as Record<string, unknown>)) {
-      if (typeof v === "string") headers[k] = v;
-    }
-  }
-
-  const text = pick<string>("text") ?? "";
-  const html = pick<string>("html") ?? "";
-
-  // Body resolution. `extracted_text` is the *new* content with quoted/forwarded
-  // history stripped — but forwards often leave it empty (the whole body reads as
-  // quoted), so fall through to the full text, then to stripped HTML. Use a
-  // non-empty check rather than `??` because empty strings are present-but-blank
-  // and must NOT short-circuit the chain.
-  const extractedText = firstNonEmpty(
-    pick<string>("extracted_text", "extractedText"),
-    text,
-    stripHtml(pick<string>("extracted_html", "extractedHtml")),
-    stripHtml(html),
-  );
-
-  // Full body *with* quoted history — the opposite preference from
-  // `extractedText`: keep the whole thread when it's the payload (forwards,
-  // loop-ins), falling back to the stripped variants only if nothing else.
-  const fullText = firstNonEmpty(text, stripHtml(html), extractedText);
-
-  const { inReplyTo, references } = parseMessageRefs(headers);
-  const rawMessageIdHeader = getHeader(headers, "Message-ID");
-  const rfcMessageId = rawMessageIdHeader
-    ? normalizeMessageId(rawMessageIdHeader)
-    : undefined;
-
-  return {
-    from,
-    to,
-    cc,
-    subject: pick<string>("subject") ?? "(no subject)",
-    text,
-    html,
-    extractedText,
-    fullText,
-    messageId: pick<string>("message_id", "messageId") ?? "",
-    threadId: pick<string>("thread_id", "threadId") ?? "",
-    rfcMessageId,
-    inReplyTo,
-    references,
-    headers,
-  };
 }
 
 /** Return the first argument that has non-whitespace content, else "". */
@@ -335,13 +249,45 @@ function firstNonEmpty(...vals: (string | undefined)[]): string {
 export async function fetchMessage(messageId: string): Promise<ReceivedEmail | null> {
   if (!messageId) return null;
   try {
-    const client = getClient();
-    const full = await client.inboxes.messages.get(getInboxId(), messageId);
-    return normalizeMessage(full);
+    const inbound = await getInboundMessage(messageId);
+    return inbound ? receivedFromGmail(inbound) : null;
   } catch (err) {
     console.error(`[Email] Failed to fetch full message ${messageId}:`, err);
     return null;
   }
+}
+
+/**
+ * Build a Buri {@link ReceivedEmail} from a parsed Gmail message. Computes both
+ * bodies locally — `fullText` keeps quoted history; `extractedText` is the
+ * quote-stripped visible reply — preserving the same dual-body contract that
+ * AgentMail's `extracted_text` used to provide.
+ */
+export function receivedFromGmail(m: GmailInbound): ReceivedEmail {
+  const plainOrHtml = firstNonEmpty(m.plain, stripHtml(m.html));
+  const fullText = plainOrHtml;
+  const extractedText = firstNonEmpty(stripQuotedReply(plainOrHtml), fullText);
+
+  const { inReplyTo, references } = parseMessageRefs(m.headers);
+  const rawMessageId = getHeader(m.headers, "Message-ID");
+  const rfcMessageId = rawMessageId ? normalizeMessageId(rawMessageId) : undefined;
+
+  return {
+    from: m.from,
+    to: m.to,
+    cc: m.cc,
+    subject: m.subject,
+    text: m.plain,
+    html: m.html,
+    extractedText,
+    fullText,
+    messageId: m.id,
+    threadId: m.threadId,
+    rfcMessageId,
+    inReplyTo,
+    references,
+    headers: m.headers,
+  };
 }
 
 /** Minimal HTML→text fallback for messages that arrive HTML-only. */
@@ -371,13 +317,13 @@ function stripHtml(html: string | undefined): string {
  * quiet on a group thread it wasn't really asked to answer. This is run context,
  * NOT stored in conversation history.
  */
-export function describeEnvelope(email: ReceivedEmail): string {
+export async function describeEnvelope(email: ReceivedEmail): Promise<string> {
   return summarizeEnvelope({
     from: email.from,
     to: email.to,
     cc: email.cc,
     subject: email.subject,
-    self: getInboxId(),
+    self: await getSelfAddress(),
   });
 }
 
@@ -438,9 +384,9 @@ function householdEmailMap(): Map<string, UserId> {
  *   2. An Authentication-Results header with spf=pass, dkim=pass, dmarc=pass.
  *
  * Any failure downgrades to guest — we'd rather lose authenticated access
- * than grant it on a spoofed `From`. AgentMail does not surface
- * SPF/DKIM/DMARC as first-class webhook fields, so this is the only
- * spoofing defense available at the message boundary.
+ * than grant it on a spoofed `From`. We parse Gmail's `Authentication-Results`
+ * header directly (Gmail stamps it on inbound mail), which is the spoofing
+ * defense at the message boundary.
  */
 export function resolveEmailIdentity(email: ReceivedEmail): ResolvedIdentity {
   const sender = bareAddress(email.from);
@@ -467,39 +413,4 @@ export function resolveEmailIdentity(email: ReceivedEmail): ResolvedIdentity {
   }
 
   return { kind: "authenticated", userId, channel: "email", rawSender: sender };
-}
-
-// --- Webhook verification ---
-
-// The AgentMail webhook envelope. Field names are snake_case on the wire.
-export interface InboundWebhookEvent {
-  type: string;
-  event_type: string;
-  event_id?: string;
-  message: unknown;
-  thread?: unknown;
-}
-
-export function verifyWebhook(
-  payload: string,
-  requestHeaders: globalThis.Headers,
-): InboundWebhookEvent | null {
-  const secret = process.env.AGENTMAIL_SIGNING_SECRET;
-  if (!secret) {
-    // No secret configured — skip verification (dev mode).
-    console.warn("[Email] AGENTMAIL_SIGNING_SECRET not set — accepting unverified webhook");
-    return JSON.parse(payload) as InboundWebhookEvent;
-  }
-
-  const wh = new Webhook(secret);
-  try {
-    return wh.verify(payload, {
-      "svix-id": requestHeaders.get("svix-id") ?? "",
-      "svix-timestamp": requestHeaders.get("svix-timestamp") ?? "",
-      "svix-signature": requestHeaders.get("svix-signature") ?? "",
-    }) as InboundWebhookEvent;
-  } catch (err) {
-    console.error("[Email] Webhook verification failed:", err);
-    return null;
-  }
 }

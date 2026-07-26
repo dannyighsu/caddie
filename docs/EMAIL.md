@@ -1,47 +1,77 @@
 # Email Setup
 
-Send and receive via [AgentMail](https://agentmail.to). Each agent gets a real inbox; replies thread automatically.
+Buri sends and receives email through its own **Gmail account** via the Gmail API.
+Outbound goes through `gmail.users.messages.send`; inbound is pulled by an
+in-process poller (no webhook). Auth reuses the same Google OAuth token as Google
+Calendar.
 
-## 1. AgentMail account
+## 1. Google Cloud + OAuth
 
-1. Sign up at [agentmail.to](https://agentmail.to) and grab your API key
-2. (Optional) Attach a custom domain in the dashboard if you want a branded sender — otherwise inboxes live on `@agentmail.to`
+Email rides the same OAuth client and token file as Calendar (see the Calendar
+setup / `make google-auth`). Two things are specific to email:
 
-## 2. Provision the inbox + webhook
+1. **Enable the Gmail API** in the Cloud project behind your OAuth client
+   (console → APIs & Services → Enable APIs → "Gmail API"), or:
+   ```bash
+   gcloud services enable gmail.googleapis.com --project=<your-project>
+   ```
+2. **Authorize the `gmail.modify` scope.** `harness/scripts/google-auth.ts`
+   requests `calendar` + `gmail.modify` (modify covers read, send, and marking
+   messages read). Re-run the consent flow so the token carries it:
+   ```bash
+   make google-auth
+   ```
 
-For local development, expose `localhost:3000` with ngrok first.
+The token is written to `harness/credentials/google-calendar-tokens.json` and is
+shared by Calendar, the Gmail MCP, and the email transport.
+
+## 2. Environment
+
+In `northstar/.env.local` (already present for Calendar):
 
 ```bash
-AGENTMAIL_API_KEY=... \
-AGENTMAIL_WEBHOOK_URL=https://your-host/api/email/webhook \
-  npx tsx harness/scripts/agentmail-setup.ts
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+# Optional:
+# GMAIL_ADDRESS=you@yourdomain.com   # else read from the account profile
+# GMAIL_POLL_INTERVAL_MS=60000       # inbound poll cadence (default 60s)
+# GOOGLE_TOKENS_FILE=...             # override the shared token path
 ```
 
-The script creates (or fetches by `clientId`) the inbox and registers the webhook for `message.received`, then prints the values for the next step.
-
-Optional env vars: `AGENTMAIL_INBOX_USERNAME`, `AGENTMAIL_INBOX_DOMAIN`, `AGENTMAIL_INBOX_CLIENT_ID` (default `agints-primary`).
-
-## 3. Add to `northstar/.env.local`
+Household identity for the auth gate:
 
 ```bash
-AGENTMAIL_API_KEY=...
-AGENTMAIL_INBOX_ID=agent@agentmail.to     # printed by the setup script
-AGENTMAIL_SIGNING_SECRET=whsec_xxxxx      # printed by the setup script
+DANNY_EMAIL=...
+BETTY_EMAIL=...
 ```
 
 ## How it works
 
-1. Someone emails the inbox address
-2. AgentMail POSTs a `message.received` webhook to `/api/email/webhook` with the full message inline
-3. We verify the Svix signature, then hand the message to the messaging handler
-4. `extractedText` (quoted history already stripped) is what the agent sees
-5. Agent replies via `messages.reply(inboxId, messageId, …)` — AgentMail preserves threading
+**Inbound** (`northstar/lib/gmail/poller.ts`)
+1. Every `GMAIL_POLL_INTERVAL_MS` the poller lists `label:INBOX label:UNREAD` —
+   the mailbox's own UNREAD state is the queue.
+2. Each message is fetched, parsed into a `ReceivedEmail`, and dispatched to the
+   shared handler. It's marked read **only after** successful dispatch, so a
+   failure just leaves it UNREAD to retry next tick.
+3. Two bodies are computed locally: `fullText` (quoted history intact) and
+   `extractedText` (quote-stripped via `email-reply-parser`). `email-threading`
+   decides which the agent sees (stripped normally; full for forwards / gaps /
+   loop-ins).
+4. Identity is resolved from the `From` address + the `Authentication-Results`
+   header (spf/dkim/dmarc must pass) → `household` or `guest`.
+
+**Outbound** (`northstar/lib/gmail/transport.ts`)
+- `send_email` / `reply` route through the control API → `sendEmail` /
+  `replyToEmail`. Replies resolve the thread, reconstruct recipients (reply-all
+  rebuilds To+Cc minus self), set `In-Reply-To`/`References`, and send within the
+  Gmail thread.
 
 ## Behavior
 
-- Conversations are keyed by AgentMail's `threadId`, so two unrelated threads from the same sender are separate conversations
-- Emails from the inbox's own address are ignored (no loops)
-- No routing confirmation emails are sent (too noisy)
+- Conversations are keyed by Gmail's `threadId` — different threads from the same
+  sender stay separate.
+- Emails from the account's own address are ignored (no loops).
+- Promotional / marketing mail is never replied to (see the persona).
 
 ## Sending via the control API
 
@@ -55,6 +85,7 @@ curl -X POST localhost:3000/api/control \
 
 | Problem | Fix |
 |---------|-----|
-| No emails received | Check the webhook URL is publicly reachable and registered for `message.received` |
-| Webhook 401 | `AGENTMAIL_SIGNING_SECRET` must match the secret from `client.webhooks.get(webhookId).secret` |
-| Sends fail | Confirm `AGENTMAIL_INBOX_ID` matches an existing inbox under your API key |
+| `Gmail API has not been used in project … or it is disabled` | Enable the Gmail API in the Cloud project (step 1). |
+| Sends fail with insufficient permission | Token lacks `gmail.modify` — re-run `make google-auth`. |
+| No inbound picked up | Confirm the poller started (server logs `[Gmail Poller] Started`) and messages are actually `INBOX`+`UNREAD`. |
+| Wrong sender identity / everyone is guest | Check `DANNY_EMAIL`/`BETTY_EMAIL` and that inbound carries a passing `Authentication-Results` header. |

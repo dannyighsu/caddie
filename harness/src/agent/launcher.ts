@@ -320,15 +320,6 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
 
     const enableChrome = agent.enableChrome || (resolved?.flags.includes("chrome") ?? false);
 
-    // AgentMail tools take an explicit inboxId argument (the upstream server has
-    // no default-inbox env var), so surface the configured inbox to the agent.
-    // Gated on the capability actually being mounted for this run.
-    if (resolved && "agentmail" in resolved.servers && process.env.AGENTMAIL_INBOX_ID) {
-      contextLines.push(
-        `Email inbox ID (pass as the \`inboxId\` argument to AgentMail email tools): ${process.env.AGENTMAIL_INBOX_ID}`
-      );
-    }
-
     // 7. Build full prompt: persona + context preamble + user prompt
     // Always prepend a fresh timestamp so the agent has the current time
     // even on session resumes (where the persona is not re-rendered).

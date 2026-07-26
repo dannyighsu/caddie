@@ -335,7 +335,7 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
 
   if (req.channel === "email") {
     if (!isEmailConfigured()) {
-      return { success: false, error: "Email not configured (missing AGENTMAIL_API_KEY or AGENTMAIL_INBOX_ID)" };
+      return { success: false, error: "Email not configured (missing Google OAuth credentials or token file)" };
     }
 
     if (!req.to) {

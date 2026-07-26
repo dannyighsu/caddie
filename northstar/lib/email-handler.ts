@@ -1,15 +1,13 @@
 /**
  * Email Message Handler
  *
- * Processes inbound emails received via the AgentMail webhook.
- * Threads are grouped by AgentMail's `threadId`, so multiple messages in the
- * same thread land in the same conversation while different threads — even
- * from the same sender — stay separate.
+ * Processes inbound emails from the Gmail poller. Threads are grouped by Gmail's
+ * `threadId`, so multiple messages in the same thread land in the same
+ * conversation while different threads — even from the same sender — stay separate.
  */
 
 import { handleInboundMessage } from "./messaging";
 import {
-  normalizeMessage,
   fetchMessage,
   fetchRfcMessageId,
   replyToEmail,
@@ -19,31 +17,25 @@ import {
   type ReceivedEmail,
 } from "./email";
 import { getConversationByExternalId, addSeenChannelIds } from "./db";
-import { selectInboundBody, isForwardedMessage } from "./email-threading";
+import { selectInboundBody, isForwardedMessage, bareEmail } from "./email-threading";
 
-export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
-  let email: ReceivedEmail;
-  try {
-    email = normalizeMessage(rawMessage);
-  } catch (err) {
-    console.error("[Email Handler] Failed to parse message:", err);
-    return;
-  }
-
+/**
+ * Process a fully-parsed inbound email: loop-guard, body selection, identity
+ * resolution, and dispatch to the agent. Fed by the Gmail poller.
+ */
+export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
   if (!email.messageId || !email.threadId) {
-    console.error(
-      "[Email Handler] Missing IDs after normalize. Raw message keys:",
-      rawMessage && typeof rawMessage === "object"
-        ? Object.keys(rawMessage as object)
-        : typeof rawMessage,
-      "extracted:",
-      { messageId: email.messageId, threadId: email.threadId, from: email.from },
-    );
+    console.error("[Email Handler] Missing IDs after parse:", {
+      messageId: email.messageId,
+      threadId: email.threadId,
+      from: email.from,
+    });
     return;
   }
 
   // Skip emails from our own address (avoid loops)
-  if (email.from === getFromRawAddress()) {
+  const self = await getFromRawAddress();
+  if (bareEmail(email.from) === self.toLowerCase()) {
     console.log(
       `[Email Handler] Skipping message: self-sent (loop prevention) from=${email.from} thread=${email.threadId}`,
     );
@@ -114,7 +106,7 @@ export async function handleEmailMessage(rawMessage: unknown): Promise<void> {
       context: { originChannel: "email" },
       // Envelope (recipients, To vs Cc, group size, subject) so the agent can
       // judge whether a reply is warranted. Prompt-only; never stored.
-      promptContext: describeEnvelope(email),
+      promptContext: await describeEnvelope(email),
       deliveryMode: "tool",
       replyTarget: { channel: "email", externalId, email: { messageId: email.messageId } },
       // Used only for the error-notice path in tool mode (normal replies go out
