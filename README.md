@@ -300,11 +300,11 @@ Memory.
 
 | Reachable from | How | What's exposed |
 |---|---|---|
-| **Public internet** | Tailscale **Funnel** on `:443` | Only the ingress webhooks: `/api/telegram/webhook`, `/api/email/webhook` |
+| **Public internet** | Tailscale **Funnel** on `:443` | Only the ingress webhook: `/api/telegram/webhook` |
 | **Your tailnet + this machine** | Tailscale **Serve** on `:8443` | The full control plane — dashboards, control API, all other endpoints |
 | **This machine only** | direct | `http://localhost:3000` |
 
-Third-party services (Telegram, AgentMail) can only reach the two webhook paths.
+Third-party services (Telegram) can only reach the webhook path.
 Every other route — the dashboards, the control API, agent config, settings — is
 invisible to the public internet and reachable only from devices on your
 Tailscale network (at `https://<node>.<tailnet>.ts.net:8443`) or locally. The

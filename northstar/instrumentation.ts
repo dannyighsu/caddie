@@ -23,6 +23,10 @@ export async function register() {
     const { handleSlackMessage } = await import("./lib/slack-handler");
     startSocketMode(handleSlackMessage);
 
-    // Telegram and Email are webhook-based — no startup needed
+    // Start Gmail inbound poller (replaces the AgentMail webhook)
+    const { startGmailPoller } = await import("./lib/gmail/poller");
+    startGmailPoller();
+
+    // Telegram is webhook-based — no startup needed
   }
 }

@@ -241,7 +241,7 @@ export async function executeJob(
     // Scheduled/triggered runs are the household's own automations (the
     // initiator is the authenticated owner, not an external sender), so they
     // run at household trust by default — otherwise every household-gated
-    // capability (email, agentmail, notion, calendar) is filtered out. A job
+    // capability (email, gmail, notion, calendar) is filtered out. A job
     // can pin itself to "guest" for least privilege.
     const trustTier = job.trustTier ?? "household";
 

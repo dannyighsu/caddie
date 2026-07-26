@@ -5,8 +5,8 @@
  *
  * Outbound email for the agent, proxied through the Northstar control API
  * (`notify` action, `email` channel). Routing sends through the control API —
- * rather than calling AgentMail directly — means every send is recorded as a
- * local conversation keyed by its AgentMail thread id, so when the recipient
+ * rather than calling the Gmail API directly — means every send is recorded as a
+ * local conversation keyed by its Gmail thread id, so when the recipient
  * replies the shared messaging handler finds the thread and supplies prior
  * context.
  *
@@ -33,7 +33,7 @@ const tools = [
   {
     name: "send_email",
     description:
-      "Send an ad-hoc outbound email from your AgentMail inbox to a recipient. " +
+      "Send an ad-hoc outbound email from your Gmail inbox to a recipient. " +
       "Use this for NEW mail you initiate — reaching out to someone, sending a heads-up or notification. " +
       "DO NOT use this to answer an email someone just sent you: the harness already delivers your reply into the current thread automatically, and using this would start a new thread. " +
       "Any reply the recipient sends comes back to you with the full thread history attached, so you don't need to restate context you've already sent.",
