@@ -12,16 +12,23 @@ Every run, check whether an 18-hole tee time has opened up for the **upcoming Sa
 
 If a match is found, notify Danny **immediately** via both Slack and email — don't wait to check the remaining courses first if you find one early, but do still finish checking the rest so you can report every match found this run, not just the first.
 
-## 0. Check the pause state first
+## 0. Check the job state first
 
-Before checking anything, read `config/golf_watch_state.md` in this workspace (create it if missing, with `paused_until: none`).
+This job's state lives in `state/golf-tee-times.md`, which holds two sections: **Directives** (expiring steering from Danny) and **State** (`paused_until`, maintained by you). On a scheduled run its contents are already injected into your run context under **"Job state"**; still read the file directly (create it if missing, with an empty Directives section and `paused_until: none`) since you'll be writing updates back to it.
 
-- If `paused_until` is a date **on or after today**, this means Danny told you to stand down for that weekend. **Skip the checks entirely** and end the run quietly (no Slack/email, no reply needed — this is a background job).
+**Directives** — apply every directive whose `(expires: YYYY-MM-DD)` is today or later, then **delete any directive whose expiry has already passed** and save the file. Directives narrow or adjust this run — e.g. "Only check Saturday this weekend" means skip the Sunday checks for this run only. If a directive fully suppresses the run (e.g. "skip this week entirely"), end quietly like a pause.
+
+**Pause (`paused_until`)** —
+- If `paused_until` is a date **on or after today**, Danny told you to stand down for that weekend. **Skip the checks entirely** and end the run quietly (no Slack/email, no reply needed — this is a background job).
 - If `paused_until` has passed (today is after it), reset it to `none` and proceed with checks normally — the pause was for a single weekend only and has expired.
 
-### Handling a "stop for the week" instruction
+### Handling steering instructions from Danny
 
-If, in any conversation (not just this scheduled run), Danny says something like "stop looking for tee times this weekend", "I'm out of town this weekend", "already got a tee time", or "don't bother this week" — update `config/golf_watch_state.md` with `paused_until: <upcoming Monday's date>` (so checks resume automatically once the following Sunday's run rolls around) and confirm back to him that you've paused the search for that weekend. You don't need to touch the schedule itself — the recurring job keeps firing, it just no-ops while paused.
+If, in any conversation (not just this scheduled run), Danny says something like:
+- **"stop looking this weekend" / "I'm out of town" / "already got a tee time" / "don't bother this week"** — set `paused_until: <upcoming Monday's date>` in the State section (so checks resume automatically once the following Sunday's run rolls around).
+- **A narrower steer** like "only check Saturday this weekend" or "I only want mornings after 8 this week" — add it to the **Directives** section as a line ending with `(expires: <upcoming Monday's date>)` so it self-clears after the weekend.
+
+Then confirm back to him what you've recorded. Either way you don't need to touch the schedule itself — the recurring job keeps firing, it just adapts (or no-ops) based on this file.
 
 ## 1. Determine target dates
 

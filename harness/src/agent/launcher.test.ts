@@ -71,6 +71,7 @@ describe("createLauncher", () => {
     mockFs.mkdir.mockResolvedValue(undefined as any);
     mockFs.lstat.mockRejectedValue(new Error("ENOENT")); // no existing symlinks
     mockFs.symlink.mockResolvedValue(undefined);
+    mockFs.readdir.mockResolvedValue([] as any); // no config/household by default
   });
 
   it("launches an agent and returns success result", async () => {
@@ -345,6 +346,117 @@ describe("createLauncher", () => {
     });
 
     expect(resolveCapabilities).toHaveBeenCalledWith(["web-search"], "/caps");
+  });
+
+  it("injects the job's state file when a stateKey is provided", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
+      if (p.endsWith("persona.md")) return "persona";
+      if (p.endsWith("state/golf-tee-times.md")) {
+        return "## Directives\n- Only check Saturday. (expires: 2099-01-01)\n\n## State\npaused_until: none";
+      }
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: ID,
+      prompt: "PROMPT_MARKER",
+      stateKey: "golf-tee-times",
+    });
+
+    const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    expect(prompt).toContain("Job state (state/golf-tee-times.md):");
+    expect(prompt).toContain("Only check Saturday. (expires: 2099-01-01)");
+    // State is run context, so it lands before the user message.
+    expect(prompt.indexOf("Job state")).toBeLessThan(prompt.indexOf("PROMPT_MARKER"));
+  });
+
+  it("does not inject anything when the job has no state file yet", async () => {
+    // Default mock throws for state/*.md (unmocked) — the read is swallowed.
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: ID,
+      prompt: "hello",
+      stateKey: "golf-tee-times",
+    });
+
+    const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    expect(prompt).not.toContain("Job state");
+  });
+
+  it("sanitizes the stateKey so the read cannot escape the state/ directory", async () => {
+    const seen: string[] = [];
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
+      if (p.endsWith("persona.md")) return "persona";
+      if (p.includes("/state/")) { seen.push(p); throw new Error("ENOENT"); }
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: ID,
+      prompt: "go",
+      stateKey: "../../config/preferences",
+    });
+
+    // Slashes are stripped, so the resolved path stays a direct child of state/.
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContain("/state/");
+    expect(seen[0]).not.toContain("config/preferences");
+    expect(seen[0].endsWith("/state/....configpreferences.md")).toBe(true);
+  });
+
+  it("injects household member files on a household turn, but not on a guest turn", async () => {
+    mockFs.readdir.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("config/household")) return ["betty.md", "danny.md"] as any;
+      return [] as any;
+    });
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
+      if (p.endsWith("persona.md")) return "persona";
+      if (p.endsWith("household/danny.md")) return "# Danny\n- Founder of Deep Agents";
+      if (p.endsWith("household/betty.md")) return "# Betty\n- PM at Peregrine";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    // Household turn: both member files injected.
+    const runtime = mockRuntime();
+    const hh = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    await hh.launch({
+      agentId: "test-agent",
+      identity: { trustTier: "household", senderIdentity: "Danny", originChannel: "email" },
+      prompt: "go",
+    });
+    const hhPrompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    expect(hhPrompt).toContain("Household member — danny:");
+    expect(hhPrompt).toContain("Founder of Deep Agents");
+    expect(hhPrompt).toContain("Household member — betty:");
+
+    // Guest turn: member files must NOT be injected.
+    const guestRt = mockRuntime();
+    const guest = createLauncher(guestRt, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    await guest.launch({
+      agentId: "test-agent",
+      identity: { trustTier: "guest", senderIdentity: "stranger", originChannel: "email" },
+      prompt: "go",
+    });
+    const guestPrompt: string = (guestRt.execute as any).mock.calls[0][0].prompt;
+    expect(guestPrompt).not.toContain("Household member");
+    expect(guestPrompt).not.toContain("Founder of Deep Agents");
   });
 
   it("passes harnessRoot to runtime", async () => {

@@ -1,21 +1,18 @@
-# Preferences
+# Household preferences
 
-## User
+Shared context for the household (Danny and Betty). Each member's profile and
+member-specific standing instructions live in `config/household/<member>.md`.
 
-### Name
-Danny Hsu
+## Routing
+Reply to whoever initiated the conversation; if unspecified, assume Danny.
 
-### Personal
-- Timezone: America/Los_Angeles
-
-### Work
-Founder of Deep Agents, AI Consulting firm. Technical background.
-
-### Communication Style
+## Communication style
 Appreciates detail and conciseness in responses. Tone approachable but to the point.
 
-## Check-In
+## Timezone
+America/Los_Angeles
 
+## Check-In
 ### Frequency
 <!-- How often to check in — e.g., "twice per work day", "every 3 hours during work hours" -->
 
@@ -24,6 +21,12 @@ Appreciates detail and conciseness in responses. Tone approachable but to the po
 
 ### Style
 <!-- e.g., "keep it brief unless something is urgent", "always start with calendar summary" -->
+
+## Standing instructions (household-wide)
+<!-- Durable directions that apply to BOTH members. Member-specific ones go in
+     config/household/<member>.md. One per bullet, tagged with provenance:
+     (Who, YYYY-MM-DD). Add or update only when a household member explicitly
+     asks; see the persona's "Preferences and memory" section. -->
 
 ## Notes
 <!-- Anything else relevant -->

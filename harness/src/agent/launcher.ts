@@ -144,18 +144,29 @@ async function bootstrapConfig(
   } catch {
     return; // No seed config in agent definition
   }
+  await copySeedTree(seedDir, resolve(workingDirectory, "config"));
+}
 
-  const destDir = resolve(workingDirectory, "config");
+/**
+ * Recursively copy a seed directory into the workspace — creating subdirectories
+ * and copying any file that doesn't already exist, never overwriting user edits.
+ * Recursion lets seeds ship nested config (e.g. config/household/<member>.md).
+ */
+async function copySeedTree(srcDir: string, destDir: string): Promise<void> {
   await mkdir(destDir, { recursive: true });
-
-  const entries = await readdir(seedDir);
+  const entries = await readdir(srcDir, { withFileTypes: true });
   for (const entry of entries) {
-    const dest = resolve(destDir, entry);
-    try {
-      await lstat(dest);
-      // Already exists — don't overwrite
-    } catch {
-      await copyFile(resolve(seedDir, entry), dest);
+    const src = resolve(srcDir, entry.name);
+    const dest = resolve(destDir, entry.name);
+    if (entry.isDirectory()) {
+      await copySeedTree(src, dest);
+    } else {
+      try {
+        await lstat(dest);
+        // Already exists — don't overwrite
+      } catch {
+        await copyFile(src, dest);
+      }
     }
   }
 }
@@ -253,6 +264,25 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       // preferences.md doesn't exist yet
     }
 
+    // Per-job state file — the job's own store for agent-maintained state (dedup
+    // markers, pauses) and expiring human directives. Injected so every run of a
+    // job starts with its state already in context, regardless of whether the
+    // job's skill remembers to read it. Keyed by stateKey (the job's purpose),
+    // sanitized so the read can't escape the state/ directory. Runs with no
+    // associated job (ad-hoc chat) pass no stateKey and get nothing here.
+    if (input.stateKey) {
+      const safeKey = input.stateKey.replace(/[^a-z0-9._-]/gi, "");
+      if (safeKey) {
+        try {
+          const statePath = resolve(workingDirectory, "state", `${safeKey}.md`);
+          const jobState = (await readFile(statePath, "utf-8")).trim();
+          if (jobState) contextLines.push(`Job state (state/${safeKey}.md):\n${jobState}`);
+        } catch {
+          // No state file yet — the job's skill creates it on first use.
+        }
+      }
+    }
+
     // Household directory — the people Buri serves and how to reach them, built
     // from the same env vars that drive inbound email identity (DANNY_EMAIL /
     // BETTY_EMAIL), so the addresses the agent invites match the ones the auth
@@ -275,6 +305,25 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
           `Household directory (the people you serve — to put an event on someone's ` +
             `calendar, invite their primary email as an attendee):\n${household.join("\n")}`
         );
+      }
+
+      // Per-member profiles and standing instructions (config/household/<member>.md).
+      // These are private, so they're injected ONLY on household-tier runs —
+      // never surfaced to a guest. Every *.md is read so new members are picked
+      // up without code changes.
+      try {
+        const membersDir = resolve(workingDirectory, "config", "household");
+        const memberFiles = (await readdir(membersDir))
+          .filter((f) => f.endsWith(".md"))
+          .sort();
+        for (const file of memberFiles) {
+          const content = (await readFile(resolve(membersDir, file), "utf-8")).trim();
+          if (content) {
+            contextLines.push(`Household member — ${file.replace(/\.md$/, "")}:\n${content}`);
+          }
+        }
+      } catch {
+        // No config/household/ directory yet
       }
     }
 

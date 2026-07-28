@@ -89,6 +89,13 @@ export interface AgentInput {
   trigger?: TriggerContext;
   /** Additional environment variables passed to the runtime subprocess. */
   additionalEnv?: Record<string, string>;
+  /**
+   * Identifies this run's job so the launcher injects the job's state file
+   * (`state/<stateKey>.md`) into the run context. That file is the per-job
+   * store for agent-maintained state (dedup markers, pauses) and expiring
+   * human directives. Omit for runs with no associated job (e.g. ad-hoc chat).
+   */
+  stateKey?: string;
 }
 
 /**
