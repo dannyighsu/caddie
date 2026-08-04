@@ -264,21 +264,33 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       // preferences.md doesn't exist yet
     }
 
-    // Per-job state file — the job's own store for agent-maintained state (dedup
-    // markers, pauses) and expiring human directives. Injected so every run of a
-    // job starts with its state already in context, regardless of whether the
-    // job's skill remembers to read it. Keyed by stateKey (the job's purpose),
-    // sanitized so the read can't escape the state/ directory. Runs with no
-    // associated job (ad-hoc chat) pass no stateKey and get nothing here.
+    // Per-job files, keyed by stateKey (the job's purpose) and sanitized so the
+    // read can't escape the workspace. Injected on any run that carries a
+    // stateKey (scheduled runs and manual job triggers); ad-hoc chat passes no
+    // stateKey and gets nothing here. A recurring job has two files:
+    //   jobs/<key>.md  — the stable procedure (the job's canonical definition,
+    //                    replacing the old per-job skill). Injected first so the
+    //                    run has its playbook without depending on a skill.
+    //   state/<key>.md — agent-maintained state (dedup markers, pauses) and
+    //                    expiring human directives that carry between runs.
     if (input.stateKey) {
       const safeKey = input.stateKey.replace(/[^a-z0-9._-]/gi, "");
       if (safeKey) {
+        try {
+          const jobsPath = resolve(workingDirectory, "jobs", `${safeKey}.md`);
+          const jobInstructions = (await readFile(jobsPath, "utf-8")).trim();
+          if (jobInstructions) {
+            contextLines.push(`Job instructions (jobs/${safeKey}.md):\n${jobInstructions}`);
+          }
+        } catch {
+          // No instructions file — an ad-hoc or not-yet-defined job.
+        }
         try {
           const statePath = resolve(workingDirectory, "state", `${safeKey}.md`);
           const jobState = (await readFile(statePath, "utf-8")).trim();
           if (jobState) contextLines.push(`Job state (state/${safeKey}.md):\n${jobState}`);
         } catch {
-          // No state file yet — the job's skill creates it on first use.
+          // No state file yet — the job creates it on first use.
         }
       }
     }

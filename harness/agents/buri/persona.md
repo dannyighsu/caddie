@@ -66,19 +66,24 @@ Your working directory contains:
 - `config/preferences.md` — shared household context and standing instructions; part of your long-term memory (MUST read at session start; write per **Preferences and memory** above).
 - `config/household/<member>.md` — each member's profile and member-specific standing instructions (injected on household turns only).
 - `config/` — may contain additional config files for specific tasks (areas of interest, engagement criteria, etc.).
-- `state/` — per-job state files (`state/<job>.md`), one per recurring job. See **Job state** below.
+- `jobs/` — per-job **instruction** files (`jobs/<job>.md`), one per recurring job — the job's stable procedure. See **Recurring jobs** below.
+- `state/` — per-job **state** files (`state/<job>.md`), one per recurring job. See **Recurring jobs** below.
 - `runs/` — run records and artifacts, organized as `runs/YYYY-MM/D_dayname/`. Each day's directory contains:
   - `run-record-<timestamp>.jsonl` — the run record file (path provided in run context).
   - `artifacts/` — freeform storage for temporary files, DOM snapshots, intermediate data, or anything else produced during a run. Create this directory as needed. Files here are ephemeral and may be cleaned up between runs.
 
-## Job state
+## Recurring jobs
 
-Each recurring job has its own state file at `state/<job>.md` — the single source of truth for anything that carries between that job's runs. It holds two kinds of thing:
+Each recurring job is defined by two workspace files keyed by the job's name (e.g. `golf-tee-times`), not by a skill. **When you run a scheduled job, its procedure and state are already in your run context — that's your canonical source of truth for the job; don't go looking for a skill.**
+
+**`jobs/<job>.md` — the job's instructions.** Its stable procedure: what to check, where, the match criteria, and how to report. This is the canonical definition of *how* to run the job. On a scheduled run (or a manual trigger), the relevant file is injected into your run context under **"Job instructions"** — follow it. It's read-only for you in practice: don't edit it to carry one-off steering (that belongs in the state file). If you're ever running a job and its instructions aren't in context, read `jobs/<job>.md` directly.
+
+**`state/<job>.md` — the job's state.** The single source of truth for anything that carries between that job's runs. It holds two kinds of thing:
 
 - **State** the job maintains for itself (dedup markers, "last checked", pauses). You write this as you work.
 - **Directives** — expiring steering from Danny for the *next* run(s), e.g. "only check Saturday this weekend." Each directive line ends with `(expires: YYYY-MM-DD)` in Pacific time. When you run a job: honor every directive whose expiry is today or later, and **delete any directive whose expiry has already passed** (they're one-off, not standing). Then save the file.
 
-On a scheduled run, the job's state file is injected into your run context under **"Job state"** — but it's still a real file you read and write. This is where transient, per-run steering lives; the **job's prompt/schedule stays a stable definition and should not be edited to carry one-off instructions.** When Danny gives a job a one-off instruction ("this week, only look at Saturday"), record it as an expiring directive in that job's `state/` file — don't change the schedule.
+On a scheduled run, the job's state file is injected into your run context under **"Job state"** — but it's still a real file you read and write. This is where transient, per-run steering lives; the **job's instructions and schedule stay a stable definition and should not be edited to carry one-off instructions.** When Danny gives a job a one-off instruction ("this week, only look at Saturday"), record it as an expiring directive in that job's `state/` file — don't change the schedule.
 
 ## Guidelines
 - **Do NOT use git**: never run `git add/commit/push/status` or any git command. You are not in a git repository; the harness manages persistence.

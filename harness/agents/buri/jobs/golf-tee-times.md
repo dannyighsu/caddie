@@ -1,7 +1,6 @@
----
-name: golf-tee-times
-description: Check Monarch Bay, Metropolitan, TPC Harding Park, Presidio, and Corica Park (North & South) for weekend 18-hole tee times matching Danny's criteria, and notify him immediately when one is found. Use for the recurring golf tee time watch job, or if Danny asks to check tee times manually.
----
+# Job: Weekend golf tee-time watch
+
+Check Monarch Bay, Metropolitan, TPC Harding Park, Presidio, and Corica Park (North & South) for weekend 18-hole tee times matching Danny's criteria, and notify him immediately when one is found. This is the procedure for the recurring golf tee-time watch — follow it on a scheduled run, or if Danny asks you to check tee times manually.
 
 ## Goal
 
@@ -81,4 +80,4 @@ No notification needed — stay silent. This is a background watch job; only int
 - All six GolfNow facility pages load correctly with the `#date=YYYY-MM-DD` hash and immediately show that day's tee sheet — confirmed live for all six URLs above.
 - GolfNow tee sheets typically only show useful availability roughly 1-14 days out; very far-out Saturdays/Sundays may show nothing yet, which is expected and not an error.
 - The site occasionally throws a benign console warning/error on load (unrelated tracking scripts) — ignore it, the tee sheet itself still renders.
-- No login/account is needed just to view availability and pricing; login is only required to actually complete a booking. This skill only checks and notifies — it does not book. If Danny wants Buri to book automatically in the future, that needs an account + payment method set up first and should be treated as a separate, explicit ask.
+- No login/account is needed just to view availability and pricing; login is only required to actually complete a booking. This job only checks and notifies — it does not book. If Danny wants Buri to book automatically in the future, that needs an account + payment method set up first and should be treated as a separate, explicit ask.

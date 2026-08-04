@@ -29,6 +29,11 @@ export function createRuntime(config: RuntimeConfig = {}): AgentRuntime {
         model: (config.options?.model as string) ?? process.env.CLAUDE_MODEL,
         effort: (config.options?.effort as string) ?? process.env.CLAUDE_EFFORT,
         timeoutMs: config.options?.timeoutMs as number | undefined,
+        bgWaitCeilingMs:
+          (config.options?.bgWaitCeilingMs as number | undefined) ??
+          (process.env.CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS
+            ? Number(process.env.CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS)
+            : undefined),
       });
     default:
       console.warn(

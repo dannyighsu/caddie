@@ -162,6 +162,27 @@ describe("ClaudeCodeRuntime", () => {
       expect(env.CUSTOM_VAR).toBe("hello");
       expect(env.HARNESS_MAX_TURNS).toBe("50");
     });
+
+    it("defaults CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS to the process timeout", () => {
+      const env = buildEnv({
+        prompt: "test",
+        maxTurns: 100,
+        workingDirectory: "/tmp",
+      });
+      expect(env.CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS).toBe(
+        String(DEFAULT_TIMEOUT_MS)
+      );
+    });
+
+    it("uses an explicit bgWaitCeilingMs when provided", () => {
+      const custom = new ClaudeCodeRuntime({ bgWaitCeilingMs: 0 });
+      const env = (custom as any).buildEnv.bind(custom)({
+        prompt: "test",
+        maxTurns: 100,
+        workingDirectory: "/tmp",
+      });
+      expect(env.CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS).toBe("0");
+    });
   });
 
   describe("parseOutput", () => {

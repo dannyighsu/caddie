@@ -249,10 +249,11 @@ export async function executeJob(
     // control API), so a reply can be traced back to this task.
     const threadContext = buildThreadContext(job, opts.source);
 
-    // Per-job state file key. An explicit params.stateKey wins; otherwise derive
-    // it from a leading slash-command in the prompt (e.g. "/golf-tee-times" ->
-    // "golf-tee-times"), so the launcher injects state/<key>.md and the run
-    // starts with the job's state and any active directives already in context.
+    // Per-job key. An explicit params.stateKey wins; otherwise derive it from a
+    // leading slash-command in the prompt (e.g. "/golf-tee-times" ->
+    // "golf-tee-times"), so the launcher injects the job's instructions
+    // (jobs/<key>.md — the procedure) and state (state/<key>.md — carried
+    // directives/pauses), and the run starts with both already in context.
     const promptStr = (job.params?.prompt as string) ?? "";
     const slashMatch = promptStr.match(/^\/([a-z0-9][a-z0-9-]*)/i);
     const stateKey = (job.params?.stateKey as string | undefined) ?? slashMatch?.[1];

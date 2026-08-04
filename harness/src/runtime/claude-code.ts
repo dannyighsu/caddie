@@ -31,6 +31,14 @@ export interface ClaudeCodeRuntimeOptions {
   effort?: string;
   /** Timeout in ms. Defaults to 10 minutes. */
   timeoutMs?: number;
+  /**
+   * How long (ms) the CLI waits in print mode for still-running background
+   * Bash tasks to finish before terminating them. Maps to the CLI's
+   * CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS env var. `0` waits indefinitely.
+   * Defaults to `timeoutMs`, so background tasks get the full process budget
+   * instead of the CLI's built-in 600s ceiling.
+   */
+  bgWaitCeilingMs?: number;
 }
 
 export class ClaudeCodeRuntime implements AgentRuntime {
@@ -39,12 +47,14 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   private model?: string;
   private effort?: string;
   private timeoutMs: number;
+  private bgWaitCeilingMs: number;
 
   constructor(options: ClaudeCodeRuntimeOptions = {}) {
     this.binary = options.claudeBinary ?? "claude";
     this.model = options.model;
     this.effort = options.effort;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.bgWaitCeilingMs = options.bgWaitCeilingMs ?? this.timeoutMs;
   }
 
   async execute(input: AgentRuntimeInput): Promise<AgentRuntimeOutput> {
@@ -130,6 +140,9 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   private buildEnv(input: AgentRuntimeInput): Record<string, string> {
     return {
       ...input.additionalEnv,
+      // Let background Bash tasks run for the full process budget instead of
+      // the CLI's built-in 600s ceiling before print mode terminates them.
+      CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: String(this.bgWaitCeilingMs),
       HARNESS_MAX_TURNS: String(input.maxTurns),
       HARNESS_ROOT: input.harnessRoot ?? "",
       // Timestamp used by turn-limit-warning hook to count only turns from

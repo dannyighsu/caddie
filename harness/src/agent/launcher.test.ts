@@ -376,6 +376,59 @@ describe("createLauncher", () => {
     expect(prompt.indexOf("Job state")).toBeLessThan(prompt.indexOf("PROMPT_MARKER"));
   });
 
+  it("injects the job's instructions file, before the state, when a stateKey is provided", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
+      if (p.endsWith("persona.md")) return "persona";
+      if (p.endsWith("jobs/golf-tee-times.md")) return "PROCEDURE: check GolfNow";
+      if (p.endsWith("state/golf-tee-times.md")) return "## State\npaused_until: none";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: ID,
+      prompt: "PROMPT_MARKER",
+      stateKey: "golf-tee-times",
+    });
+
+    const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    expect(prompt).toContain("Job instructions (jobs/golf-tee-times.md):");
+    expect(prompt).toContain("PROCEDURE: check GolfNow");
+    // Instructions (the stable procedure) land before the current state,
+    // and both land in run context before the user message.
+    expect(prompt.indexOf("Job instructions")).toBeLessThan(prompt.indexOf("Job state"));
+    expect(prompt.indexOf("Job state")).toBeLessThan(prompt.indexOf("PROMPT_MARKER"));
+  });
+
+  it("still injects state when the job has instructions but no state file, and vice versa", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
+      if (p.endsWith("persona.md")) return "persona";
+      if (p.endsWith("jobs/golf-tee-times.md")) return "PROCEDURE";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: ID,
+      prompt: "go",
+      stateKey: "golf-tee-times",
+    });
+
+    const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    expect(prompt).toContain("Job instructions (jobs/golf-tee-times.md):");
+    expect(prompt).not.toContain("Job state");
+  });
+
   it("does not inject anything when the job has no state file yet", async () => {
     // Default mock throws for state/*.md (unmocked) — the read is swallowed.
     const runtime = mockRuntime();
@@ -390,6 +443,7 @@ describe("createLauncher", () => {
 
     const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
     expect(prompt).not.toContain("Job state");
+    expect(prompt).not.toContain("Job instructions");
   });
 
   it("sanitizes the stateKey so the read cannot escape the state/ directory", async () => {
