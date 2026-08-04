@@ -11,7 +11,7 @@
  */
 
 import { readFile, mkdir, symlink, lstat, readdir, copyFile } from "fs/promises";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
 import type { AgentRuntime } from "../runtime/types.js";
 import { resolveCapabilities } from "../capability/mcp-resolver.js";
 import {
@@ -74,33 +74,38 @@ async function loadPersona(
 }
 
 /**
- * Ensure .claude/skills/ is symlinked from the agent definition into the workspace
- * so Claude Code discovers skills natively.
+ * Symlink a read-only directory from the agent definition into the workspace at
+ * the same relative path, so the running agent sees the agent's stable
+ * definitions natively. Used for `.claude/skills/` (native skill discovery) and
+ * `jobs/` (recurring-job procedures injected as "Job instructions"). A no-op if
+ * the agent has no such directory or the workspace already links it — so an edit
+ * to the agent definition propagates without a workspace rebuild.
  */
-async function ensureSkillsSymlink(
+async function ensureDefinitionSymlink(
   agentDir: string,
-  workingDirectory: string
+  workingDirectory: string,
+  relPath: string
 ): Promise<void> {
-  const agentSkillsDir = resolve(agentDir, ".claude", "skills");
-  const workspaceSkillsDir = resolve(workingDirectory, ".claude", "skills");
+  const agentPath = resolve(agentDir, relPath);
+  const workspacePath = resolve(workingDirectory, relPath);
 
-  // Check if agent has skills
+  // Nothing to link if the agent definition doesn't have it.
   try {
-    await lstat(agentSkillsDir);
+    await lstat(agentPath);
   } catch {
-    return; // No skills directory in agent definition
+    return;
   }
 
-  // Check if symlink already exists
+  // Already linked — leave it.
   try {
-    const stat = await lstat(workspaceSkillsDir);
-    if (stat.isSymbolicLink()) return; // Already symlinked
+    const stat = await lstat(workspacePath);
+    if (stat.isSymbolicLink()) return;
   } catch {
-    // Doesn't exist yet — create it
+    // Doesn't exist yet — create it below.
   }
 
-  await mkdir(resolve(workingDirectory, ".claude"), { recursive: true });
-  await symlink(agentSkillsDir, workspaceSkillsDir);
+  await mkdir(dirname(workspacePath), { recursive: true });
+  await symlink(agentPath, workspacePath);
 }
 
 /**
@@ -209,8 +214,9 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     // 3. Bootstrap config (seed files, never overwrites existing)
     await bootstrapConfig(agentDir, workingDirectory);
 
-    // 4. Symlink skills and hooks into workspace
-    await ensureSkillsSymlink(agentDir, workingDirectory);
+    // 4. Symlink skills, job definitions, and hooks into workspace
+    await ensureDefinitionSymlink(agentDir, workingDirectory, ".claude/skills");
+    await ensureDefinitionSymlink(agentDir, workingDirectory, "jobs");
     const harnessRoot = resolve(agentsDir, "..");
     await ensureHarnessClaudeConfig(harnessRoot, workingDirectory);
 
