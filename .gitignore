@@ -116,4 +116,5 @@ Secrets.swift
 .aider*
 .DS_Store
 .workspace
+harness/agents/buri/jobs
 workspace/
