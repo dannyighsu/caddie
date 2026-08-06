@@ -9,6 +9,9 @@
     },
     "xmanager": {
       "capabilities": ["browser", "egress"]
+    },
+    "extended": {
+      "maxTurns": 300
     }
   }
 }
