@@ -2,7 +2,7 @@
   "id": "buri",
   "name": "Buri",
   "persona": "./persona.md",
-  "capabilities": ["notion", "egress", "browser", "google-calendar", "google-gmail", "email", "email-household", "reply"],
+  "capabilities": ["notion", "egress", "browser", "google-calendar", "google-gmail", "email", "email-household", "reply", "introspect"],
   "profiles": {
     "writer": {
       "capabilities": ["notion", "web-search", "egress", "browser"]
