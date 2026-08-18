@@ -25,7 +25,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { sendMessage, replyInThread, isSlackConfigured } from "@/lib/slack";
+import { sendMessage, replyInThread, recordOutboundSlackThread, isSlackConfigured } from "@/lib/slack";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
 import { sendEmail, replyToEmail, recordEmailReply, isEmailConfigured } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
@@ -302,13 +302,21 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
       ? `*[${req.from}]* ${req.message}`
       : req.message;
 
-    if (req.threadTs) {
-      await replyInThread(channelId, req.threadTs, formatted);
+    // Resolve the thread root: the parent thread_ts when replying into an
+    // existing thread, otherwise the new top-level message's own ts. Register it
+    // so a reply in this thread matches a conversation and — for posts from the
+    // agent's own tasks — carries the source-task facts (see recordOutboundSlackThread).
+    let threadTs = req.threadTs;
+    if (threadTs) {
+      await replyInThread(channelId, threadTs, formatted);
     } else {
-      await sendMessage(channelId, formatted);
+      threadTs = await sendMessage(channelId, formatted);
+    }
+    if (threadTs) {
+      await recordOutboundSlackThread(channelId, threadTs, formatted, req.threadContext);
     }
 
-    return { success: true, channel: "slack", channelId };
+    return { success: true, channel: "slack", channelId, threadTs };
   }
 
   if (req.channel === "telegram") {

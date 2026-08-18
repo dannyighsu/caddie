@@ -5,7 +5,7 @@
  * Used by the scheduler and control API to route messages to Slack, Telegram, or email.
  */
 
-import { sendMessage, isSlackConfigured } from "./slack";
+import { sendMessage, recordOutboundSlackThread, isSlackConfigured } from "./slack";
 import { sendTelegramMessage, isTelegramConfigured } from "./telegram";
 import { sendEmail, isEmailConfigured } from "./email";
 import { getSetting } from "./db";
@@ -29,7 +29,7 @@ export interface NotificationOptions {
   recipient?: string;
   /** Email subject (only used for email channel) */
   subject?: string;
-  /** Source-task facts to attach to the created email thread (email channel only). */
+  /** Source-task facts to attach to the created thread (Slack and email channels). */
   threadContext?: ThreadContext;
 }
 
@@ -56,7 +56,10 @@ export async function sendNotification(
     if (!channelId) {
       throw new Error("No Slack channel specified and no default configured");
     }
-    await sendMessage(channelId, formatted);
+    const ts = await sendMessage(channelId, formatted);
+    if (ts) {
+      await recordOutboundSlackThread(channelId, ts, formatted, options.threadContext);
+    }
     return;
   }
 

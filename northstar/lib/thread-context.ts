@@ -2,9 +2,10 @@
  * Thread Context ("source task frontmatter")
  *
  * A small block of factual metadata about the task run that created an outbound
- * email thread. It rides the run env → email-mcp → control API → conversation
- * record, and is replayed to whoever handles a reply so the agent knows where
- * the thread came from (and can act on it — e.g. stop a recurring reminder).
+ * thread (Slack or email). It rides the run env → egress/email MCP → control API
+ * → conversation record, and is replayed to whoever handles a reply so the agent
+ * knows where the thread came from (and can act on it — e.g. stop a recurring
+ * reminder or job).
  *
  * Deliberately just facts — no behavioral directives. The agent decides what to
  * do from its persona + these facts + its normal tools (e.g. delete_schedule).
@@ -30,7 +31,7 @@ export function renderThreadContext(ctx: ThreadContext): string {
   if (ctx.scheduledTime) lines.push(`- Scheduled for: ${ctx.scheduledTime}`);
   lines.push(`- Ran: ${ctx.runTime}`);
   return (
-    "Source task (this email thread was created by one of your own tasks):\n" +
+    "Source task (this thread was created by one of your own tasks):\n" +
     lines.join("\n")
   );
 }

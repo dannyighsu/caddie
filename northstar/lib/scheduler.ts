@@ -245,8 +245,8 @@ export async function executeJob(
     // can pin itself to "guest" for least privilege.
     const trustTier = job.trustTier ?? "household";
 
-    // Attached to any email thread the run creates (via env → email-mcp →
-    // control API), so a reply can be traced back to this task.
+    // Attached to any Slack or email thread the run creates (via env → egress/
+    // email MCP → control API), so a reply can be traced back to this task.
     const threadContext = buildThreadContext(job, opts.source);
 
     // Per-job key. An explicit params.stateKey wins; otherwise derive it from a
@@ -352,7 +352,8 @@ async function executeNotifyJob(job: ScheduledJob, source: JobSource): Promise<E
       message,
       from,
       recipient: job.notificationRecipient,
-      // Only meaningful for the email channel; harmless elsewhere.
+      // Registers the outbound thread on Slack and email so a reply carries the
+      // source-task facts; ignored by channels without thread registration.
       threadContext: buildThreadContext(job, source),
     });
     return { success: true };

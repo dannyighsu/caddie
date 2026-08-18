@@ -258,6 +258,16 @@ const tools = [
 async function handlePostToSlack(args) {
   const { message, from, channel, threadTs } = args;
 
+  // If this run was created by one of the agent's own tasks, its source-task
+  // facts arrive via NORTHSTAR_THREAD_CONTEXT (inherited from the run env, set
+  // only for scheduled/triggered runs). Forward them so a reply in the posted
+  // Slack thread can be traced back to the task (mirrors the send_email path).
+  let threadContext;
+  const rawCtx = process.env.NORTHSTAR_THREAD_CONTEXT;
+  if (rawCtx) {
+    try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
+  }
+
   const body = {
     action: "notify",
     channel: "slack",
@@ -265,6 +275,7 @@ async function handlePostToSlack(args) {
     ...(from && { from }),
     ...(channel && { slackChannel: channel }),
     ...(threadTs && { threadTs }),
+    ...(threadContext && { threadContext }),
   };
 
   const res = await fetch(`${NORTHSTAR_URL}/api/control`, {

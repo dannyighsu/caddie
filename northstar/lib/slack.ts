@@ -12,6 +12,16 @@
 import { WebClient } from "@slack/web-api";
 import { SocketModeClient } from "@slack/socket-mode";
 import type { ResolvedIdentity, UserId } from "./identity";
+import {
+  createConversation,
+  getConversationByExternalId,
+  appendMessages,
+  type Message,
+} from "./db";
+import type { ThreadContext } from "./thread-context";
+
+/** Agent a reply to an outbound-initiated Slack thread routes to. */
+const OUTBOUND_AGENT_ID = "buri";
 
 // --- Web API (sending) ---
 
@@ -50,6 +60,59 @@ export async function replyInThread(
 
 export function isSlackConfigured(): boolean {
   return !!process.env.SLACK_BOT_TOKEN;
+}
+
+/**
+ * Register (or append to) the local conversation for an outbound Slack message,
+ * keyed by the message's thread root, so a reply in that thread matches an
+ * existing conversation. The reply handler then starts with history (the posted
+ * message as an assistant turn) and — when the post came from one of Buri's own
+ * tasks — the source-task facts (`thread_context`) it needs to act on the reply
+ * (e.g. stop a recurring job). This is the Slack counterpart to email's
+ * outbound-thread recording; without it a reply lands in a blank session with no
+ * idea what thread it came from.
+ *
+ * `threadTs` is the thread root: the message's own `ts` for a new top-level post,
+ * or the parent `thread_ts` when posting into an existing thread. Idempotent per
+ * thread — subsequent posts append rather than duplicate the conversation.
+ *
+ * Best-effort by contract: a record failure is logged and swallowed so it can
+ * never fail the send that already succeeded. Callers invoke it only after a
+ * successful post.
+ */
+export async function recordOutboundSlackThread(
+  channel: string,
+  threadTs: string,
+  body: string,
+  threadContext?: ThreadContext,
+): Promise<void> {
+  try {
+    const externalId = `slack:${channel}:${threadTs}`;
+    const existing = await getConversationByExternalId(externalId);
+    const conversationId = existing
+      ? existing.id
+      : (
+          await createConversation(
+            OUTBOUND_AGENT_ID,
+            body.slice(0, 80),
+            externalId,
+            undefined,
+            threadContext,
+          )
+        ).id;
+
+    const message: Message = {
+      role: "assistant",
+      content: body,
+      timestamp: new Date().toISOString(),
+    };
+    await appendMessages(conversationId, [message]);
+  } catch (err) {
+    console.error(
+      `[Slack] Posted to ${channel} (thread ${threadTs}) but failed to record local conversation:`,
+      err,
+    );
+  }
 }
 
 // --- Socket Mode (receiving) ---
