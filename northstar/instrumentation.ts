@@ -8,6 +8,11 @@
 export async function register() {
   // Only run on the server, not during build
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Prefix every process log line with a timestamp. Installed first so all
+    // subsequent startup logging (and the harness we import) is stamped too.
+    const { installLogTimestamps } = await import("./lib/log-timestamps");
+    installLogTimestamps();
+
     // Pre-flight health checks
     const { checkAllCapabilities } = await import("./lib/health");
     checkAllCapabilities().catch((err) =>
