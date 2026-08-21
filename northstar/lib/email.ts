@@ -31,6 +31,11 @@ import {
   type GmailInbound,
 } from "./gmail/transport";
 import { stripQuotedReply } from "./gmail/strip";
+import { htmlToText } from "./gmail/html-text";
+
+// Re-exported: callers that format outbound mail (the control API) need it, and
+// the email channel is where it belongs conceptually.
+export { htmlToText };
 
 // --- Config ---
 
@@ -58,15 +63,22 @@ const OUTBOUND_AGENT_ID = "buri";
  * supply prior context. Without this, agent-initiated threads (scheduled
  * reminders, control-API notifications) have no local record, so replies land as
  * brand-new conversations with no history.
+ *
+ * Pass `opts.html` to send a formatted message: the result is a
+ * `multipart/alternative` carrying both bodies, and `text` becomes the
+ * plain-text alternative shown by text-only clients. Callers that have only
+ * HTML should derive `text` with {@link htmlToText} rather than passing the
+ * markup — `text` is also what gets stored as conversation history, which the
+ * agent re-reads on the next turn.
  */
 export async function sendEmail(
   to: string,
   subject: string,
   text: string,
-  opts?: { threadContext?: ThreadContext },
+  opts?: { threadContext?: ThreadContext; html?: string },
 ): Promise<{ messageId: string; threadId: string }> {
   const self = await getSelfAddress();
-  const result = await sendNewEmail(self, to, subject, text);
+  const result = await sendNewEmail(self, to, subject, text, opts?.html);
 
   // Best-effort: a failed record must not fail the send itself.
   try {
@@ -264,7 +276,7 @@ export async function fetchMessage(messageId: string): Promise<ReceivedEmail | n
  * AgentMail's `extracted_text` used to provide.
  */
 export function receivedFromGmail(m: GmailInbound): ReceivedEmail {
-  const plainOrHtml = firstNonEmpty(m.plain, stripHtml(m.html));
+  const plainOrHtml = firstNonEmpty(m.plain, htmlToText(m.html));
   const fullText = plainOrHtml;
   const extractedText = firstNonEmpty(stripQuotedReply(plainOrHtml), fullText);
 
@@ -288,24 +300,6 @@ export function receivedFromGmail(m: GmailInbound): ReceivedEmail {
     references,
     headers: m.headers,
   };
-}
-
-/** Minimal HTML→text fallback for messages that arrive HTML-only. */
-function stripHtml(html: string | undefined): string {
-  if (!html) return "";
-  return html
-    .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, "")
-    .replace(/<\/(p|div|br|tr|li|h[1-6])>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&quot;/gi, '"')
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
 
 // --- Envelope description (agent run context) ---

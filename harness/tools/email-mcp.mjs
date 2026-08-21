@@ -36,7 +36,8 @@ const tools = [
       "Send an ad-hoc outbound email from your Gmail inbox to a recipient. " +
       "Use this for NEW mail you initiate — reaching out to someone, sending a heads-up or notification. " +
       "DO NOT use this to answer an email someone just sent you: the harness already delivers your reply into the current thread automatically, and using this would start a new thread. " +
-      "Any reply the recipient sends comes back to you with the full thread history attached, so you don't need to restate context you've already sent.",
+      "Any reply the recipient sends comes back to you with the full thread history attached, so you don't need to restate context you've already sent. " +
+      "Pass `html` instead of `message` when the mail benefits from real formatting.",
     inputSchema: {
       type: "object",
       properties: {
@@ -50,20 +51,36 @@ const tools = [
         },
         message: {
           type: "string",
-          description: "The email body.",
+          description:
+            "The email body as plain text. Omit this if you are supplying `html` — the plain-text " +
+            "version is then derived from your HTML automatically.",
+        },
+        html: {
+          type: "string",
+          description:
+            "Optional HTML body, for mail that benefits from real formatting — headings, lists, tables, links, emphasis. " +
+            "Write a body fragment only (no <html>, <head>, or <body> wrapper) and put ALL styling in inline `style=` " +
+            "attributes: mail clients strip <style> blocks and ignore external stylesheets, so a <style> rule simply " +
+            "will not apply. No scripts, no remote images. Prefer plain `message` for short, conversational mail — " +
+            "HTML is for when the structure genuinely helps the reader.",
         },
       },
-      required: ["to", "subject", "message"],
+      required: ["to", "subject"],
     },
   },
 ];
 
 async function handleSendEmail(args) {
-  const { to, subject, message } = args;
+  const { to, subject, message, html } = args;
 
-  if (!to || !subject || !message) {
+  if (!to || !subject || (!message && !html)) {
     return {
-      content: [{ type: "text", text: "send_email requires `to`, `subject`, and `message`." }],
+      content: [
+        {
+          type: "text",
+          text: "send_email requires `to`, `subject`, and a body — either `message` or `html`.",
+        },
+      ],
       isError: true,
     };
   }
@@ -85,7 +102,8 @@ async function handleSendEmail(args) {
       channel: "email",
       to,
       subject,
-      message,
+      ...(message && { message }),
+      ...(html && { html }),
       ...(threadContext && { threadContext }),
     }),
   });

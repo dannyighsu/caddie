@@ -66,6 +66,24 @@ BETTY_EMAIL=...
   rebuilds To+Cc minus self), set `In-Reply-To`/`References`, and send within the
   Gmail thread.
 
+**HTML formatting**
+- `send_email` and `email_household` accept an `html` body in place of `message`.
+  The send becomes a `multipart/alternative`: the HTML as given, plus a
+  plain-text alternative derived from it by `htmlToText`
+  (`northstar/lib/gmail/html-text.ts`), which keeps link URLs (`text (url)`) and
+  list bullets so text-only clients lose nothing. That same derived text — never
+  the markup — is what gets stored as conversation history.
+- Supply `message`, `html`, or both. With both, each is used verbatim; with only
+  `html`, the plain part is derived. A `from` attribution is prefixed onto both.
+- Agent-written HTML must be a body fragment (no `<html>`/`<head>`/`<body>`) and
+  must carry all styling in inline `style=` attributes — mail clients strip
+  `<style>` blocks. This is stated in the tool schemas and the persona.
+- **Not** supported on: `reply` (channel-agnostic — the same tool serves Slack
+  and Telegram, so HTML there would leak tags into the wrong channel), and
+  deferred `scheduledFor` notifications (the job payload carries a plain body
+  only; an `html` field on a scheduled notify is dropped, and the plain part is
+  derived from it up front).
+
 ## Behavior
 
 - Conversations are keyed by Gmail's `threadId` — different threads from the same
@@ -79,6 +97,15 @@ BETTY_EMAIL=...
 curl -X POST localhost:3000/api/control \
   -H 'Content-Type: application/json' \
   -d '{"action":"notify","channel":"email","to":"user@example.com","subject":"Hello","message":"Hi there"}'
+```
+
+With an HTML body (the plain-text alternative is derived automatically):
+
+```bash
+curl -X POST localhost:3000/api/control \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"notify","channel":"email","to":"user@example.com","subject":"Hello",
+       "html":"<p>Hi there — <a href=\"https://example.com\">the doc</a>.</p>"}'
 ```
 
 ## Troubleshooting

@@ -27,7 +27,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, replyInThread, recordOutboundSlackThread, isSlackConfigured } from "@/lib/slack";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
-import { sendEmail, replyToEmail, recordEmailReply, isEmailConfigured } from "@/lib/email";
+import { sendEmail, replyToEmail, recordEmailReply, isEmailConfigured, htmlToText } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
 import type { ReplyTarget } from "@/lib/messaging";
 import { portalIdentity, toRunIdentity, parsePortalOwner, type TrustTier, type UserId } from "@/lib/identity";
@@ -66,6 +66,14 @@ interface ControlRequest {
   to?: string;
   /** Email subject line */
   subject?: string;
+  /**
+   * Formatted HTML body (email channel only). An alternative to `message`, not
+   * an addition: when only `html` is given the plain-text part is derived from
+   * it, so the two MIME alternatives cannot drift apart. Ignored by the other
+   * channels, which have their own markup, and by deferred (`scheduledFor`)
+   * notifications, which carry only a plain body through the job payload.
+   */
+  html?: string;
   /**
    * Source-task facts to attach to the email thread this send creates (email
    * channel only). Forwarded by email-mcp from the run's NORTHSTAR_THREAD_CONTEXT.
@@ -247,7 +255,10 @@ async function executeTrigger(req: ControlRequest): Promise<Record<string, unkno
 }
 
 async function executeNotify(req: ControlRequest): Promise<Record<string, unknown>> {
-  if (!req.message) {
+  // An HTML-only send is legitimate (the agent wrote the body as markup), so
+  // derive the plain-text body rather than demanding the caller write it twice.
+  const message = req.message ?? (req.html ? htmlToText(req.html) : undefined);
+  if (!message) {
     return { success: false, error: "message is required" };
   }
 
@@ -275,7 +286,7 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
     }
 
     const job = await scheduleNotification(runAt, {
-      message: req.message,
+      message,
       from: req.from,
       description: req.description,
       notificationChannel,
@@ -299,8 +310,8 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
     }
 
     const formatted = req.from
-      ? `*[${req.from}]* ${req.message}`
-      : req.message;
+      ? `*[${req.from}]* ${message}`
+      : message;
 
     // Resolve the thread root: the parent thread_ts when replying into an
     // existing thread, otherwise the new top-level message's own ts. Register it
@@ -334,8 +345,8 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
     }
 
     const formatted = req.from
-      ? `*[${req.from}]* ${req.message}`
-      : req.message;
+      ? `*[${req.from}]* ${message}`
+      : message;
 
     await sendTelegramMessage(recipient, formatted);
     return { success: true, channel: "telegram", to: recipient };
@@ -351,11 +362,16 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
     }
 
     const subject = req.subject ?? "Notification";
-    const formatted = req.from
-      ? `[${req.from}] ${req.message}`
-      : req.message;
+    // The `from` attribution is prefixed onto BOTH alternatives — prefixing only
+    // the plain part would drop it for every recipient who reads the HTML.
+    const html = req.html
+      ? req.from
+        ? `<p>[${req.from}]</p>\n${req.html}`
+        : req.html
+      : undefined;
+    const formatted = req.from ? `[${req.from}] ${message}` : message;
 
-    await sendEmail(req.to, subject, formatted, { threadContext: req.threadContext });
+    await sendEmail(req.to, subject, formatted, { threadContext: req.threadContext, html });
     return { success: true, channel: "email", to: req.to };
   }
 

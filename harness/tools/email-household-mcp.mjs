@@ -80,20 +80,35 @@ const tools = [
         message: {
           type: "string",
           description:
-            "The email body. Include the context they need — who this concerns and what you need from them.",
+            "The email body as plain text. Include the context they need — who this concerns and what you need " +
+            "from them. Omit this if you are supplying `html`; the plain-text version is then derived from it.",
+        },
+        html: {
+          type: "string",
+          description:
+            "Optional HTML body, for mail that benefits from real formatting — headings, lists, tables, links, emphasis. " +
+            "Write a body fragment only (no <html>, <head>, or <body> wrapper) and put ALL styling in inline `style=` " +
+            "attributes: mail clients strip <style> blocks and ignore external stylesheets, so a <style> rule simply " +
+            "will not apply. No scripts, no remote images. Prefer plain `message` for a short note — HTML is for when " +
+            "the structure genuinely helps them read it.",
         },
       },
-      required: ["subject", "message"],
+      required: ["subject"],
     },
   },
 ];
 
 async function handleEmailHousehold(args) {
-  const { to = "both", subject, message } = args;
+  const { to = "both", subject, message, html } = args;
 
-  if (!subject || !message) {
+  if (!subject || (!message && !html)) {
     return {
-      content: [{ type: "text", text: "email_household requires `subject` and `message`." }],
+      content: [
+        {
+          type: "text",
+          text: "email_household requires `subject` and a body — either `message` or `html`.",
+        },
+      ],
       isError: true,
     };
   }
@@ -131,7 +146,8 @@ async function handleEmailHousehold(args) {
           channel: "email",
           to: address,
           subject,
-          message,
+          ...(message && { message }),
+          ...(html && { html }),
           ...(threadContext && { threadContext }),
         }),
       });

@@ -254,14 +254,18 @@ async function rawSend(opts: {
   return { messageId: res.data.id!, threadId: res.data.threadId! };
 }
 
-/** Send a brand-new email (new thread). */
+/**
+ * Send a brand-new email (new thread). Supplying `html` produces a
+ * `multipart/alternative` with `text` as the plain-text alternative.
+ */
 export async function sendNewEmail(
   self: string,
   to: string,
   subject: string,
   text: string,
+  html?: string,
 ): Promise<{ messageId: string; threadId: string }> {
-  return rawSend({ from: self, to, subject, text });
+  return rawSend({ from: self, to, subject, text, html });
 }
 
 /**
