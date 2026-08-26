@@ -20,10 +20,14 @@ agints/
 ## Quick Start
 
 ```bash
-pnpm install              # install dependencies
-make run                  # start Northstar (production build) on http://localhost:3000
-make smoke                # run a smoke test directly via the harness
+pnpm install                                   # install dependencies
+cp northstar/.env.example northstar/.env.local # then fill in the REQUIRED block
+make run                                       # start Northstar on http://localhost:3000
+make smoke                                     # run a smoke test directly via the harness
 ```
+
+`make run` needs Postgres, Redis, and the required variables in
+`northstar/.env.local` — see [Prerequisites](#prerequisites).
 
 > Use `make run` for any long-lived session — it serves a production build, so
 > memory stays bounded. For active development with hot reload, use `make dev`.
@@ -50,16 +54,16 @@ harness/agents/<id>/
   "id": "buri",
   "name": "Buri",
   "persona": "./persona.md",
-  "capabilities": ["notion"],
+  "capabilities": ["reply", "notion", "browser"],
   "resolvers": ["google-calendar"],
-  "maxTurns": 20,
   "profiles": {
-    "writer": {
-      "capabilities": ["notion", "web-search"],
-      "maxTurns": 30
+    "extended": {
+      "maxTurns": 300
     },
-    "xmanager": {
-      "capabilities": ["chrome"]
+    "research": {
+      "addCapabilities": ["web-search"],
+      "removeCapabilities": ["notion"],
+      "skills": ["feed-scan"]
     }
   }
 }
@@ -72,27 +76,48 @@ harness/agents/<id>/
 | `persona` | yes | Path to persona markdown (relative to agent dir), or inline string |
 | `capabilities` | yes | Capability names (references JSON files in `harness/capabilities/`) |
 | `resolvers` | no | Pre-run resolver names (references files in `harness/resolvers/`) |
-| `maxTurns` | no | Max agent loop iterations. Default: 20 |
+| `maxTurns` | no | Max agent loop iterations. Default: 150 |
 | `enableChrome` | no | Enable Chrome browser automation. Can also be set via the `chrome` capability |
 | `outputSchema` | no | JSON Schema for structured output. Omit for free-form mode |
-| `profiles` | no | Named capability profiles. Each can override `capabilities`, `resolvers`, `maxTurns` |
+| `profiles` | no | Named run variants of this same agent — see below |
 
 ### Profiles
 
-Profiles are capability sets. They control which MCP servers and resolvers are loaded for a given run. All profiles share the same persona, workspace, config, and skills. Any profile can be used conversationally (Slack, UI) or on a schedule.
+A profile is a **run variant of one agent**, not a second agent. It keeps the
+agent's identity, persona, and workspace, and varies only what the run can reach
+and how long it may run.
+
+| Field | Effect |
+|-------|--------|
+| `addCapabilities` | Capability names added to the agent's base set |
+| `removeCapabilities` | Capability names removed from it (applied before adds) |
+| `skills` | Skill directory names this run may use. Omit for all of them |
+| `resolvers` · `maxTurns` · `enableChrome` | Replace the agent's value |
+| `configFiles` | Merged over the agent's |
+
+Capabilities are **adjusted, not replaced**. A profile that replaced the list
+could silently drop something every run depends on — `reply` being the
+load-bearing case: an inbound run without it executes and then says nothing.
+Naming an unknown profile logs a warning and runs the base configuration rather
+than failing the run.
+
+Skills are mounted per run: with no `skills` list the workspace links the whole
+skills directory (so the agent can also author new skills into it — see the
+`manage-skills` skill); with one, it gets a directory of links to just those.
+
+A profile is always an **explicit** choice — passed to the control API, or set on
+a scheduled job. Nothing infers one from message text; inbound messages always
+run the base configuration.
 
 ```bash
-# Run with the writer profile (notion + web-search)
-curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"writer","prompt":"Draft a post about AI agents"}'
-
-# Run with xmanager profile (chrome — can browse X)
-curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"xmanager","prompt":"/feed-scan"}'
+# Run with the extended profile (higher turn ceiling, for long research jobs)
+curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"extended","prompt":"/feed-scan"}'
 
 # Run with no profile (default: notion + google-calendar)
 curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","prompt":"Do a check-in"}'
 
-# Schedule xmanager to run every 30 minutes
-curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","profile":"xmanager","cron":"0,30 * * * *","prompt":"/feed-scan"}'
+# Schedule a recurring run every 30 minutes
+curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","cron":"0,30 * * * *","prompt":"/feed-scan"}'
 ```
 
 All profiles share the same workspace at `workspace/buri/`.
@@ -115,14 +140,46 @@ Unresolved `{{variables}}` are left as-is so you can spot missing context.
 
 ### 4. Add skills (optional)
 
-Skills use Claude Code's native SKILL.md format in `.claude/skills/`:
+Skills use Claude Code's native SKILL.md format, and come from two places:
 
 ```
-harness/agents/buri/.claude/skills/feed-scan/SKILL.md
-harness/agents/buri/.claude/skills/metrics-check/SKILL.md
+harness/skills/core/manage-schedules/SKILL.md      # shared by every agent
+harness/agents/buri/.claude/skills/feed-scan/SKILL.md   # this agent's own
 ```
 
-Skills are symlinked into the agent's workspace automatically. The agent invokes them via `/skill-name` in the prompt.
+**Core skills** (`harness/skills/core/`) are instance-agnostic mechanism —
+scheduling, skill authoring, repo mounting. They live outside any agent so a fix
+lands once instead of being copied into each agent directory, and so a second
+install inherits them through `git pull`.
+
+**Agent skills** live with the agent and belong to that install. On a name
+collision the agent's wins, so an install can override a core skill locally.
+
+At launch both sources are mounted into the agent's workspace as
+`.claude/skills/` — a directory of per-skill symlinks, rebuilt each run. The
+agent invokes them via `/skill-name` in the prompt.
+
+The workspace also gets `.claude/skills-src/`, pointing at the agent's own skill
+directory. That's where an agent authors a skill: `.claude/skills/` is an
+assembled view, so a file created there would live in the scratch workspace and
+be swept on the next run.
+
+**Editing skills.** Because the workspace mounts `.claude/skills` by symlink, a
+skill file is only ever stored in one place — the agent definition — and an edit
+takes effect on the agent's next run with no rebuild or restart. Two ways to make one:
+
+- **In the portal** — *Agents → \<agent\> → Config → Skills* lists every skill's
+  `SKILL.md`, edits it in place, and creates or deletes skills (deleting removes
+  the whole skill directory).
+- **By the agent itself** — an agent with `base-tools` can write its own
+  `.claude/skills/`. Whether it *may* is a persona rule, not a runtime one: Buri's
+  persona permits skill changes only when a team member explicitly asks on
+  that turn, and its `manage-skills` skill holds the format rules. Guest-tier runs
+  can't do it at all — `guest` is denied `base-tools`, so it has no Write, Edit,
+  or Bash.
+
+A new or renamed skill isn't visible until a fresh run, since skills are indexed
+at session start.
 
 ### 5. Done
 
@@ -341,7 +398,16 @@ be reachable from the internet). Tune via make variables `FUNNEL_PATHS`,
 
 ## Prerequisites
 
+Start by copying the annotated environment template — it lists every variable,
+split into the ones you must set, the ones that already have working defaults,
+and the optional per-feature blocks (Slack, Telegram, Notion, tracing):
+
+```bash
+cp northstar/.env.example northstar/.env.local
+```
+
 - **Node.js** and **pnpm** (10.22+)
+- **Bun** — the `notion` and `web-search` capabilities launch their MCP servers with `bunx`. Without it, those two are skipped at launch (with a warning); everything else runs.
 - **`claude` CLI** on PATH -- the Claude Code CLI is the current runtime driver
 - **Postgres** -- `POSTGRES_URL` in `northstar/.env.local`
 - **Redis** -- `REDIS_URL` in `northstar/.env.local`

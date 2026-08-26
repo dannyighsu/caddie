@@ -7,14 +7,17 @@
  * Proxies through the Northstar control API (/api/control).
  *
  * Env:
- *   NORTHSTAR_URL — Base URL for the Northstar control API (default: http://localhost:3000)
+ *   PORTAL_URL — Base URL for the portal control API (default: http://localhost:3000)
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-const NORTHSTAR_URL = process.env.NORTHSTAR_URL || "http://localhost:3000";
+const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
+// The agent this server is mounted for — injected by the launcher, so schedule
+// tools default to "run me" instead of making the model name itself.
+const AGENT_ID = process.env.NORTHSTAR_AGENT_ID || "buri";
 
 const server = new Server(
   { name: "egress", version: "0.1.0" },
@@ -113,12 +116,13 @@ const tools = [
       properties: {
         agentId: {
           type: "string",
-          description: "Agent to run on the schedule (typically 'buri').",
+          description:
+            "Agent to run. Omit to schedule yourself, which is almost always what you want.",
         },
         profile: {
           type: "string",
           description:
-            "Profile/skill variant the agent should run as (e.g., 'feed-scan', 'metrics-check'). Omit to use the default profile.",
+            "Named run variant from the agent's agent.json profiles — currently only 'extended' (a higher turn limit, for long research jobs). NOT a skill name: to run a skill, put its invocation in `prompt`. Omit for the default configuration.",
         },
         cron: {
           type: "string",
@@ -143,7 +147,7 @@ const tools = [
           description: "Optional channel-specific recipient override.",
         },
       },
-      required: ["agentId", "cron", "prompt"],
+      required: ["cron", "prompt"],
     },
   },
   {
@@ -156,11 +160,13 @@ const tools = [
       properties: {
         agentId: {
           type: "string",
-          description: "Agent to run (typically 'buri').",
+          description:
+            "Agent to run. Omit to schedule yourself, which is almost always what you want.",
         },
         profile: {
           type: "string",
-          description: "Profile/skill variant. Omit to use the default profile.",
+          description:
+            "Named run variant from the agent's agent.json profiles — currently only 'extended'. NOT a skill name. Omit for the default configuration.",
         },
         prompt: {
           type: "string",
@@ -185,7 +191,7 @@ const tools = [
           description: "Optional channel-specific recipient override.",
         },
       },
-      required: ["agentId", "prompt", "scheduledFor"],
+      required: ["prompt", "scheduledFor"],
     },
   },
   {
@@ -278,7 +284,7 @@ async function handlePostToSlack(args) {
     ...(threadContext && { threadContext }),
   };
 
-  const res = await fetch(`${NORTHSTAR_URL}/api/control`, {
+  const res = await fetch(`${PORTAL_URL}/api/control`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -301,7 +307,7 @@ async function handlePostToSlack(args) {
 // --- Schedule tool handlers ---
 
 async function callControl(body) {
-  const res = await fetch(`${NORTHSTAR_URL}/api/control`, {
+  const res = await fetch(`${PORTAL_URL}/api/control`, {
     method: body.action ? "POST" : "GET",
     headers: { "Content-Type": "application/json" },
     body: body.action ? JSON.stringify(body) : undefined,
@@ -342,7 +348,7 @@ async function handleScheduleReminder(args) {
 async function handleScheduleRecurring(args) {
   const result = await callControl({
     action: "schedule",
-    agentId: args.agentId,
+    agentId: args.agentId ?? AGENT_ID,
     cron: args.cron,
     prompt: args.prompt,
     ...(args.profile && { profile: args.profile }),
@@ -356,7 +362,7 @@ async function handleScheduleRecurring(args) {
 async function handleScheduleOneshotRun(args) {
   const result = await callControl({
     action: "run",
-    agentId: args.agentId,
+    agentId: args.agentId ?? AGENT_ID,
     prompt: args.prompt,
     scheduledFor: args.scheduledFor,
     ...(args.profile && { profile: args.profile }),
@@ -368,7 +374,7 @@ async function handleScheduleOneshotRun(args) {
 }
 
 async function handleListSchedules() {
-  const res = await fetch(`${NORTHSTAR_URL}/api/control`, { method: "GET" });
+  const res = await fetch(`${PORTAL_URL}/api/control`, { method: "GET" });
   const result = await res.json();
   return {
     content: [

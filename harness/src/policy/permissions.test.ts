@@ -11,18 +11,18 @@ import {
 vi.mock("fs/promises");
 
 const policy: PermissionPolicy = {
-  household: { notion: true, egress: true, "base-tools": true },
+  team: { notion: true, egress: true, "base-tools": true },
   guest: {},
 };
 
 describe("isAllowed (default-deny)", () => {
   it("grants explicitly-true keys", () => {
-    expect(isAllowed(policy, "household", "notion")).toBe(true);
-    expect(isAllowed(policy, "household", BASE_TOOLS_KEY)).toBe(true);
+    expect(isAllowed(policy, "team", "notion")).toBe(true);
+    expect(isAllowed(policy, "team", BASE_TOOLS_KEY)).toBe(true);
   });
 
   it("denies keys not present for the tier", () => {
-    expect(isAllowed(policy, "household", "browser")).toBe(false);
+    expect(isAllowed(policy, "team", "browser")).toBe(false);
   });
 
   it("denies everything for a tier with no grants (guest = default-deny)", () => {
@@ -37,7 +37,7 @@ describe("isAllowed (default-deny)", () => {
 
 describe("filterCapabilitiesByPolicy", () => {
   it("keeps granted capabilities and drops denied ones", () => {
-    const r = filterCapabilitiesByPolicy(["notion", "browser", "egress"], policy, "household");
+    const r = filterCapabilitiesByPolicy(["notion", "browser", "egress"], policy, "team");
     expect(r.kept).toEqual(["notion", "egress"]);
     expect(r.dropped).toEqual(["browser"]);
   });

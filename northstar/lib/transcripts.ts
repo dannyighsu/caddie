@@ -143,7 +143,7 @@ export interface ApiError {
  * `isApiErrorMessage: true` (with `model: "<synthetic>"`) carrying an `error`
  * code. That is categorically different from an agent that ran and returned an
  * error on its task: the run never got off the ground, and the cause is
- * infrastructure the household owner must fix (usually re-auth). Returns the
+ * infrastructure the team owner must fix (usually re-auth). Returns the
  * last such error found, or null if the session had none / can't be read.
  */
 export async function getApiError(

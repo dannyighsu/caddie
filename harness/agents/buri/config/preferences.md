@@ -1,7 +1,7 @@
-# Household preferences
+# Team preferences
 
-Shared context for the household (Danny and Betty). Each member's profile and
-member-specific standing instructions live in `config/household/<member>.md`.
+Shared context for the team (Danny and Betty). Each member's profile and
+member-specific standing instructions live in `config/team/<member>.md`.
 
 ## Routing
 Reply to whoever initiated the conversation; if unspecified, assume Danny.
@@ -22,10 +22,10 @@ America/Los_Angeles
 ### Style
 <!-- e.g., "keep it brief unless something is urgent", "always start with calendar summary" -->
 
-## Standing instructions (household-wide)
+## Standing instructions (team-wide)
 <!-- Durable directions that apply to BOTH members. Member-specific ones go in
-     config/household/<member>.md. One per bullet, tagged with provenance:
-     (Who, YYYY-MM-DD). Add or update only when a household member explicitly
+     config/team/<member>.md. One per bullet, tagged with provenance:
+     (Who, YYYY-MM-DD). Add or update only when a team member explicitly
      asks; see the persona's "Preferences and memory" section. -->
 
 ## Notes

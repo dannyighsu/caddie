@@ -4,13 +4,13 @@
  * The core function of the harness. Loads an agent config, resolves its
  * persona, capabilities, and resolvers, then delegates execution to the runtime.
  *
- * If the agent has .claude/skills/, symlinks them into the workspace so
- * Claude Code discovers them natively.
+ * Mounts skills into the workspace so Claude Code discovers them natively —
+ * shared core skills plus the agent's own, or just the ones a profile grants.
  *
  * No scheduling, no messaging, no persistence — those are the caller's job.
  */
 
-import { readFile, mkdir, symlink, lstat, readdir, copyFile } from "fs/promises";
+import { readFile, mkdir, symlink, lstat, readdir, copyFile, unlink, rm, readlink } from "fs/promises";
 import { resolve, dirname } from "path";
 import type { AgentRuntime } from "../runtime/types.js";
 import { resolveCapabilities } from "../capability/mcp-resolver.js";
@@ -21,10 +21,12 @@ import {
   BASE_TOOLS_KEY,
 } from "../policy/permissions.js";
 import { runResolvers } from "../resolver/runner.js";
-import type { AgentConfig, AgentInput, AgentResult } from "./types.js";
+import { teamRoster } from "../team/roster.js";
+import type { AgentConfig, AgentProfile, AgentInput, AgentResult } from "./types.js";
 
 const TEMPLATE_VAR_PATTERN = /\{\{(\w+)\}\}/g;
-const DEFAULT_MAX_TURNS = 150;
+/** Turn ceiling for an agent that doesn't set one. Exported so UIs report the real number. */
+export const DEFAULT_MAX_TURNS = 150;
 
 export interface LauncherConfig {
   /** Directory containing agent subdirectories. */
@@ -35,6 +37,11 @@ export interface LauncherConfig {
   resolversDir?: string;
   /** Root directory for agent workspaces. Defaults to <cwd>/workspace. */
   workspaceRoot?: string;
+  /**
+   * Directory of shared, instance-agnostic skills mounted for every agent.
+   * Defaults to <harnessRoot>/skills/core.
+   */
+  coreSkillsDir?: string;
 }
 
 /**
@@ -155,7 +162,7 @@ async function bootstrapConfig(
 /**
  * Recursively copy a seed directory into the workspace — creating subdirectories
  * and copying any file that doesn't already exist, never overwriting user edits.
- * Recursion lets seeds ship nested config (e.g. config/household/<member>.md).
+ * Recursion lets seeds ship nested config (e.g. config/team/<member>.md).
  */
 async function copySeedTree(srcDir: string, destDir: string): Promise<void> {
   await mkdir(destDir, { recursive: true });
@@ -177,6 +184,138 @@ async function copySeedTree(srcDir: string, destDir: string): Promise<void> {
 }
 
 /**
+ * Capabilities for a run: the agent's base set, adjusted by the profile.
+ *
+ * Removals apply first, so a name in both lists ends up present. Adjusting
+ * rather than replacing is deliberate — a profile that replaced the list could
+ * drop a capability every run depends on without saying so.
+ */
+export function resolveProfileCapabilities(
+  base: string[],
+  profile?: AgentProfile
+): string[] {
+  if (!profile) return base;
+  const result = new Set(base);
+  for (const name of profile.removeCapabilities ?? []) result.delete(name);
+  for (const name of profile.addCapabilities ?? []) result.add(name);
+  return [...result];
+}
+
+/**
+ * Mount skills into the workspace at `.claude/skills`, layering two sources:
+ *
+ *   1. `harness/skills/core/` — instance-agnostic mechanism (scheduling, skill
+ *      authoring, repo mounting). Shared by every agent and every install, so a
+ *      fix lands once instead of being copied into each agent directory.
+ *   2. `<agentDir>/.claude/skills/` — this agent's own skills. On a name
+ *      collision the agent's wins, so an install can override a core skill
+ *      without editing the shared copy.
+ *
+ * The mount is a real directory of per-skill symlinks, rebuilt each run, with
+ * entries a previous profile left behind swept away. Edits still propagate both
+ * ways because each link points at the real skill directory.
+ *
+ * Because the mount is assembled rather than being one link to the agent
+ * directory, a skill *created* under `.claude/skills/` would land in the
+ * workspace and vanish on the next rebuild. So authoring goes through
+ * `.claude/skills-src`, a link straight to the agent's own skills — see
+ * ensureSkillsSrcLink and the `manage-skills` skill.
+ */
+async function mountSkills(
+  agentDir: string,
+  coreSkillsDir: string,
+  workingDirectory: string,
+  allowed?: string[]
+): Promise<void> {
+  const dest = resolve(workingDirectory, ".claude", "skills");
+
+  // Collect name -> source directory. Core first, agent second so it overrides.
+  const sources = new Map<string, string>();
+  for (const dir of [coreSkillsDir, resolve(agentDir, ".claude", "skills")]) {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      continue; // that source doesn't exist — fine
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+      if (entry.name.startsWith(".")) continue;
+      sources.set(entry.name, resolve(dir, entry.name));
+    }
+  }
+
+  if (allowed) {
+    for (const name of allowed) {
+      if (!sources.has(name)) {
+        console.warn(`[Launcher] Profile grants unknown skill "${name}" — skipping`);
+      }
+    }
+    for (const name of [...sources.keys()]) {
+      if (!allowed.includes(name)) sources.delete(name);
+    }
+  }
+
+  // An earlier version mounted the whole set as a single symlink at this path.
+  // Unlink (never recursively remove) if that's what's there — recursing through
+  // it would delete the agent's real skills.
+  const current = await lstat(dest).catch(() => null);
+  if (current?.isSymbolicLink()) await unlink(dest);
+  await mkdir(dest, { recursive: true });
+
+  // Drop links this run doesn't want (a previous profile's, or a deleted skill).
+  for (const entry of await readdir(dest, { withFileTypes: true }).catch(() => [])) {
+    if (sources.has(entry.name)) continue;
+    const stale = resolve(dest, entry.name);
+    if (entry.isSymbolicLink()) await unlink(stale);
+    else await rm(stale, { recursive: true, force: true });
+  }
+
+  for (const [name, source] of sources) {
+    const link = resolve(dest, name);
+    const existing = await lstat(link).catch(() => null);
+    if (existing) {
+      // Repoint if it currently resolves somewhere else (core -> agent override,
+      // or the reverse after a local skill is deleted).
+      const target = await readlink(link).catch(() => null);
+      if (target === source) continue;
+      if (existing.isSymbolicLink()) await unlink(link);
+      else await rm(link, { recursive: true, force: true });
+    }
+    await symlink(source, link);
+  }
+}
+
+/**
+ * Link `.claude/skills-src` to the agent's own skills directory.
+ *
+ * This is where the agent authors skills. `.claude/skills/` is the assembled
+ * read/invoke view (core + agent), so creating a directory there would write
+ * into the workspace and be swept on the next run; writing through this link
+ * lands in the agent definition, where it persists and is visible in the portal.
+ *
+ * Deliberately a sibling of `.claude/skills`, not inside it — Claude Code only
+ * scans `.claude/skills/<name>/SKILL.md`, so this never registers as a skill.
+ */
+async function ensureSkillsSrcLink(
+  agentDir: string,
+  workingDirectory: string
+): Promise<void> {
+  const source = resolve(agentDir, ".claude", "skills");
+  const link = resolve(workingDirectory, ".claude", "skills-src");
+  try {
+    await lstat(source);
+  } catch {
+    return; // agent has no skills directory of its own yet
+  }
+  const current = await lstat(link).catch(() => null);
+  if (current?.isSymbolicLink()) return;
+  if (current) await rm(link, { recursive: true, force: true });
+  await mkdir(dirname(link), { recursive: true });
+  await symlink(source, link);
+}
+
+/**
  * Create an agent launcher bound to specific directories and a runtime.
  */
 export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
@@ -185,6 +324,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     capabilitiesDir,
     resolversDir,
     workspaceRoot = resolve(process.cwd(), "workspace"),
+    coreSkillsDir = resolve(agentsDir, "..", "skills", "core"),
   } = config;
 
   /**
@@ -198,9 +338,18 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     );
 
     const profile = input.profile ? baseAgent.profiles?.[input.profile] : undefined;
+    if (input.profile && !profile) {
+      // Don't fail the run — a bad profile name shouldn't take down a scheduled
+      // job — but never let it pass silently either.
+      console.warn(
+        `[Launcher] Unknown profile "${input.profile}" for agent "${baseAgent.id}" — ` +
+          `running the base configuration. Known profiles: ` +
+          `${Object.keys(baseAgent.profiles ?? {}).join(", ") || "(none)"}`
+      );
+    }
     const agent = {
       ...baseAgent,
-      capabilities: profile?.capabilities ?? baseAgent.capabilities,
+      capabilities: resolveProfileCapabilities(baseAgent.capabilities, profile),
       resolvers: profile?.resolvers ?? baseAgent.resolvers,
       maxTurns: profile?.maxTurns ?? baseAgent.maxTurns,
       enableChrome: profile?.enableChrome ?? baseAgent.enableChrome,
@@ -214,8 +363,10 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     // 3. Bootstrap config (seed files, never overwrites existing)
     await bootstrapConfig(agentDir, workingDirectory);
 
-    // 4. Symlink skills, job definitions, and hooks into workspace
-    await ensureDefinitionSymlink(agentDir, workingDirectory, ".claude/skills");
+    // 4. Mount skills (core + agent, or just what the profile grants), then
+    //    link job definitions and hooks into the workspace.
+    await mountSkills(agentDir, coreSkillsDir, workingDirectory, profile?.skills);
+    await ensureSkillsSrcLink(agentDir, workingDirectory);
     await ensureDefinitionSymlink(agentDir, workingDirectory, "jobs");
     const harnessRoot = resolve(agentsDir, "..");
     await ensureHarnessClaudeConfig(harnessRoot, workingDirectory);
@@ -301,47 +452,42 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       }
     }
 
-    // Household directory — the people Buri serves and how to reach them, built
-    // from the same env vars that drive inbound email identity (DANNY_EMAIL /
-    // BETTY_EMAIL), so the addresses the agent invites match the ones the auth
-    // gate trusts. Each var is a comma-separated list; the first entry is the
-    // primary address. Injected ONLY for household-tier runs — a guest run must
-    // never receive these private addresses.
-    if (input.identity.trustTier === "household") {
-      const household: string[] = [];
-      const addMember = (name: string, envValue: string | undefined): void => {
-        const emails = (envValue ?? "").split(",").map((e) => e.trim()).filter(Boolean);
-        if (emails.length === 0) return;
-        const [primary, ...alts] = emails;
-        const altNote = alts.length > 0 ? ` (also: ${alts.join(", ")})` : "";
-        household.push(`- ${name}: ${primary}${altNote}`);
-      };
-      addMember("Danny", process.env.DANNY_EMAIL);
-      addMember("Betty", process.env.BETTY_EMAIL);
-      if (household.length > 0) {
+    // Team directory — the people this instance serves and how to reach them,
+    // from the same roster that drives inbound sender identity, so the addresses
+    // the agent invites match the ones the auth gate trusts. Injected ONLY for
+    // team-tier runs — a guest run must never receive these private addresses.
+    if (input.identity.trustTier === "team") {
+      const directory = teamRoster()
+        .filter((m) => m.emails.length > 0)
+        .map(({ name, emails }) => {
+          const [primary, ...alts] = emails;
+          const altNote = alts.length > 0 ? ` (also: ${alts.join(", ")})` : "";
+          return `- ${name}: ${primary}${altNote}`;
+        });
+      if (directory.length > 0) {
         contextLines.push(
-          `Household directory (the people you serve — to put an event on someone's ` +
-            `calendar, invite their primary email as an attendee):\n${household.join("\n")}`
+          `Team directory (the people you serve — to put an event on someone's ` +
+            `calendar, invite their primary email as an attendee):\n${directory.join("\n")}`
         );
       }
 
-      // Per-member profiles and standing instructions (config/household/<member>.md).
-      // These are private, so they're injected ONLY on household-tier runs —
-      // never surfaced to a guest. Every *.md is read so new members are picked
-      // up without code changes.
+      // Per-member profiles and standing instructions (config/team/<member>.md).
+      // These are private, so they're injected ONLY on team-tier runs — never
+      // surfaced to a guest. Every *.md is read so new members are picked up
+      // without code changes.
       try {
-        const membersDir = resolve(workingDirectory, "config", "household");
+        const membersDir = resolve(workingDirectory, "config", "team");
         const memberFiles = (await readdir(membersDir))
           .filter((f) => f.endsWith(".md"))
           .sort();
         for (const file of memberFiles) {
           const content = (await readFile(resolve(membersDir, file), "utf-8")).trim();
           if (content) {
-            contextLines.push(`Household member — ${file.replace(/\.md$/, "")}:\n${content}`);
+            contextLines.push(`Team member — ${file.replace(/\.md$/, "")}:\n${content}`);
           }
         }
       } catch {
-        // No config/household/ directory yet
+        // No config/team/ directory yet
       }
     }
 
@@ -378,12 +524,30 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     }
 
     const resolved = trustFiltered.kept.length > 0
-      ? await resolveCapabilities(trustFiltered.kept, capabilitiesDir)
+      ? await resolveCapabilities(trustFiltered.kept, capabilitiesDir, { HARNESS_ROOT: harnessRoot })
       : undefined;
 
+    // Tell every capability server which agent it is serving, so tools can
+    // default to it instead of asking the model to name its own agent id.
     const mcpServers = resolved && Object.keys(resolved.servers).length > 0
-      ? resolved.servers
+      ? Object.fromEntries(
+          Object.entries(resolved.servers).map(([name, server]) => [
+            name,
+            { ...server, env: { ...server.env, NORTHSTAR_AGENT_ID: agent.id } },
+          ])
+        )
       : undefined;
+
+    // A capability with unset credentials is skipped, not mounted broken. Log it
+    // beside the trust-dropped ones so "why doesn't it have notion?" has one
+    // place to look.
+    if (resolved?.skipped?.length) {
+      for (const { name, missingVars } of resolved.skipped) {
+        console.log(
+          `[Launcher] Capability "${name}" unavailable this run — unset: ${missingVars.join(", ")}`
+        );
+      }
+    }
 
     const enableChrome = agent.enableChrome || (resolved?.flags.includes("chrome") ?? false);
 

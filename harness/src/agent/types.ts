@@ -16,7 +16,7 @@ import type { TriggerContext } from "../trigger/types.js";
  * Resolved by the caller (e.g. northstar's messaging layer) from the inbound
  * sender's identity — never from message content.
  */
-export type TrustTier = "household" | "guest";
+export type TrustTier = "team" | "guest";
 
 /**
  * The origin identity of a run. Trust and "who" travel together as one object
@@ -48,21 +48,43 @@ export interface AgentConfig {
   resolvers?: string[];
   /** JSON Schema for structured output. Omit for free-form conversational mode. */
   outputSchema?: Record<string, unknown>;
-  /** Maximum agent loop iterations. Defaults to 20. */
+  /** Maximum agent loop iterations. Defaults to 150 (DEFAULT_MAX_TURNS). */
   maxTurns?: number;
   /** Whether this agent needs Chrome browser automation. */
   enableChrome?: boolean;
   /** Config files to read and inject as context variables. Maps var name to workspace-relative path. */
   configFiles?: Record<string, string>;
-  /** Named capability profiles. Overrides base capabilities/resolvers/maxTurns/enableChrome when selected. */
-  profiles?: Record<string, {
-    capabilities?: string[];
-    resolvers?: string[];
-    maxTurns?: number;
-    enableChrome?: boolean;
-    /** Profile-specific config files, merged with base configFiles. */
-    configFiles?: Record<string, string>;
-  }>;
+  /**
+   * Named run variants of this same agent. A profile keeps the agent's identity
+   * and persona and varies only what it can reach and how long it may run.
+   *
+   * Capabilities are adjusted relative to the base set rather than replacing it,
+   * so a profile can never silently drop something every run needs (`reply`
+   * being the load-bearing example — an inbound run without it executes and
+   * then says nothing).
+   */
+  profiles?: Record<string, AgentProfile>;
+}
+
+/** One named run variant of an agent. All fields are optional adjustments. */
+export interface AgentProfile {
+  /** Capability names to add to the agent's base set. */
+  addCapabilities?: string[];
+  /** Capability names to remove from the agent's base set. Applied before adds. */
+  removeCapabilities?: string[];
+  /**
+   * Skill directory names this profile may use. Omit to mount every skill the
+   * agent has (the default). When set, only these are visible to the run.
+   */
+  skills?: string[];
+  /** Replaces the agent's resolver list outright. */
+  resolvers?: string[];
+  /** Replaces the agent's turn ceiling. */
+  maxTurns?: number;
+  /** Replaces the agent's Chrome setting. */
+  enableChrome?: boolean;
+  /** Profile-specific config files, merged over the agent's. */
+  configFiles?: Record<string, string>;
 }
 
 /**
@@ -71,7 +93,7 @@ export interface AgentConfig {
 export interface AgentInput {
   /** Which agent to run. */
   agentId: string;
-  /** Which profile to use (overrides base capabilities). */
+  /** Which named profile to run as. Omit for the agent's base configuration. */
   profile?: string;
   /**
    * Origin identity for this run — trust tier, sender, and origin channel,

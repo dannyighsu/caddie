@@ -21,6 +21,8 @@ import {
   type Message,
 } from "./db";
 import type { ThreadContext } from "./thread-context";
+import { defaultAgentId } from "./harness";
+import { teamLookup } from "@agints/harness";
 import { parseMessageRefs, normalizeMessageId, summarizeEnvelope } from "./email-threading";
 import { isGmailConfigured, getSelfAddress } from "./gmail/client";
 import {
@@ -51,8 +53,6 @@ export async function getFromRawAddress(): Promise<string> {
 
 // --- Send ---
 
-/** The agent that owns outbound-initiated email threads. */
-const OUTBOUND_AGENT_ID = "buri";
 
 /**
  * Send an ad-hoc outbound email and return AgentMail's thread/message ids.
@@ -118,7 +118,7 @@ async function recordOutboundThread(
     ? existing.id
     : (
         await createConversation(
-          OUTBOUND_AGENT_ID,
+          await defaultAgentId(),
           // "Notification" is the generic default subject; prefer a body snippet.
           subject && subject !== "Notification" ? subject : body.slice(0, 80),
           externalId,
@@ -356,22 +356,13 @@ function parseAuthenticationResults(value: string): AuthResults {
   return results;
 }
 
-function householdEmailMap(): Map<string, UserId> {
-  const map = new Map<string, UserId>();
-  const add = (envValue: string | undefined, userId: UserId) => {
-    if (!envValue) return;
-    for (const addr of envValue.split(",")) {
-      const cleaned = addr.trim().toLowerCase();
-      if (cleaned) map.set(cleaned, userId);
-    }
-  };
-  add(process.env.DANNY_EMAIL, "danny");
-  add(process.env.BETTY_EMAIL, "betty");
-  return map;
+/** Email address -> team member id, from the roster. */
+function teamEmailMap(): Map<string, UserId> {
+  return teamLookup("emails");
 }
 
 /**
- * Resolve an inbound email to a household identity or fall back to guest.
+ * Resolve an inbound email to a team identity or fall back to guest.
  *
  * Requires both:
  *   1. `From` address matches DANNY_EMAIL or BETTY_EMAIL (case-insensitive).
@@ -384,7 +375,7 @@ function householdEmailMap(): Map<string, UserId> {
  */
 export function resolveEmailIdentity(email: ReceivedEmail): ResolvedIdentity {
   const sender = bareAddress(email.from);
-  const userId = householdEmailMap().get(sender);
+  const userId = teamEmailMap().get(sender);
 
   if (!userId) {
     return { kind: "guest", channel: "email", rawSender: sender };

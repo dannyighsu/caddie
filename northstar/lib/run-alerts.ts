@@ -2,7 +2,7 @@
  * Run Failure Alerts
  *
  * When a run fails at the API layer — expired OAuth, rate limit, overload — the
- * household owner (danny) is otherwise blind to it: there is no agent output to
+ * team owner is otherwise blind to it: there is no agent output to
  * reply with, so the originating channel stays silent, and the cause is
  * infrastructure only the owner can fix (usually re-authenticating Claude Code).
  * This module detects that class of failure and emails danny directly.
@@ -15,9 +15,10 @@
 import type { AgentResult } from "@agints/harness";
 import { classifyRunFailure } from "./failure-classifier";
 import { sendEmail, isEmailConfigured } from "./email";
+import { teamOwner } from "@agints/harness";
 
 function transcriptUrl(agentId: string, sessionId: string): string {
-  const base = process.env.NORTHSTAR_BASE_URL ?? "http://localhost:3000";
+  const base = process.env.PORTAL_URL ?? "http://localhost:3000";
   return `${base}/transcripts/${sessionId}?agentId=${agentId}`;
 }
 
@@ -37,7 +38,7 @@ export async function alertOwnerOnApiFailure(
   if (!classified || classified.failureClass !== "api") return;
   const { code, detail } = classified;
 
-  const to = process.env.DANNY_EMAIL;
+  const to = teamOwner()?.emails[0];
   if (!to || !isEmailConfigured()) {
     console.error(
       `[RunAlerts] API-layer failure for "${agentId}" (${code}) but email is not configured: ${detail}`

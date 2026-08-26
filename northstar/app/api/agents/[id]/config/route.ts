@@ -1,12 +1,12 @@
 import { readdir, readFile, mkdir } from "fs/promises";
 import { resolve } from "path";
 import { NextResponse } from "next/server";
-import { workspaceRoot, agentsDir } from "@/lib/harness";
+import { workspaceRoot, agentsDir, coreSkillsDir } from "@/lib/harness";
 
 interface AgentFile {
   name: string;
   content: string;
-  category: "persona" | "skill" | "config";
+  category: "persona" | "skill" | "core-skill" | "config";
 }
 
 export async function GET(
@@ -45,6 +45,30 @@ export async function GET(
     }
   } catch {
     // No skills directory
+  }
+
+  // 2b. Core skills — shared by every agent, so an edit here lands for all of
+  // them. Listed separately from the agent's own so that's visible in the UI.
+  try {
+    const coreEntries = await readdir(coreSkillsDir, { withFileTypes: true });
+    for (const entry of coreEntries) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const content = await readFile(
+          resolve(coreSkillsDir, entry.name, "SKILL.md"),
+          "utf-8"
+        );
+        files.push({
+          name: `core-skills/${entry.name}/SKILL.md`,
+          content,
+          category: "core-skill",
+        });
+      } catch {
+        // Skill dir without SKILL.md
+      }
+    }
+  } catch {
+    // No core skills directory
   }
 
   // 3. Config files (from workspace)

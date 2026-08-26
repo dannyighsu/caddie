@@ -19,9 +19,9 @@ import {
   type Message,
 } from "./db";
 import type { ThreadContext } from "./thread-context";
+import { defaultAgentId } from "./harness";
+import { teamLookup } from "@agints/harness";
 
-/** Agent a reply to an outbound-initiated Slack thread routes to. */
-const OUTBOUND_AGENT_ID = "buri";
 
 // --- Web API (sending) ---
 
@@ -93,7 +93,7 @@ export async function recordOutboundSlackThread(
       ? existing.id
       : (
           await createConversation(
-            OUTBOUND_AGENT_ID,
+            await defaultAgentId(),
             body.slice(0, 80),
             externalId,
             undefined,
@@ -194,28 +194,19 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
 
 // --- Identity resolution ---
 
-function householdSlackMap(): Map<string, UserId> {
-  const map = new Map<string, UserId>();
-  const add = (envValue: string | undefined, userId: UserId) => {
-    if (!envValue) return;
-    for (const raw of envValue.split(",")) {
-      const cleaned = raw.trim();
-      if (cleaned) map.set(cleaned, userId);
-    }
-  };
-  add(process.env.DANNY_SLACK_USER_ID, "danny");
-  add(process.env.BETTY_SLACK_USER_ID, "betty");
-  return map;
+/** Slack user id -> team member id, from the roster. */
+function teamSlackMap(): Map<string, UserId> {
+  return teamLookup("slackId");
 }
 
 /**
- * Resolve a Slack `event.user` ID against the household allowlist.
+ * Resolve a Slack `event.user` ID against the team roster.
  * Socket Mode events are not per-event signed, but the connection is
  * token-authenticated and `event.bot_id` is filtered upstream, so `user`
  * is treated as a verified ID.
  */
 export function resolveSlackIdentity(user: string): ResolvedIdentity {
-  const userId = householdSlackMap().get(user);
+  const userId = teamSlackMap().get(String(user).toLowerCase());
   if (userId) {
     return { kind: "authenticated", userId, channel: "slack", rawSender: user };
   }

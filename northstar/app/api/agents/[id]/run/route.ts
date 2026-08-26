@@ -26,7 +26,7 @@ export async function POST(
   }
 
   // The agent page is the owner console (network-gated), so runs execute as
-  // the selected household owner.
+  // the selected team owner.
   const portalOwner = parsePortalOwner(request.cookies.get("portal_owner")?.value);
 
   try {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import OwnerSelector from "./owner-selector";
+import { teamRoster } from "@agints/harness";
 
 export const metadata: Metadata = {
   title: "Buri Agent Portal",
@@ -22,7 +23,7 @@ export default function RootLayout({
             Buri Agent Portal
           </a>
           <div className="flex items-center gap-3">
-            <OwnerSelector />
+            <OwnerSelector options={teamRoster().map(({ id, name }) => ({ id, name }))} />
             <span className="h-5 w-px bg-line" />
             <a href="/runs" className="text-sm text-ink-soft hover:text-primary hover:bg-primary-soft rounded-md px-3 py-1.5 transition-colors">
               Runs

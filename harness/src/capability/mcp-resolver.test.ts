@@ -36,6 +36,7 @@ describe("resolveCapabilities", () => {
     });
     expect(result.flags).toEqual([]);
     expect(result.warnings).toEqual([]);
+    expect(result.skipped).toEqual([]);
   });
 
   it("resolves env vars in server config", async () => {
@@ -57,9 +58,10 @@ describe("resolveCapabilities", () => {
     expect(result.servers["api-server"].args).toEqual(["--host", "example.com"]);
     expect(result.servers["api-server"].env).toEqual({ KEY: "secret123" });
     expect(result.warnings).toEqual([]);
+    expect(result.skipped).toEqual([]);
   });
 
-  it("warns on missing env vars", async () => {
+  it("skips a capability with unset env vars instead of mounting it blank", async () => {
     mockReadFile.mockResolvedValueOnce(
       JSON.stringify({
         name: "needs-env",
@@ -72,9 +74,52 @@ describe("resolveCapabilities", () => {
 
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = await resolveCapabilities(["needs-env"], "/caps");
+
+    // Not mounted — a blank credential would give the agent tools that fail at
+    // first use, mid-run, rather than simply being absent.
+    expect(result.servers).not.toHaveProperty("needs-env");
+    expect(result.skipped).toEqual([
+      { name: "needs-env", missingVars: ["MISSING_VAR"] },
+    ]);
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]).toContain("MISSING_VAR");
-    expect(result.servers["needs-env"].args).toEqual([""]);
+    expect(result.warnings[0]).toContain("NOT mounted");
+    warn.mockRestore();
+  });
+
+  it("skipping one capability does not disturb the others", async () => {
+    mockReadFile
+      .mockResolvedValueOnce(
+        JSON.stringify({ name: "ok", server: { command: "run", args: ["--fine"] } })
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({ name: "broken", server: { command: "run", args: ["${NOPE}"] } })
+      );
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await resolveCapabilities(["ok", "broken"], "/caps");
+
+    // The run proceeds with what IS configured — nothing throws.
+    expect(Object.keys(result.servers)).toEqual(["ok"]);
+    expect(result.skipped.map((s) => s.name)).toEqual(["broken"]);
+    warn.mockRestore();
+  });
+
+  it("reports every unset var for a capability, not just the first", async () => {
+    mockReadFile.mockResolvedValueOnce(
+      JSON.stringify({
+        name: "multi",
+        server: {
+          command: "${CMD_VAR}",
+          args: ["${ARG_VAR}"],
+          env: { TOKEN: "${ENV_VAR}" },
+        },
+      })
+    );
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await resolveCapabilities(["multi"], "/caps");
+    expect(result.skipped[0].missingVars.sort()).toEqual(["ARG_VAR", "CMD_VAR", "ENV_VAR"]);
     warn.mockRestore();
   });
 
@@ -124,5 +169,6 @@ describe("resolveCapabilities", () => {
     expect(result.servers).toEqual({});
     expect(result.flags).toEqual([]);
     expect(result.warnings).toEqual([]);
+    expect(result.skipped).toEqual([]);
   });
 });

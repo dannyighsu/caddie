@@ -238,12 +238,12 @@ export async function executeJob(
         profile: job.profile,
       });
 
-    // Scheduled/triggered runs are the household's own automations (the
+    // Scheduled/triggered runs are the team's own automations (the
     // initiator is the authenticated owner, not an external sender), so they
-    // run at household trust by default — otherwise every household-gated
+    // run at team trust by default — otherwise every team-gated
     // capability (email, gmail, notion, calendar) is filtered out. A job
     // can pin itself to "guest" for least privilege.
-    const trustTier = job.trustTier ?? "household";
+    const trustTier = job.trustTier ?? "team";
 
     // Attached to any Slack or email thread the run creates (via env → egress/
     // email MCP → control API), so a reply can be traced back to this task.

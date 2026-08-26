@@ -18,12 +18,15 @@ export interface Message {
   timestamp: string;
   /**
    * Verified sender of this message at the time of receipt. Set on `user`
-   * rows by the messaging layer from the channel's identity resolver.
+   * rows by the messaging layer from the channel's identity resolver. The
+   * userId is a team-roster id; history keeps whatever id was current when the
+   * row was written, so a later rename renders as the raw id rather than
+   * rewriting the past.
    * Omitted on `assistant` rows and on user rows persisted before the
    * identity layer existed (rendered as `[User]` in history).
    */
   sender?:
-    | { kind: "authenticated"; userId: "danny" | "betty" }
+    | { kind: "authenticated"; userId: string }
     | { kind: "guest" };
 }
 

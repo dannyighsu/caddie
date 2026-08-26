@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createLauncher } from "./launcher.js";
+import { createLauncher, resolveProfileCapabilities } from "./launcher.js";
 import type { AgentRuntime, AgentRuntimeOutput } from "../runtime/types.js";
 import * as fs from "fs/promises";
 import { resolveCapabilities } from "../capability/mcp-resolver.js";
@@ -11,10 +11,11 @@ vi.mock("../capability/mcp-resolver.js", () => ({
     servers: {},
     flags: [],
     warnings: [],
+    skipped: [],
   }),
 }));
 vi.mock("../policy/permissions.js", () => ({
-  loadPermissions: vi.fn().mockResolvedValue({ household: {}, guest: {} }),
+  loadPermissions: vi.fn().mockResolvedValue({ team: {}, guest: {} }),
   isAllowed: vi.fn().mockReturnValue(true),
   filterCapabilitiesByPolicy: vi.fn((names: string[]) => ({
     kept: names,
@@ -48,7 +49,7 @@ const baseAgentConfig = {
 };
 
 const ID = {
-  trustTier: "household" as const,
+  trustTier: "team" as const,
   senderIdentity: "test",
   originChannel: "test",
 };
@@ -71,7 +72,7 @@ describe("createLauncher", () => {
     mockFs.mkdir.mockResolvedValue(undefined as any);
     mockFs.lstat.mockRejectedValue(new Error("ENOENT")); // no existing symlinks
     mockFs.symlink.mockResolvedValue(undefined);
-    mockFs.readdir.mockResolvedValue([] as any); // no config/household by default
+    mockFs.readdir.mockResolvedValue([] as any); // no config/team by default
   });
 
   it("launches an agent and returns success result", async () => {
@@ -156,7 +157,7 @@ describe("createLauncher", () => {
 
     await launcher.launch({
       agentId: "test-agent",
-      identity: { trustTier: "household", senderIdentity: "Danny (owner)", originChannel: "portal" },
+      identity: { trustTier: "team", senderIdentity: "Danny (owner)", originChannel: "portal" },
       prompt: "PROMPT_MARKER",
       context: { currentTime: "2025-01-01 10:00" },
     });
@@ -171,7 +172,7 @@ describe("createLauncher", () => {
     expect(iPersona).toBeGreaterThanOrEqual(0);
     expect(iIdentity).toBeGreaterThan(iPersona);
     expect(prompt).toContain("Sender: Danny (owner)");
-    expect(prompt).toContain("Trust tier: household");
+    expect(prompt).toContain("Trust tier: team");
     expect(iTime).toBeGreaterThan(iIdentity);
     expect(iUser).toBeGreaterThan(iTime);
   });
@@ -212,16 +213,17 @@ describe("createLauncher", () => {
     expect(result.error).toBe("timeout");
   });
 
-  it("applies profile overrides", async () => {
+  it("applies profile overrides, adjusting capabilities rather than replacing them", async () => {
     mockFs.readFile.mockImplementation(async (path: any) => {
       if (String(path).endsWith("agent.json")) {
         return JSON.stringify({
           ...baseAgentConfig,
-          capabilities: ["base-cap"],
+          capabilities: ["reply", "browser", "notion"],
           maxTurns: 10,
           profiles: {
             heavy: {
-              capabilities: ["heavy-cap"],
+              addCapabilities: ["web-search"],
+              removeCapabilities: ["notion"],
               maxTurns: 50,
             },
           },
@@ -246,8 +248,50 @@ describe("createLauncher", () => {
       profile: "heavy",
     });
 
-    const call = (runtime.execute as any).mock.calls[0][0];
-    expect(call.maxTurns).toBe(50);
+    expect((runtime.execute as any).mock.calls[0][0].maxTurns).toBe(50);
+
+    const [names] = vi.mocked(filterCapabilitiesByPolicy).mock.calls[0];
+    expect(names).toContain("web-search");
+    expect(names).not.toContain("notion");
+    // The load-bearing assertion: a profile can't drop what it never mentioned.
+    expect(names).toContain("reply");
+    expect(names).toContain("browser");
+  });
+
+  it("warns and falls back to base config when the profile name is unknown", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({
+          ...baseAgentConfig,
+          capabilities: ["reply"],
+          maxTurns: 10,
+          profiles: { extended: { maxTurns: 300 } },
+        });
+      }
+      if (String(path).endsWith("persona.md")) return "persona";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    // "feed-scan" is a skill, not a profile — the mistake the scheduling tool
+    // used to invite. It must not pass silently.
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: ID,
+      prompt: "go",
+      profile: "feed-scan",
+    });
+
+    expect((runtime.execute as any).mock.calls[0][0].maxTurns).toBe(10);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Unknown profile "feed-scan"')
+    );
   });
 
   it("uses default maxTurns when not specified", async () => {
@@ -308,14 +352,14 @@ describe("createLauncher", () => {
 
     await launcher.launch({
       agentId: "test-agent",
-      identity: { trustTier: "household", senderIdentity: "h", originChannel: "h" },
+      identity: { trustTier: "team", senderIdentity: "h", originChannel: "h" },
       prompt: "go",
     });
 
     expect(filterCapabilitiesByPolicy).toHaveBeenCalledWith(
       ["calendar"],
       expect.anything(),
-      "household",
+      "team",
     );
   });
 
@@ -345,7 +389,13 @@ describe("createLauncher", () => {
       prompt: "go",
     });
 
-    expect(resolveCapabilities).toHaveBeenCalledWith(["web-search"], "/caps");
+    // ...LastCalledWith, not ...CalledWith: this module mock accumulates calls
+    // across tests, so a plain "was called with" can match an earlier test's.
+    // The third argument is HARNESS_ROOT, supplied by the launcher rather than
+    // read from the environment.
+    expect(resolveCapabilities).toHaveBeenLastCalledWith(["web-search"], "/caps", {
+      HARNESS_ROOT: "/",
+    });
   });
 
   it("injects the job's state file when a stateKey is provided", async () => {
@@ -473,32 +523,32 @@ describe("createLauncher", () => {
     expect(seen[0].endsWith("/state/....configpreferences.md")).toBe(true);
   });
 
-  it("injects household member files on a household turn, but not on a guest turn", async () => {
+  it("injects team member files on a team turn, but not on a guest turn", async () => {
     mockFs.readdir.mockImplementation(async (path: any) => {
-      if (String(path).endsWith("config/household")) return ["betty.md", "danny.md"] as any;
+      if (String(path).endsWith("config/team")) return ["betty.md", "danny.md"] as any;
       return [] as any;
     });
     mockFs.readFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
       if (p.endsWith("persona.md")) return "persona";
-      if (p.endsWith("household/danny.md")) return "# Danny\n- Founder of Deep Agents";
-      if (p.endsWith("household/betty.md")) return "# Betty\n- PM at Peregrine";
+      if (p.endsWith("team/danny.md")) return "# Danny\n- Founder of Deep Agents";
+      if (p.endsWith("team/betty.md")) return "# Betty\n- PM at Peregrine";
       throw new Error(`Unmocked: ${path}`);
     });
 
-    // Household turn: both member files injected.
+    // Team turn: both member files injected.
     const runtime = mockRuntime();
     const hh = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
     await hh.launch({
       agentId: "test-agent",
-      identity: { trustTier: "household", senderIdentity: "Danny", originChannel: "email" },
+      identity: { trustTier: "team", senderIdentity: "Danny", originChannel: "email" },
       prompt: "go",
     });
     const hhPrompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
-    expect(hhPrompt).toContain("Household member — danny:");
+    expect(hhPrompt).toContain("Team member — danny:");
     expect(hhPrompt).toContain("Founder of Deep Agents");
-    expect(hhPrompt).toContain("Household member — betty:");
+    expect(hhPrompt).toContain("Team member — betty:");
 
     // Guest turn: member files must NOT be injected.
     const guestRt = mockRuntime();
@@ -509,8 +559,42 @@ describe("createLauncher", () => {
       prompt: "go",
     });
     const guestPrompt: string = (guestRt.execute as any).mock.calls[0][0].prompt;
-    expect(guestPrompt).not.toContain("Household member");
+    expect(guestPrompt).not.toContain("Team member —");
     expect(guestPrompt).not.toContain("Founder of Deep Agents");
+  });
+
+  it("injects the team directory from the roster on a team turn only", async () => {
+    const prev = { ...process.env };
+    process.env.TEAM_MEMBER_A_NAME = "Danny";
+    process.env.TEAM_MEMBER_A_EMAIL = "danny@example.com, danny@alt.example.com";
+    process.env.TEAM_MEMBER_B_NAME = "Veronica";
+    process.env.TEAM_MEMBER_B_EMAIL = "veronica@example.com";
+
+    try {
+      const runtime = mockRuntime();
+      const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+      await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+      const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+
+      expect(prompt).toContain("Team directory");
+      expect(prompt).toContain("- Danny: danny@example.com (also: danny@alt.example.com)");
+      // The roster is the only source of names — no hardcoded pair survives.
+      expect(prompt).toContain("- Veronica: veronica@example.com");
+
+      // A guest run must never see private addresses.
+      const guestRt = mockRuntime();
+      const guest = createLauncher(guestRt, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+      await guest.launch({
+        agentId: "test-agent",
+        identity: { trustTier: "guest", senderIdentity: "stranger", originChannel: "email" },
+        prompt: "go",
+      });
+      const guestPrompt: string = (guestRt.execute as any).mock.calls[0][0].prompt;
+      expect(guestPrompt).not.toContain("Team directory");
+      expect(guestPrompt).not.toContain("veronica@example.com");
+    } finally {
+      process.env = prev;
+    }
   });
 
   it("passes harnessRoot to runtime", async () => {
@@ -524,5 +608,188 @@ describe("createLauncher", () => {
 
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.harnessRoot).toBe("/");
+  });
+});
+
+describe("resolveProfileCapabilities", () => {
+  const base = ["reply", "browser", "notion"];
+
+  it("returns the base set unchanged with no profile", () => {
+    expect(resolveProfileCapabilities(base)).toEqual(base);
+  });
+
+  it("returns the base set unchanged for a profile that adjusts nothing", () => {
+    expect(resolveProfileCapabilities(base, { maxTurns: 300 })).toEqual(base);
+  });
+
+  it("adds and removes relative to the base set", () => {
+    const result = resolveProfileCapabilities(base, {
+      addCapabilities: ["web-search"],
+      removeCapabilities: ["browser"],
+    });
+    expect(result).toEqual(["reply", "notion", "web-search"]);
+  });
+
+  it("applies removals before adds, so a name in both survives", () => {
+    const result = resolveProfileCapabilities(base, {
+      addCapabilities: ["notion"],
+      removeCapabilities: ["notion"],
+    });
+    expect(result).toContain("notion");
+  });
+
+  it("ignores removals for capabilities the agent doesn't have", () => {
+    expect(
+      resolveProfileCapabilities(base, { removeCapabilities: ["nonexistent"] })
+    ).toEqual(base);
+  });
+
+  it("does not duplicate a capability the base set already has", () => {
+    const result = resolveProfileCapabilities(base, { addCapabilities: ["reply"] });
+    expect(result.filter((c) => c === "reply")).toHaveLength(1);
+  });
+});
+
+describe("skill mounting", () => {
+  const AGENT_SKILLS = "/agents/test-agent/.claude/skills";
+  const CORE_SKILLS = "/skills/core";
+  const DEST = "/workspace/test-agent/.claude/skills";
+
+  /** readdir that returns the given directory names for the given paths. */
+  function dirs(byPath: Record<string, string[]>) {
+    return async (path: any) => {
+      const names = byPath[String(path)] ?? [];
+      return names.map((name) => ({
+        name,
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      })) as any;
+    };
+  }
+
+  function launcher(runtime: any) {
+    return createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+      workspaceRoot: "/workspace",
+      coreSkillsDir: CORE_SKILLS,
+    });
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({
+          ...baseAgentConfig,
+          capabilities: [],
+          profiles: { scoped: { skills: ["feed-scan"] } },
+        });
+      }
+      if (String(path).endsWith("persona.md")) return "persona";
+      throw new Error(`Unmocked: ${path}`);
+    });
+    mockFs.mkdir.mockResolvedValue(undefined as any);
+    mockFs.symlink.mockResolvedValue(undefined);
+    mockFs.unlink.mockResolvedValue(undefined);
+    mockFs.rm.mockResolvedValue(undefined);
+    mockFs.lstat.mockRejectedValue(new Error("ENOENT"));
+    mockFs.readlink.mockRejectedValue(new Error("ENOENT"));
+    mockFs.readdir.mockImplementation(dirs({}));
+  });
+
+  it("mounts core skills and the agent's own side by side", async () => {
+    mockFs.readdir.mockImplementation(
+      dirs({ [CORE_SKILLS]: ["manage-schedules"], [AGENT_SKILLS]: ["feed-scan"] })
+    );
+    mockFs.lstat.mockImplementation(async (p: any) =>
+      String(p) === AGENT_SKILLS ? ({ isSymbolicLink: () => false } as any) : Promise.reject(new Error("ENOENT"))
+    );
+
+    const runtime = mockRuntime();
+    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+
+    expect(mockFs.symlink).toHaveBeenCalledWith(
+      `${CORE_SKILLS}/manage-schedules`, `${DEST}/manage-schedules`
+    );
+    expect(mockFs.symlink).toHaveBeenCalledWith(
+      `${AGENT_SKILLS}/feed-scan`, `${DEST}/feed-scan`
+    );
+  });
+
+  it("lets an agent skill override a core skill of the same name", async () => {
+    mockFs.readdir.mockImplementation(
+      dirs({ [CORE_SKILLS]: ["repo-mount"], [AGENT_SKILLS]: ["repo-mount"] })
+    );
+
+    const runtime = mockRuntime();
+    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+
+    expect(mockFs.symlink).toHaveBeenCalledWith(
+      `${AGENT_SKILLS}/repo-mount`, `${DEST}/repo-mount`
+    );
+    expect(mockFs.symlink).not.toHaveBeenCalledWith(
+      `${CORE_SKILLS}/repo-mount`, `${DEST}/repo-mount`
+    );
+  });
+
+  it("mounts only what a profile grants, across both sources", async () => {
+    mockFs.readdir.mockImplementation(
+      dirs({ [CORE_SKILLS]: ["manage-schedules"], [AGENT_SKILLS]: ["feed-scan", "checkin"] })
+    );
+
+    const runtime = mockRuntime();
+    await launcher(runtime).launch({
+      agentId: "test-agent", identity: ID, prompt: "go", profile: "scoped",
+    });
+
+    const linked = mockFs.symlink.mock.calls.map((c: any) => String(c[1]));
+    expect(linked).toContain(`${DEST}/feed-scan`);
+    expect(linked).not.toContain(`${DEST}/checkin`);
+    expect(linked).not.toContain(`${DEST}/manage-schedules`);
+  });
+
+  it("unlinks (never recursively removes) a legacy whole-set symlink at the mount point", async () => {
+    mockFs.readdir.mockImplementation(dirs({ [AGENT_SKILLS]: ["feed-scan"] }));
+    mockFs.lstat.mockImplementation(async (p: any) =>
+      String(p) === DEST
+        ? ({ isSymbolicLink: () => true } as any)
+        : Promise.reject(new Error("ENOENT"))
+    );
+
+    const runtime = mockRuntime();
+    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+
+    // Recursing through that link would delete the agent's real skills.
+    expect(mockFs.unlink).toHaveBeenCalledWith(DEST);
+    expect(mockFs.rm).not.toHaveBeenCalledWith(DEST, expect.objectContaining({ recursive: true }));
+  });
+
+  it("sweeps a link this run doesn't want", async () => {
+    mockFs.readdir.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p === AGENT_SKILLS) return [{ name: "feed-scan", isDirectory: () => true, isSymbolicLink: () => false }] as any;
+      if (p === DEST) return [{ name: "metrics-check", isDirectory: () => false, isSymbolicLink: () => true }] as any;
+      return [] as any;
+    });
+
+    const runtime = mockRuntime();
+    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+    expect(mockFs.unlink).toHaveBeenCalledWith(`${DEST}/metrics-check`);
+  });
+
+  it("links skills-src to the agent's own skills, so authoring persists", async () => {
+    mockFs.readdir.mockImplementation(dirs({ [AGENT_SKILLS]: ["feed-scan"] }));
+    mockFs.lstat.mockImplementation(async (p: any) =>
+      String(p) === AGENT_SKILLS ? ({ isSymbolicLink: () => false } as any) : Promise.reject(new Error("ENOENT"))
+    );
+
+    const runtime = mockRuntime();
+    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+
+    expect(mockFs.symlink).toHaveBeenCalledWith(
+      AGENT_SKILLS, "/workspace/test-agent/.claude/skills-src"
+    );
   });
 });

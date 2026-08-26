@@ -19,9 +19,9 @@
  *   curl -X POST localhost:3000/api/control -d '{"action":"notify","channel":"slack","message":"done"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"notify","channel":"telegram","to":"123456789","message":"done"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri"}'
- *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"xmanager"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"extended"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","scheduledFor":"2026-03-28T09:00:00Z"}'
- *   curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","profile":"xmanager","cron":"0,30 * * * *","description":"Feed scan every 30 min"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","cron":"0,30 * * * *","description":"Feed scan every 30 min"}'
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -86,8 +86,8 @@ interface ControlRequest {
   prompt?: string;
   context?: Record<string, string>;
   /**
-   * Trust tier for scheduled/one-shot agent runs. Defaults to "household" at
-   * execution time (these are the household's own automations). Set "guest" to
+   * Trust tier for scheduled/one-shot agent runs. Defaults to "team" at
+   * execution time (these are the team's own automations). Set "guest" to
    * pin a job to least privilege.
    */
   trustTier?: TrustTier;
@@ -412,7 +412,7 @@ async function executeRun(req: ControlRequest, portalOwner: UserId): Promise<Rec
     profile: req.profile,
     // An immediate run through the control API is owner-initiated from the
     // portal (the endpoint is network-gated to localhost/tailnet), so it runs
-    // as the selected household owner.
+    // as the selected team owner.
     identity: toRunIdentity(portalIdentity(portalOwner)),
     prompt: req.prompt ?? "Run.",
     context: {

@@ -25,15 +25,15 @@
  * exposes nothing new and is safe wherever the agent already runs.
  *
  * Env:
- *   NORTHSTAR_URL       — Base URL for the Northstar API (default: http://localhost:3000)
- *   NORTHSTAR_AGENT_ID  — Which agent's traces to read (default: "buri")
+ *   PORTAL_URL          — Base URL for the portal control API (default: http://localhost:3000)
+ *   NORTHSTAR_AGENT_ID  — Which agent's traces to read (injected by the launcher)
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-const NORTHSTAR_URL = process.env.NORTHSTAR_URL || "http://localhost:3000";
+const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 const AGENT_ID = process.env.NORTHSTAR_AGENT_ID || "buri";
 
 const server = new Server(
@@ -134,8 +134,8 @@ async function handleListRuns(args) {
   // session). The ledger is fetched only to enrich each with orchestration
   // metadata; both calls are best-effort so a failure of one still yields a list.
   const [transcripts, ledger] = await Promise.all([
-    fetchJsonSafe(`${NORTHSTAR_URL}/api/transcripts?agentId=${encodeURIComponent(AGENT_ID)}`),
-    fetchJsonSafe(`${NORTHSTAR_URL}/api/runs?agentId=${encodeURIComponent(AGENT_ID)}&status=all&limit=200`),
+    fetchJsonSafe(`${PORTAL_URL}/api/transcripts?agentId=${encodeURIComponent(AGENT_ID)}`),
+    fetchJsonSafe(`${PORTAL_URL}/api/runs?agentId=${encodeURIComponent(AGENT_ID)}&status=all&limit=200`),
   ]);
 
   // Index ledger rows by session_id, keeping the most recent (the list is
@@ -218,7 +218,7 @@ async function handleViewRun(args) {
     return { content: [{ type: "text", text: "view_run requires a `sessionId`." }], isError: true };
   }
 
-  const url = `${NORTHSTAR_URL}/api/transcripts/${encodeURIComponent(sessionId)}?agentId=${encodeURIComponent(AGENT_ID)}`;
+  const url = `${PORTAL_URL}/api/transcripts/${encodeURIComponent(sessionId)}?agentId=${encodeURIComponent(AGENT_ID)}`;
   const res = await fetch(url);
   const data = await res.json();
 

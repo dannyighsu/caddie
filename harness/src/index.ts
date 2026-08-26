@@ -22,8 +22,20 @@ export { ClaudeCodeRuntime, type ClaudeCodeRuntimeOptions } from "./runtime/clau
 export { createRuntime, type RuntimeConfig } from "./runtime/factory.js";
 
 // Agent
-export type { AgentConfig, AgentInput, AgentResult, TrustTier, RunIdentity } from "./agent/types.js";
-export { createLauncher, type LauncherConfig } from "./agent/launcher.js";
+export type {
+  AgentConfig,
+  AgentProfile,
+  AgentInput,
+  AgentResult,
+  TrustTier,
+  RunIdentity,
+} from "./agent/types.js";
+export {
+  createLauncher,
+  resolveProfileCapabilities,
+  DEFAULT_MAX_TURNS,
+  type LauncherConfig,
+} from "./agent/launcher.js";
 
 // Capability
 export { resolveCapabilities, type ResolveResult } from "./capability/mcp-resolver.js";
@@ -45,6 +57,16 @@ export type {
   ResolverConfig,
 } from "./resolver/types.js";
 export { runResolvers } from "./resolver/runner.js";
+
+// Team roster (who this instance serves — read from the environment)
+export {
+  teamRoster,
+  teamOwner,
+  teamMember,
+  teamMemberLabel,
+  teamLookup,
+  type TeamMember,
+} from "./team/roster.js";
 
 // Trigger
 export type { TriggerContext } from "./trigger/types.js";

@@ -7,7 +7,8 @@ interface Agent {
   id: string;
   name: string;
   capabilities: string[];
-  maxTurns?: number;
+  /** Always resolved by the API — the agent's own value or the runtime default. */
+  maxTurns: number;
 }
 
 interface Message {
@@ -29,7 +30,7 @@ interface Conversation {
 interface ConfigFile {
   name: string;
   content: string;
-  category: "persona" | "skill" | "config";
+  category: "persona" | "skill" | "core-skill" | "config";
 }
 
 type Tab = "main" | "config";
@@ -57,7 +58,7 @@ export default function AgentPage() {
         <h1 className="text-xl font-semibold">{agent.name}</h1>
         <p className="text-xs text-ink-faint mt-1">
           {agent.capabilities.join(", ")}
-          {" · "}Max {agent.maxTurns ?? 20} turns
+          {" · "}Max {agent.maxTurns} turns
         </p>
         <div className="flex gap-4 mt-3 border-b border-line">
           <button
@@ -288,6 +289,8 @@ function ConfigView({ agentId }: { agentId: string }) {
   const [editContent, setEditContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [newFileName, setNewFileName] = useState("");
+  const [newSkillName, setNewSkillName] = useState("");
+  const [skillError, setSkillError] = useState<string | null>(null);
 
   useEffect(() => {
     refreshFiles();
@@ -340,9 +343,65 @@ function ConfigView({ agentId }: { agentId: string }) {
     refreshFiles();
   }
 
-  async function handleDelete(name: string) {
-    await fetch(`/api/agents/${agentId}/config/${name}`, { method: "DELETE" });
-    if (activeFile?.name === name) {
+  /**
+   * Create a new skill: a directory under the agent definition's
+   * .claude/skills/ holding a SKILL.md scaffolded with the frontmatter Claude
+   * Code needs to discover it. The agent picks it up on its next run — the
+   * workspace mounts the skills directory by symlink, so nothing to rebuild.
+   */
+  async function handleCreateSkill() {
+    const slug = newSkillName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    if (!slug) return;
+    if (skillFiles.some((f) => f.name.split("/")[1] === slug)) {
+      setSkillError(`Skill "${slug}" already exists`);
+      return;
+    }
+
+    const scaffold = `---\nname: ${slug}\ndescription: TODO — one line on what this skill does and when to use it.\n---\n\n## ${slug}\n\nTODO: the procedure.\n`;
+
+    const res = await fetch(
+      `/api/agents/${agentId}/config/skills/${slug}/SKILL.md`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: scaffold, category: "skill" }),
+      }
+    );
+    if (!res.ok) {
+      setSkillError("Could not create skill");
+      return;
+    }
+    setNewSkillName("");
+    setSkillError(null);
+    setActiveFile({
+      name: `skills/${slug}/SKILL.md`,
+      content: scaffold,
+      category: "skill",
+    });
+    setEditContent(scaffold);
+    refreshFiles();
+  }
+
+  async function handleDelete(file: ConfigFile) {
+    if (file.category === "skill") {
+      const skill = file.name.split("/")[1];
+      if (
+        !confirm(
+          `Delete the "${skill}" skill? This removes its whole directory and takes effect on the agent's next run.`
+        )
+      ) {
+        return;
+      }
+    }
+    await fetch(
+      `/api/agents/${agentId}/config/${file.name}?category=${file.category}`,
+      { method: "DELETE" }
+    );
+    if (activeFile?.name === file.name) {
       setActiveFile(null);
       setEditContent("");
     }
@@ -353,6 +412,7 @@ function ConfigView({ agentId }: { agentId: string }) {
 
   const personaFiles = files.filter((f) => f.category === "persona");
   const skillFiles = files.filter((f) => f.category === "skill");
+  const coreSkillFiles = files.filter((f) => f.category === "core-skill");
   const configFiles = files.filter((f) => f.category === "config");
 
   function FileEntry({ file, deletable }: { file: ConfigFile; deletable?: boolean }) {
@@ -366,11 +426,13 @@ function ConfigView({ agentId }: { agentId: string }) {
               : "text-ink-soft hover:bg-surface-muted hover:text-ink"
           }`}
         >
-          {file.category === "skill" ? file.name.split("/")[1] : file.name}
+          {file.category === "skill" || file.category === "core-skill"
+            ? file.name.split("/")[1]
+            : file.name}
         </button>
         {deletable && (
           <button
-            onClick={() => handleDelete(file.name)}
+            onClick={() => handleDelete(file)}
             className="px-2 text-ink-faint hover:text-bad opacity-0 group-hover:opacity-100 transition-opacity text-xs"
           >
             x
@@ -393,12 +455,51 @@ function ConfigView({ agentId }: { agentId: string }) {
             </div>
           )}
 
-          {skillFiles.length > 0 && (
+          <div>
+            <h2 className="text-xs font-semibold text-ink-faint uppercase tracking-wide mb-1 px-3">
+              Skills
+            </h2>
+            {skillFiles.map((f) => (
+              <FileEntry key={f.name} file={f} deletable />
+            ))}
+            {skillFiles.length === 0 && (
+              <p className="text-xs text-ink-faint px-3 py-2">No skills yet</p>
+            )}
+            <div className="mt-1 px-3 flex gap-1">
+              <input
+                value={newSkillName}
+                onChange={(e) => {
+                  setNewSkillName(e.target.value);
+                  setSkillError(null);
+                }}
+                placeholder="new-skill-name"
+                className="flex-1 min-w-0 bg-surface-muted border border-line-strong rounded px-2 py-1 text-xs focus:outline-none focus:border-primary focus:bg-surface"
+                onKeyDown={(e) => { if (e.key === "Enter") handleCreateSkill(); }}
+              />
+              <button
+                onClick={handleCreateSkill}
+                disabled={!newSkillName.trim()}
+                className="px-2 py-1 bg-surface-muted text-ink-soft rounded text-xs hover:bg-primary-soft hover:text-primary disabled:opacity-40 transition-colors"
+              >
+                +
+              </button>
+            </div>
+            {skillError && (
+              <p className="text-xs text-bad px-3 pt-1">{skillError}</p>
+            )}
+          </div>
+
+          {coreSkillFiles.length > 0 && (
             <div>
               <h2 className="text-xs font-semibold text-ink-faint uppercase tracking-wide mb-1 px-3">
-                Skills
+                Shared skills
               </h2>
-              {skillFiles.map((f) => <FileEntry key={f.name} file={f} />)}
+              <p className="text-xs text-ink-faint px-3 pb-1 leading-snug">
+                Used by every agent. Editing one changes it everywhere.
+              </p>
+              {coreSkillFiles.map((f) => (
+                <FileEntry key={f.name} file={f} />
+              ))}
             </div>
           )}
 

@@ -1,80 +1,102 @@
 #!/usr/bin/env node
 
 /**
- * Email-Household MCP Server
+ * Email-Team MCP Server
  *
- * A minimal-privilege escalation tool: email the household members (Danny and
- * Betty) — and ONLY them. Like `reply`, the destination is NOT chosen by the
- * agent: the recipient is resolved server-side from the household address env
- * vars (DANNY_EMAIL / BETTY_EMAIL), so the agent picks "danny", "betty", or
- * "both" but can never redirect this to an arbitrary address.
+ * A minimal-privilege escalation tool: email the team members — and ONLY them.
+ * Like `reply`, the destination is NOT chosen by the agent: recipients are
+ * resolved server-side from the TEAM_MEMBER_* roster, so the agent picks which
+ * member by id (or "all") and can never redirect this to an arbitrary address.
  *
- * That's what makes it safe to grant at GUEST trust. When an unverified/guest
- * sender writes in (e.g. replying to mail Buri sent), Buri can loop the
- * household in or ask them to act — without gaining the ability to send mail to
- * anyone else. Contrast with `send_email` (the `email` capability), which takes
- * an agent-supplied recipient and therefore stays household-trust only.
+ * That's what makes it safe to grant at GUEST trust. When an unverified sender
+ * writes in (e.g. replying to mail the agent sent), the agent can loop the team
+ * in or ask them to act — without gaining the ability to mail anyone else.
+ * Contrast with `send_email` (the `email` capability), which takes an
+ * agent-supplied recipient and therefore stays team-trust only.
  *
- * Delivery is proxied through the Northstar control API (`notify` action, email
- * channel), the same path as `send_email`, so the outbound thread is recorded
- * and a household reply comes back with full context.
+ * Delivery is proxied through the control API (`notify` action, email channel),
+ * the same path as `send_email`, so the outbound thread is recorded and a team
+ * reply comes back with full context.
+ *
+ * The tool's `to` enum is generated from the roster at startup, so each install
+ * exposes its own people's ids rather than a hardcoded pair.
  *
  * Env:
- *   NORTHSTAR_URL — Base URL for the control API (default: http://localhost:3000)
- *   DANNY_EMAIL   — Danny's address(es), comma-separated (first is primary)
- *   BETTY_EMAIL   — Betty's address(es), comma-separated (first is primary)
+ *   PORTAL_URL       — Base URL for the portal control API (default: http://localhost:3000)
+ *   TEAM_MEMBER_*    — The roster; see harness/src/team/roster.ts
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-const NORTHSTAR_URL = process.env.NORTHSTAR_URL || "http://localhost:3000";
+const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 
-/** Primary address for a household member, or null if unconfigured. */
-function primaryAddress(envValue) {
-  const first = (envValue ?? "").split(",").map((e) => e.trim()).filter(Boolean)[0];
-  return first ?? null;
+/**
+ * The team roster, read from TEAM_MEMBER_* env. Duplicated here rather than
+ * imported because this file runs as a standalone MCP process with no build
+ * step — it can't import the harness's compiled TS. Keep in sync with
+ * harness/src/team/roster.ts.
+ */
+function roster() {
+  const members = [];
+  for (const slot of ["A", "B"]) {
+    const name = process.env[`TEAM_MEMBER_${slot}_NAME`]?.trim();
+    if (!name) continue;
+    const id =
+      process.env[`TEAM_MEMBER_${slot}_ID`]?.trim() ||
+      name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const email = (process.env[`TEAM_MEMBER_${slot}_EMAIL`] ?? "")
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean)[0];
+    members.push({ id, name, email: email ?? null });
+  }
+  return members;
 }
 
 /** Resolve the "to" selector into [{ member, address }], skipping unconfigured members. */
 function resolveRecipients(to) {
-  const members =
-    to === "danny" ? ["danny"] : to === "betty" ? ["betty"] : ["danny", "betty"];
-  const envByMember = { danny: process.env.DANNY_EMAIL, betty: process.env.BETTY_EMAIL };
+  const all = roster();
+  const selected = to === "all" ? all : all.filter((m) => m.id === to);
   const resolved = [];
   const missing = [];
-  for (const member of members) {
-    const address = primaryAddress(envByMember[member]);
-    if (address) resolved.push({ member, address });
-    else missing.push(member);
+  for (const member of selected) {
+    if (member.email) resolved.push({ member: member.id, address: member.email });
+    else missing.push(member.id);
   }
   return { resolved, missing };
 }
 
 const server = new Server(
-  { name: "email-household", version: "0.1.0" },
+  { name: "email-team", version: "0.1.0" },
   { capabilities: { tools: {} } }
 );
 
+const ROSTER = roster();
+/** "all" plus one entry per configured member, so each install shows its own people. */
+const TO_ENUM = [...ROSTER.map((m) => m.id), "all"];
+const TEAM_DESCRIPTION =
+  ROSTER.map((m) => `${m.name} (${m.id})`).join(", ") || "no members configured";
+
 const tools = [
   {
-    name: "email_household",
+    name: "email_team",
     description:
-      "Email the household — Danny and/or Betty — to loop them in or ask them to act. " +
+      `Email the team — ${TEAM_DESCRIPTION} — to loop them in or ask them to act. ` +
       "Use this when you need to reach the people you serve: relaying something a sender told you, " +
       "escalating a decision only they can make, or flagging something that needs their attention. " +
-      "You choose WHO among the household (danny, betty, or both) but NOT the address — it is always " +
-      "one of the household members, never anyone else. This starts a new email thread; when they reply, " +
-      "it comes back to you with the full history attached. " +
+      "You choose WHO among the team but NOT the address — it is always one of the team members, " +
+      "never anyone else. This starts a new email thread; when they reply, it comes back to you " +
+      "with the full history attached. " +
       "This is separate from replying to whoever wrote in (use `reply` for that).",
     inputSchema: {
       type: "object",
       properties: {
         to: {
           type: "string",
-          enum: ["danny", "betty", "both"],
-          description: "Which household member(s) to email. Defaults to both.",
+          enum: TO_ENUM,
+          description: "Which team member to email, by id — or \"all\" for everyone. Defaults to all.",
         },
         subject: { type: "string", description: "Email subject line." },
         message: {
@@ -98,15 +120,15 @@ const tools = [
   },
 ];
 
-async function handleEmailHousehold(args) {
-  const { to = "both", subject, message, html } = args;
+async function handleEmailTeam(args) {
+  const { to = "all", subject, message, html } = args;
 
   if (!subject || (!message && !html)) {
     return {
       content: [
         {
           type: "text",
-          text: "email_household requires `subject` and a body — either `message` or `html`.",
+          text: "email_team requires `subject` and a body — either `message` or `html`.",
         },
       ],
       isError: true,
@@ -119,7 +141,7 @@ async function handleEmailHousehold(args) {
       content: [
         {
           type: "text",
-          text: `No household address is configured for: ${missing.join(", ") || to}. Cannot send.`,
+          text: `No team address is configured for: ${missing.join(", ") || to}. Cannot send.`,
         },
       ],
       isError: true,
@@ -138,7 +160,7 @@ async function handleEmailHousehold(args) {
   const failed = [];
   for (const { member, address } of resolved) {
     try {
-      const res = await fetch(`${NORTHSTAR_URL}/api/control`, {
+      const res = await fetch(`${PORTAL_URL}/api/control`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -171,7 +193,7 @@ async function handleEmailHousehold(args) {
 }
 
 const handlers = {
-  email_household: handleEmailHousehold,
+  email_team: handleEmailTeam,
 };
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));

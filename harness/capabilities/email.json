@@ -1,6 +1,6 @@
 {
   "name": "email",
-  "description": "Send ad-hoc outbound email as the household, via the Northstar control API (records the thread so replies come back with context).",
+  "description": "Send ad-hoc outbound email as the team, via the Northstar control API (records the thread so replies come back with context).",
   "server": {
     "command": "node",
     "args": ["${HARNESS_ROOT}/tools/email-mcp.mjs"]

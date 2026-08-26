@@ -11,7 +11,7 @@
  * reach anyone new, only answer whoever wrote in — exactly what auto-delivery
  * did before, but as an explicit, skippable action.
  *
- * Contrast with `send_email` (a separate, household-only capability), which
+ * Contrast with `send_email` (a separate, team-only capability), which
  * starts arbitrary new mail and therefore stays gated to authenticated senders.
  *
  * Delivery is proxied through the Northstar control API (`reply` action) so the
@@ -19,7 +19,7 @@
  * faithful copy of the real, user-visible thread.
  *
  * Env:
- *   NORTHSTAR_URL           — Base URL for the control API (default: http://localhost:3000)
+ *   PORTAL_URL              — Base URL for the portal control API (default: http://localhost:3000)
  *   NORTHSTAR_REPLY_TARGET  — JSON reply target injected by the harness for this run
  */
 
@@ -27,7 +27,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-const NORTHSTAR_URL = process.env.NORTHSTAR_URL || "http://localhost:3000";
+const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 
 const server = new Server(
   { name: "reply", version: "0.1.0" },
@@ -100,7 +100,7 @@ async function handleReply(args) {
     };
   }
 
-  const res = await fetch(`${NORTHSTAR_URL}/api/control`, {
+  const res = await fetch(`${PORTAL_URL}/api/control`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "reply", replyTarget, message, replyAll }),

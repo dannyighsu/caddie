@@ -6,7 +6,7 @@ It's a grid of `trust tier → permission key → allowed`:
 
 ```json
 {
-  "household": { "notion": true,  ..., "base-tools": true  },
+  "team": { "notion": true,  ..., "base-tools": true  },
   "guest":     { "notion": false, ..., "base-tools": false }
 }
 ```
@@ -21,7 +21,7 @@ It's a grid of `trust tier → permission key → allowed`:
 ## How it's enforced
 
 At launch (`harness/src/agent/launcher.ts`), the run's trust tier is resolved
-(from the sender's identity, or `household` for scheduled/owner runs) and the
+(from the sender's identity, or `team` for scheduled/owner runs) and the
 policy is applied in two places:
 
 1. **MCP capabilities** — the agent's declared `capabilities` are filtered to the
@@ -47,14 +47,14 @@ identity: { trustTier, senderIdentity, originChannel }
 
 Each entry point builds it:
 
-- **Channels** (`messaging.ts`) — from the resolved sender: verified household
-  member → `household`; unverified → `guest`.
+- **Channels** (`messaging.ts`) — from the resolved sender: verified team
+  member → `team`; unverified → `guest`.
 - **Portal** (`/api/agents/[id]/run`, `/api/control` immediate run) — always
-  `household`, attributed to the household member picked in the header's *Acting
+  `team`, attributed to the team member picked in the header's *Acting
   as* selector (persisted in the `portal_owner` cookie; both options are
-  household-trust, so it's attribution only). The portal is gated to
+  team-trust, so it's attribution only). The portal is gated to
   localhost/tailnet, so its runs are owner-initiated by definition.
-- **Scheduled / triggered runs** (`scheduler.ts`) — `household` (the household's
+- **Scheduled / triggered runs** (`scheduler.ts`) — `team` (the team's
   own automations), sender "Automated run".
 
 `senderIdentity` and `originChannel` are rendered into the persona
@@ -64,7 +64,7 @@ Each entry point builds it:
 
 | Tier | Capabilities | Built-in tools |
 |---|---|---|
-| **household** | all granted | on |
+| **team** | all granted | on |
 | **guest** | **none** | **off** |
 
 A guest run is therefore conversational only — no MCP capabilities and no Bash /
@@ -80,7 +80,7 @@ a capability, set its key to `true` under `guest`.
 > **Note — `base-tools` is a superset.** Bash can reach anything on the box
 > (the control API, the browser profile, other capabilities' credentials). So
 > granting a tier `base-tools` effectively grants it everything, regardless of
-> the other toggles. That's fine for `household`; just don't expect
+> the other toggles. That's fine for `team`; just don't expect
 > "base-tools on + egress off" to actually contain a tier.
 
 ## Related

@@ -28,7 +28,7 @@ export interface PortalRunInput {
   agentId: string;
   prompt: string;
   profile?: string;
-  /** Household owner the run is attributed to. */
+  /** Team owner the run is attributed to. */
   portalOwner: UserId;
   /** Extra persona/template context (currentTime is added if absent). */
   context?: Record<string, string>;

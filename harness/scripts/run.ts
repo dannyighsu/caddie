@@ -47,7 +47,7 @@ async function main() {
   const result = await launcher.launch({
     agentId,
     identity: {
-      trustTier: "household",
+      trustTier: "team",
       senderIdentity: "CLI (smoke test)",
       originChannel: "cli",
     },

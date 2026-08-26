@@ -4,6 +4,10 @@
  * Reads capability definition files (JSON) and resolves them into
  * MCPServerConfig objects ready to pass to the agent runtime.
  * Environment variable references (${VAR_NAME}) are resolved from process.env.
+ *
+ * A capability with an unresolved reference is skipped rather than mounted with
+ * a blank value, so a missing credential costs you that one capability instead
+ * of producing tools that fail at first use. Nothing here fails a run.
  */
 
 import { readFile } from "fs/promises";
@@ -27,9 +31,13 @@ const ENV_VAR_PATTERN = /\$\{([^}]+)\}/g;
  * Resolve ${ENV_VAR} references in a string from process.env.
  * Collects names of missing variables into the provided set.
  */
-function resolveEnvVars(value: string, missingVars: Set<string>): string {
+function resolveEnvVars(
+  value: string,
+  missingVars: Set<string>,
+  provided: Record<string, string> = {}
+): string {
   return value.replace(ENV_VAR_PATTERN, (_, varName) => {
-    const resolved = process.env[varName];
+    const resolved = provided[varName] ?? process.env[varName];
     if (resolved === undefined) {
       missingVars.add(varName);
       return "";
@@ -41,10 +49,14 @@ function resolveEnvVars(value: string, missingVars: Set<string>): string {
 /**
  * Resolve env vars in all string values of a record.
  */
-function resolveEnvRecord(record: Record<string, string>, missingVars: Set<string>): Record<string, string> {
+function resolveEnvRecord(
+  record: Record<string, string>,
+  missingVars: Set<string>,
+  provided: Record<string, string> = {}
+): Record<string, string> {
   const resolved: Record<string, string> = {};
   for (const [key, value] of Object.entries(record)) {
-    resolved[key] = resolveEnvVars(value, missingVars);
+    resolved[key] = resolveEnvVars(value, missingVars, provided);
   }
   return resolved;
 }
@@ -61,6 +73,13 @@ async function loadCapability(
   return JSON.parse(content) as CapabilityDefinition;
 }
 
+/** A capability left unmounted because its configuration is incomplete. */
+export interface SkippedCapability {
+  name: string;
+  /** The `${VAR}` references that resolved to nothing. */
+  missingVars: string[];
+}
+
 export interface ResolveResult {
   /** MCP servers to pass to the runtime. */
   servers: Record<string, MCPServerConfig>;
@@ -68,6 +87,11 @@ export interface ResolveResult {
   flags: string[];
   /** Warnings about missing env vars or failed loads. */
   warnings: string[];
+  /**
+   * Capabilities skipped for missing credentials. The run still proceeds — an
+   * unconfigured capability is simply absent, never a broken mount.
+   */
+  skipped: SkippedCapability[];
 }
 
 /**
@@ -78,11 +102,18 @@ export interface ResolveResult {
  */
 export async function resolveCapabilities(
   capabilityNames: string[],
-  capabilitiesDir: string
+  capabilitiesDir: string,
+  /**
+   * Substitutions the caller knows, checked before process.env. Used for paths
+   * the harness computes rather than the operator configures (HARNESS_ROOT), so
+   * a capability is never skipped for something that was never user config.
+   */
+  provided: Record<string, string> = {}
 ): Promise<ResolveResult> {
   const servers: Record<string, MCPServerConfig> = {};
   const flags: string[] = [];
   const warnings: string[] = [];
+  const skipped: SkippedCapability[] = [];
 
   for (const name of capabilityNames) {
     try {
@@ -95,25 +126,36 @@ export async function resolveCapabilities(
       }
 
       const missingVars = new Set<string>();
-      servers[def.name] = {
-        command: resolveEnvVars(def.server.command, missingVars),
+      const server = {
+        command: resolveEnvVars(def.server.command, missingVars, provided),
         args: def.server.args.map((a) => {
-          const resolved = resolveEnvVars(a, missingVars);
+          const resolved = resolveEnvVars(a, missingVars, provided);
           // Resolve relative paths against the capabilities directory
           if (resolved.startsWith("./") || resolved.startsWith("../")) {
             return resolve(capabilitiesDir, resolved);
           }
           return resolved;
         }),
-        env: def.server.env ? resolveEnvRecord(def.server.env, missingVars) : undefined,
+        env: def.server.env ? resolveEnvRecord(def.server.env, missingVars, provided) : undefined,
       };
 
+      // A capability whose credentials are unset is NOT mounted. Mounting it
+      // anyway would hand the agent tools that authenticate with an empty
+      // string — the failure then surfaces mid-run as a confusing tool error,
+      // and the agent may burn turns retrying it. An unconfigured optional
+      // capability should look like an absent one: the run proceeds without it.
       if (missingVars.size > 0) {
         const vars = Array.from(missingVars).join(", ");
-        const msg = `Capability "${name}" has unset env vars: ${vars}`;
+        const msg =
+          `Capability "${name}" NOT mounted — unset env vars: ${vars}. ` +
+          `Set them (see northstar/.env.example) or drop "${name}" from the agent's capabilities.`;
+        skipped.push({ name, missingVars: Array.from(missingVars) });
         warnings.push(msg);
         console.warn(`[MCP Resolver] ${msg}`);
+        continue;
       }
+
+      servers[def.name] = server;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const msg = `Failed to load capability "${name}": ${message}`;
@@ -122,5 +164,5 @@ export async function resolveCapabilities(
     }
   }
 
-  return { servers, flags, warnings };
+  return { servers, flags, warnings, skipped };
 }

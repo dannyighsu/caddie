@@ -11,6 +11,7 @@
  */
 
 import type { ResolvedIdentity, UserId } from "./identity";
+import { teamLookup } from "@agints/harness";
 
 const API_BASE = "https://api.telegram.org";
 
@@ -339,22 +340,13 @@ function escapeRegex(str: string): string {
 
 // --- Identity resolution ---
 
-function householdTelegramMap(): Map<string, UserId> {
-  const map = new Map<string, UserId>();
-  const add = (envValue: string | undefined, userId: UserId) => {
-    if (!envValue) return;
-    for (const raw of envValue.split(",")) {
-      const cleaned = raw.trim();
-      if (cleaned) map.set(cleaned, userId);
-    }
-  };
-  add(process.env.DANNY_TELEGRAM_ID, "danny");
-  add(process.env.BETTY_TELEGRAM_ID, "betty");
-  return map;
+/** Telegram user id -> team member id, from the roster. */
+function teamTelegramMap(): Map<string, UserId> {
+  return teamLookup("telegramId");
 }
 
 /**
- * Resolve a Telegram message's sender against the household allowlist.
+ * Resolve a Telegram message's sender against the team roster.
  * The webhook secret is verified upstream in the route handler, so the
  * `from.id` here is treated as a verified Telegram user ID.
  */
@@ -365,7 +357,7 @@ export function resolveTelegramIdentity(
     return { kind: "guest", channel: "telegram", rawSender: "unknown" };
   }
   const rawSender = String(from.id);
-  const userId = householdTelegramMap().get(rawSender);
+  const userId = teamTelegramMap().get(String(rawSender).toLowerCase());
   if (userId) {
     return { kind: "authenticated", userId, channel: "telegram", rawSender };
   }

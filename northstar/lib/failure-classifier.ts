@@ -6,7 +6,7 @@
  *
  *   - "api"   — the Claude API call itself failed before the agent could do its
  *               work: expired OAuth, rate limit, overload, credit/usage cap.
- *               Infrastructure the household owner must fix (usually re-auth).
+ *               Infrastructure the team owner must fix (usually re-auth).
  *   - "agent" — the agent ran but returned an error on its task (non-zero exit,
  *               max turns exhausted, output-schema validation, a thrown tool).
  *

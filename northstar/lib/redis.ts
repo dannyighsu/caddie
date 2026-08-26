@@ -111,8 +111,8 @@ export interface ScheduledJob {
   notificationRecipient?: string;
   /**
    * Trust tier the agent run launches at. Scheduled/triggered runs are the
-   * household's own automations, so they default to "household" (giving access
-   * to household-gated capabilities like email/notion/calendar). Pin to "guest"
+   * team's own automations, so they default to "team" (giving access
+   * to team-gated capabilities like email/notion/calendar). Pin to "guest"
    * for a job that should run least-privilege. Only applies to "run" jobs.
    */
   trustTier?: TrustTier;

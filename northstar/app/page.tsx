@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { getPortalStats, isStatsRange, type PortalStats, type StatsRange } from "@/lib/stats";
+import { DEFAULT_MAX_TURNS } from "@agints/harness";
 
 interface Agent {
   id: string;
   name: string;
   capabilities: string[];
   maxTurns?: number;
-  mode?: "conversational" | "triggered";
 }
 
 interface Conversation {
@@ -175,8 +175,7 @@ export default async function Dashboard({
                     <h3 className="font-semibold text-ink">{agent.name}</h3>
                     <p className="text-sm text-ink-soft mt-1">
                       {agent.capabilities.join(", ")}
-                      {" · "}max {agent.maxTurns ?? 20} turns
-                      {agent.mode === "triggered" && " · triggered"}
+                      {" · "}max {agent.maxTurns ?? DEFAULT_MAX_TURNS} turns
                     </p>
                   </div>
                   <span className="text-xs font-mono text-primary bg-primary-soft rounded-md px-2 py-1">{agent.id}</span>

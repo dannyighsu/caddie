@@ -2,14 +2,8 @@
   "id": "buri",
   "name": "Buri",
   "persona": "./persona.md",
-  "capabilities": ["notion", "egress", "browser", "google-calendar", "google-gmail", "email", "email-household", "reply", "introspect"],
+  "capabilities": ["notion", "egress", "browser", "google-calendar", "google-gmail", "email", "email-team", "reply", "introspect"],
   "profiles": {
-    "writer": {
-      "capabilities": ["notion", "web-search", "egress", "browser"]
-    },
-    "xmanager": {
-      "capabilities": ["browser", "egress"]
-    },
     "extended": {
       "maxTurns": 300
     }

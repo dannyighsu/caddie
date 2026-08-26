@@ -10,19 +10,19 @@
  * replies the shared messaging handler finds the thread and supplies prior
  * context.
  *
- * This is intentionally a SEPARATE, household-trust capability (see
+ * This is intentionally a SEPARATE, team-trust capability (see
  * capabilities/email.json) rather than a tool on the public `egress` server:
- * sending mail as the household must stay gated to authenticated senders.
+ * sending mail as the team must stay gated to authenticated senders.
  *
  * Env:
- *   NORTHSTAR_URL — Base URL for the Northstar control API (default: http://localhost:3000)
+ *   PORTAL_URL — Base URL for the portal control API (default: http://localhost:3000)
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-const NORTHSTAR_URL = process.env.NORTHSTAR_URL || "http://localhost:3000";
+const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 
 const server = new Server(
   { name: "email", version: "0.1.0" },
@@ -94,7 +94,7 @@ async function handleSendEmail(args) {
     try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
   }
 
-  const res = await fetch(`${NORTHSTAR_URL}/api/control`, {
+  const res = await fetch(`${PORTAL_URL}/api/control`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

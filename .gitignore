@@ -40,13 +40,10 @@ xcschememanagement.plist
 
 # Environment files #
 ######################
-.env
-.env_prod
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.production
+# Catch-all, so backups and one-off variants (.env.local.bak-*, .env.staging)
+# can never be committed. The template is the single deliberate exception.
+.env*
+!.env.example
 
 # Python #
 ##########
@@ -116,5 +113,9 @@ Secrets.swift
 .aider*
 .DS_Store
 .workspace
-harness/agents/buri/jobs
+# Recurring job definitions are per-instance: a job names real places, people,
+# and criteria for one household, so it belongs to that install and not the
+# repo. The README is kept so a fresh clone still explains what goes here.
+harness/agents/*/jobs/*
+!harness/agents/*/jobs/README.md
 workspace/

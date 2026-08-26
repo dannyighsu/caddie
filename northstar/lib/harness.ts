@@ -21,6 +21,8 @@ export const workspaceRoot = process.env.WORKSPACE_ROOT
 
 export const resolversDir = resolve(harnessRoot, "resolvers");
 export const agentsDir = resolve(harnessRoot, "agents");
+/** Shared, instance-agnostic skills mounted for every agent. */
+export const coreSkillsDir = resolve(harnessRoot, "skills", "core");
 
 let launcherInstance: ReturnType<typeof createLauncher> | null = null;
 
@@ -66,6 +68,41 @@ export function getLauncher() {
       return result;
     },
   };
+}
+
+/**
+ * The agent every un-attributed run belongs to — inbound messages, outbound
+ * threads, failure alerts.
+ *
+ * This deployment runs one base agent; variation lives in its profiles, not in
+ * separate agents. So the default is simply "the agent that's there", and an
+ * explicit `DEFAULT_AGENT_ID` is only needed if a second one is ever added.
+ * Throws rather than guessing when the choice is ambiguous.
+ */
+let cachedDefaultAgentId: string | null = null;
+
+export async function defaultAgentId(): Promise<string> {
+  if (cachedDefaultAgentId) return cachedDefaultAgentId;
+
+  const configured = process.env.DEFAULT_AGENT_ID;
+  if (configured) {
+    cachedDefaultAgentId = configured;
+    return configured;
+  }
+
+  const agents = await listAgents();
+  if (agents.length === 1) {
+    cachedDefaultAgentId = agents[0].id;
+    return cachedDefaultAgentId;
+  }
+  if (agents.length === 0) {
+    throw new Error(
+      `No agents found in ${resolve(harnessRoot, "agents")}. Add one, or set DEFAULT_AGENT_ID.`
+    );
+  }
+  throw new Error(
+    `Multiple agents found (${agents.map((a) => a.id).join(", ")}) — set DEFAULT_AGENT_ID to pick the one that handles inbound messages.`
+  );
 }
 
 /**

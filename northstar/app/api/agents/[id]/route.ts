@@ -1,4 +1,5 @@
 import { getAgent } from "@/lib/harness";
+import { DEFAULT_MAX_TURNS } from "@agints/harness";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -12,5 +13,7 @@ export async function GET(
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   }
 
-  return NextResponse.json(agent);
+  // Resolve the turn ceiling here rather than in the browser — the default
+  // lives in the harness, which can't be imported into a client component.
+  return NextResponse.json({ ...agent, maxTurns: agent.maxTurns ?? DEFAULT_MAX_TURNS });
 }

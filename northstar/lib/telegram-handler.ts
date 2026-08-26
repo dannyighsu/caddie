@@ -24,7 +24,7 @@ import {
   storeTelegramMessage,
 } from "./db";
 import { handleInboundMessage, type Attachment } from "./messaging";
-import { workspaceRoot } from "./harness";
+import { workspaceRoot, defaultAgentId } from "./harness";
 import {
   sendTelegramMessage,
   isBotMentioned,
@@ -161,7 +161,7 @@ export async function handleTelegramMessage(msg: TelegramMessage): Promise<void>
     return;
   }
 
-  const agentId = conversation?.agent_id ?? "buri";
+  const agentId = conversation?.agent_id ?? (await defaultAgentId());
 
   // Download attachments eagerly in active conversations — even without
   // @mention — so they're available when the bot is next triggered.

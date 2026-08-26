@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -n \"$NORTHSTAR_TRACE_ID\" ]; then curl -s -X POST http://localhost:3000/api/traces -H 'Content-Type: application/json' -H \"X-Trace-Id: $NORTHSTAR_TRACE_ID\" -d \"$(cat)\" > /dev/null 2>&1; fi"
+            "command": "if [ -n \"$NORTHSTAR_TRACE_ID\" ]; then curl -s -X POST \"${PORTAL_URL:-http://localhost:3000}/api/traces\" -H 'Content-Type: application/json' -H \"X-Trace-Id: $NORTHSTAR_TRACE_ID\" -d \"$(cat)\" > /dev/null 2>&1; fi"
           },
           {
             "type": "command",
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -n \"$NORTHSTAR_TRACE_ID\" ]; then curl -s -X POST http://localhost:3000/api/traces -H 'Content-Type: application/json' -H \"X-Trace-Id: $NORTHSTAR_TRACE_ID\" -d '{\"type\":\"stop\"}' > /dev/null 2>&1; fi"
+            "command": "if [ -n \"$NORTHSTAR_TRACE_ID\" ]; then curl -s -X POST \"${PORTAL_URL:-http://localhost:3000}/api/traces\" -H 'Content-Type: application/json' -H \"X-Trace-Id: $NORTHSTAR_TRACE_ID\" -d '{\"type\":\"stop\"}' > /dev/null 2>&1; fi"
           }
         ]
       }

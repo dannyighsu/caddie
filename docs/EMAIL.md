@@ -38,11 +38,13 @@ GOOGLE_CLIENT_SECRET=...
 # GOOGLE_TOKENS_FILE=...             # override the shared token path
 ```
 
-Household identity for the auth gate:
+Team identity for the auth gate — the roster (see `northstar/.env.example`):
 
 ```bash
-DANNY_EMAIL=...
-BETTY_EMAIL=...
+TEAM_MEMBER_A_NAME=...
+TEAM_MEMBER_A_EMAIL=...        # comma-separated; first is primary
+# TEAM_MEMBER_B_NAME=...
+# TEAM_MEMBER_B_EMAIL=...
 ```
 
 ## How it works
@@ -58,7 +60,7 @@ BETTY_EMAIL=...
    decides which the agent sees (stripped normally; full for forwards / gaps /
    loop-ins).
 4. Identity is resolved from the `From` address + the `Authentication-Results`
-   header (spf/dkim/dmarc must pass) → `household` or `guest`.
+   header (spf/dkim/dmarc must pass) → `team` or `guest`.
 
 **Outbound** (`northstar/lib/gmail/transport.ts`)
 - `send_email` / `reply` route through the control API → `sendEmail` /
@@ -67,7 +69,7 @@ BETTY_EMAIL=...
   Gmail thread.
 
 **HTML formatting**
-- `send_email` and `email_household` accept an `html` body in place of `message`.
+- `send_email` and `email_team` accept an `html` body in place of `message`.
   The send becomes a `multipart/alternative`: the HTML as given, plus a
   plain-text alternative derived from it by `htmlToText`
   (`northstar/lib/gmail/html-text.ts`), which keeps link URLs (`text (url)`) and
@@ -115,4 +117,4 @@ curl -X POST localhost:3000/api/control \
 | `Gmail API has not been used in project … or it is disabled` | Enable the Gmail API in the Cloud project (step 1). |
 | Sends fail with insufficient permission | Token lacks `gmail.modify` — re-run `make google-auth`. |
 | No inbound picked up | Confirm the poller started (server logs `[Gmail Poller] Started`) and messages are actually `INBOX`+`UNREAD`. |
-| Wrong sender identity / everyone is guest | Check `DANNY_EMAIL`/`BETTY_EMAIL` and that inbound carries a passing `Authentication-Results` header. |
+| Wrong sender identity / everyone is guest | Check the sender's address is on the `TEAM_MEMBER_*_EMAIL` roster and that inbound carries a passing `Authentication-Results` header. |

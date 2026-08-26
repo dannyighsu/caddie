@@ -16,7 +16,8 @@ import {
   appendMessages,
   type Message,
 } from "./db";
-import { classifyMessage } from "./classifier";
+import { defaultAgentId } from "./harness";
+import { teamMemberLabel } from "@agints/harness";
 import { currentTimePST } from "./helpers";
 import { renderThreadContext } from "./thread-context";
 import {
@@ -126,7 +127,7 @@ export interface InboundMessageResult {
  * Process an inbound message from any channel.
  *
  * 1. Lookup or create conversation by external ID
- * 2. Classify new conversations to route to the right agent/profile
+ * 2. Create new conversations against the base agent (default profile)
  * 3. Launch agent with conversation history as context (fresh session each time)
  * 4. Persist messages
  * 5. Reply via the provided replyFn
@@ -169,23 +170,17 @@ export async function handleInboundMessage(
     let profile: string | undefined;
 
     if (conversation) {
+      // An existing thread keeps whatever profile it was created with, so a
+      // profile chosen once (e.g. from the portal) carries across replies.
       profile = conversation.profile ?? undefined;
     } else {
-      const classification = await classifyMessage(text);
-      console.log(
-        `[Messaging] Classified "${text.substring(0, 50)}..." as: ${classification.label} (${classification.confidence})`
-      );
-
-      profile = classification.profile;
+      // Inbound messages always run the base agent on its default profile.
+      // Profiles are an explicit choice — made from the portal or on a
+      // scheduled job — never inferred from message text.
+      const agentId = await defaultAgentId();
       const title = text.length > 80 ? text.substring(0, 80) + "..." : text;
-      conversation = await createConversation(
-        classification.agentId,
-        title,
-        externalId,
-        profile
-      );
-
-      console.log(`[Messaging] Routed to ${classification.label}`);
+      conversation = await createConversation(agentId, title, externalId, undefined);
+      console.log(`[Messaging] New thread -> ${agentId}`);
     }
 
     // Build prompt with conversation history for continuity. Each run is a
@@ -348,12 +343,12 @@ function senderLabel(m: Message): string {
   if (m.role === "assistant") return "Assistant";
   if (!m.sender) return "User";
   if (m.sender.kind === "guest") return "Guest";
-  return m.sender.userId === "danny" ? "Danny" : "Betty";
+  return teamMemberLabel(m.sender.userId);
 }
 
 function currentMessageLabel(identity: ResolvedIdentity): string {
   if (identity.kind === "guest") return "Guest";
-  return identity.userId === "danny" ? "Danny" : "Betty";
+  return teamMemberLabel(identity.userId);
 }
 
 function buildPromptWithHistory(

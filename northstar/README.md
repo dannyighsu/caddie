@@ -31,7 +31,7 @@ Open `http://localhost:3000`. The agent page shows conversations, config editing
 
 ### Slack
 
-Connects via Socket Mode (outbound WebSocket -- no public URL or tunnel needed). New threads are classified and routed to the appropriate agent. Replies in the same thread continue the conversation with session resumption.
+Connects via Socket Mode (outbound WebSocket -- no public URL or tunnel needed). New threads start a conversation with the base agent; replies in the same thread continue it with session resumption.
 
 Setup: Enable Socket Mode in your Slack app settings, generate an App-Level Token (`xapp-...`), subscribe to `message.im` and `app_mention` events. Connection starts automatically when the server boots.
 
@@ -44,7 +44,7 @@ The control-plane command surface for agent executions, notifications, and sched
 curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri"}'
 
 # Run with a specific profile
-curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"writer","prompt":"Draft a summary"}'
+curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","prompt":"Draft a summary"}'
 
 # Send to Slack
 curl -X POST localhost:3000/api/control -d '{
@@ -54,13 +54,13 @@ curl -X POST localhost:3000/api/control -d '{
 
 # Schedule for later (works with both notify and run)
 curl -X POST localhost:3000/api/control -d '{
-  "action": "run", "agentId": "buri", "profile": "xmanager",
+  "action": "run", "agentId": "buri", "profile": "extended",
   "scheduledFor": "2026-03-28T09:00:00Z"
 }'
 
 # Create a recurring schedule
 curl -X POST localhost:3000/api/control -d '{
-  "action": "schedule", "agentId": "buri", "profile": "xmanager",
+  "action": "schedule", "agentId": "buri",
   "cron": "0,30 * * * *", "description": "Feed scan every 30 min"
 }'
 
@@ -98,7 +98,6 @@ curl localhost:3000/api/control
 | `REDIS_URL` | yes | Redis connection string |
 | `SLACK_BOT_TOKEN` | for Slack | Bot token for sending messages (xoxb-...) |
 | `SLACK_APP_TOKEN` | for Slack | App-level token for Socket Mode (xapp-...) |
-| `OPENROUTER_API_KEY` | for Slack routing | Powers the agent classifier |
 | `LANGFUSE_SECRET_KEY` | for tracing | Langfuse secret key |
 | `LANGFUSE_PUBLIC_KEY` | for tracing | Langfuse public key |
 | `LANGFUSE_BASE_URL` | for tracing | Defaults to `https://us.cloud.langfuse.com` |
