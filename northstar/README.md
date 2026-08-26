@@ -49,7 +49,7 @@ curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","pr
 # Send to Slack
 curl -X POST localhost:3000/api/control -d '{
   "action": "notify", "channel": "slack",
-  "message": "Found 3 vulnerabilities", "from": "sandcastle"
+  "message": "Nightly digest ready", "from": "buri"
 }'
 
 # Schedule for later (works with both notify and run)

@@ -41,7 +41,9 @@ async function main() {
     agentsDir: resolve(harnessRoot, "agents"),
     capabilitiesDir: resolve(harnessRoot, "capabilities"),
     resolversDir: resolve(harnessRoot, "resolvers"),
-    workspaceRoot: resolve(harnessRoot, "workspace"),
+    // Same workspace the server uses (<repo>/workspace), so a smoke run
+    // exercises the real one instead of creating a second one under harness/.
+    workspaceRoot: process.env.WORKSPACE_ROOT ?? resolve(harnessRoot, "..", "workspace"),
   });
 
   const result = await launcher.launch({

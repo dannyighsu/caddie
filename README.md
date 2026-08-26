@@ -9,28 +9,106 @@ agints/
 ├── harness/              # Agent Harness library (@agints/harness)
 │   ├── src/              # Runtime, launcher, capability + resolver system
 │   ├── agents/           # Agent definitions (agent.json + persona.md + skills)
+│   ├── skills/core/      # Shared skills, mounted for every agent
 │   ├── capabilities/     # MCP server configs (JSON files)
+│   ├── credentials/      # OAuth tokens (gitignored)
 │   ├── resolvers/        # Pre-run data fetchers (e.g., Google Calendar)
 │   └── scripts/run.ts    # CLI smoke test
 ├── northstar/            # Control plane + API server (Next.js)
-├── workspace/            # Agent working directories (gitignored)
-└── sandcastle/           # Security investigation project
+└── workspace/            # Agent working directories (gitignored)
 ```
 
 ## Quick Start
 
+First-time setup, in order. Steps 1–4 get an agent running; 5 connects it to the
+outside world.
+
+**1. Install what the runtime needs**
+
+- **Node.js** and **pnpm** 10.22+
+- **`claude` CLI** on PATH — the Claude Code CLI is the runtime driver
+- **Bun** — only for the `notion` and `web-search` capabilities, which launch
+  their MCP servers with `bunx`. Skip it and those two sit out; nothing breaks.
+- **Postgres** and **Redis** — an empty database is enough. The schema is
+  created on first use; there is no migration step.
+
 ```bash
-pnpm install                                   # install dependencies
-cp northstar/.env.example northstar/.env.local # then fill in the REQUIRED block
-make run                                       # start Northstar on http://localhost:3000
-make smoke                                     # run a smoke test directly via the harness
+pnpm install
 ```
 
-`make run` needs Postgres, Redis, and the required variables in
-`northstar/.env.local` — see [Prerequisites](#prerequisites).
+**2. Configure**
 
-> Use `make run` for any long-lived session — it serves a production build, so
-> memory stays bounded. For active development with hot reload, use `make dev`.
+```bash
+cp northstar/.env.example northstar/.env.local
+```
+
+Fill in the `REQUIRED` block — that's `POSTGRES_URL`, `REDIS_URL`, one team
+member, and Google credentials. The template splits everything else into
+variables that already have working defaults and optional per-feature blocks
+(Slack, Telegram, Notion, tracing), so the required set is short.
+
+The **team roster** is what makes the agent usable: an inbound sender who isn't
+on it is treated as a guest, and guests are granted nothing. At minimum:
+
+```bash
+TEAM_MEMBER_A_NAME=Your Name
+TEAM_MEMBER_A_EMAIL=you@example.com
+```
+
+**3. Authorize Google** (Calendar + Gmail — the agent's inbox and calendar)
+
+In Google Cloud: enable the Calendar and Gmail APIs, then create an OAuth 2.0
+**Desktop app** credential with `http://localhost:3456/oauth2callback` as an
+authorized redirect URI. Put the client id and secret in `.env.local`, then:
+
+```bash
+make google-auth      # opens a browser; writes harness/credentials/ (gitignored)
+```
+
+Run it once per install. Skip this only if you want a portal-only agent with no
+email and no calendar.
+
+**4. Check it runs**
+
+```bash
+make smoke            # launches the agent directly through the harness
+```
+
+This needs no server, no Postgres, and no Redis — it verifies the `claude` CLI,
+the agent config, and your capability credentials. Anything unconfigured is
+reported as skipped rather than failing the run, so read the output: a
+capability you expected to see missing means a variable didn't land.
+
+```bash
+make run              # portal on http://localhost:3000
+```
+
+Open the portal and talk to the agent from the **Conversations** tab.
+
+> `make run` serves a production build — use it for anything long-lived. For
+> active development with hot reload, `make dev`.
+
+**5. Connect channels** (each optional, each independent)
+
+Email arrives once step 3 is done. For the rest, see
+[TELEGRAM.md](docs/TELEGRAM.md) and the Slack section in
+[northstar/README.md](northstar/README.md); both are just env vars plus setup on
+the provider's side. To reach the agent from outside your machine, see
+[Network exposure](#network-exposure).
+
+### Making it yours
+
+A fresh clone ships the `buri` agent. To adapt it, edit these — all of it is
+also editable in the portal's **Config** tab:
+
+| What | Where |
+|---|---|
+| Voice, boundaries, how it represents you | `harness/agents/buri/persona.md` |
+| Shared standing instructions | `harness/agents/buri/config/preferences.md` |
+| Per-person profiles | `harness/agents/buri/config/team/<member>.md` |
+| Recurring job procedures | `harness/agents/buri/jobs/` (gitignored — see its README) |
+
+Changes take effect on the agent's next run. Nothing to rebuild or restart.
 
 ## Creating an Agent
 
@@ -207,7 +285,7 @@ Capabilities are MCP server configurations. Each is a JSON file in `harness/capa
 }
 ```
 
-`${ENV_VAR}` references are resolved from `process.env` at runtime. Missing env vars produce warnings, not errors.
+`${ENV_VAR}` references are resolved from `process.env` at runtime. A capability with an unresolved reference is **skipped** — not mounted with a blank value — so a missing credential costs you that capability rather than giving the agent a tool that fails at first use. The run proceeds, and the launcher logs which variable was missing. `HARNESS_ROOT` is supplied by the launcher, not read from the environment.
 
 ### Flag-only capability
 
@@ -237,12 +315,27 @@ Reference in agent.json: `"resolvers": ["google-calendar"]`
 
 ### Current capabilities
 
-| Name | Type | Description |
-|------|------|-------------|
-| `notion` | MCP server | Notion workspace access |
-| `web-search` | MCP server | Web fetching |
-| `chrome` | Flag | Chrome browser automation |
-| `google-calendar` | Resolver | Injects `{{calendarEvents}}` from Google Calendar API |
+Generated from `harness/capabilities/`. Which of these a run actually gets is
+*agent's declared capabilities ∩ trust-tier grants ∩ configured credentials* —
+see [PERMISSIONS.md](docs/PERMISSIONS.md).
+
+| Name | Needs | Description |
+|------|-------|-------------|
+| `reply` | — | Reply into the conversation the run is handling. Destination injected by the harness, never chosen by the agent |
+| `email-team` | — | Email team members and only them; recipients resolved from the roster. Granted at guest tier too |
+| `introspect` | — | Read the agent's own run transcripts for self-diagnosis. Read-only, self-scoped |
+| `egress` | — | Outbound messaging and scheduling via the control API |
+| `browser` | — | Headed Playwright browser; persistent profile keeps logins |
+| `chrome` | — | Flag-only: enables Chrome automation on the runtime |
+| `web-search` | Bun | Web search and fetching |
+| `email` | Google | Send ad-hoc outbound email; records the thread so replies come back with context |
+| `google-calendar` | Google | Calendar read/write |
+| `google-gmail` | Google | Gmail search and read — the agent's inbox |
+| `notion` | `NOTION_INTERNAL_TOKEN` | Notion workspace access |
+
+There is also a `google-calendar` **resolver** (`harness/resolvers/`), which is a
+different thing: it pre-fetches events into `{{calendarEvents}}` before the run
+starts, rather than giving the agent a tool.
 
 ## Architecture
 
@@ -321,7 +414,7 @@ make debug        # DEV + memory diagnostics (see below)
 make build        # build harness + northstar
 make install      # install all dependencies
 make smoke        # run a quick smoke test via the harness
-make google-auth  # one-time Google Calendar OAuth setup (opens browser)
+make google-auth  # one-time Google Calendar + Gmail OAuth (opens browser, port 3456)
 ```
 
 `make run` vs `make dev`: the dev server runs the Turbopack dev compiler, which
@@ -396,22 +489,16 @@ be reachable from the internet). Tune via make variables `FUNNEL_PATHS`,
 > middleware (`northstar/middleware.ts`) keeps a coarse host-based allow-list as a
 > secondary backstop, but Tailscale is now the primary gate.
 
-## Prerequisites
+## Configuration reference
 
-Start by copying the annotated environment template — it lists every variable,
-split into the ones you must set, the ones that already have working defaults,
-and the optional per-feature blocks (Slack, Telegram, Notion, tracing):
+Every variable lives in one place: **`northstar/.env.example`**, annotated and
+split into required / defaulted / optional. Copy it to `northstar/.env.local`.
 
-```bash
-cp northstar/.env.example northstar/.env.local
-```
+A capability whose variables aren't set is **not mounted** — the run proceeds
+without it and the launcher logs which variable was missing. So a missing
+credential costs you that one capability; it never fails a run, and it never
+gives the agent tools that fail at first use.
 
-- **Node.js** and **pnpm** (10.22+)
-- **Bun** — the `notion` and `web-search` capabilities launch their MCP servers with `bunx`. Without it, those two are skipped at launch (with a warning); everything else runs.
-- **`claude` CLI** on PATH -- the Claude Code CLI is the current runtime driver
-- **Postgres** -- `POSTGRES_URL` in `northstar/.env.local`
-- **Redis** -- `REDIS_URL` in `northstar/.env.local`
-- **Env vars for capabilities** -- e.g., `NOTION_INTERNAL_TOKEN` for Notion. Missing vars produce warnings, not errors.
-- **Google Calendar** (optional) -- set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `northstar/.env.local`, then run `make google-auth` once to authorize. Tokens are saved to `harness/credentials/` (gitignored).
-- **Telegram** (optional) -- connect your agent to Telegram via the Bot API. See [TELEGRAM.md](docs/TELEGRAM.md) for setup instructions.
-- **Email** (optional) -- See [EMAIL.md](docs/EMAIL.md) for setup instructions.
+Per-integration setup lives with each integration:
+[EMAIL.md](docs/EMAIL.md), [TELEGRAM.md](docs/TELEGRAM.md),
+[PERMISSIONS.md](docs/PERMISSIONS.md).
