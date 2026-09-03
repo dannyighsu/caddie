@@ -32,6 +32,7 @@ import {
   getInboundMessage,
   type GmailInbound,
 } from "./gmail/transport";
+import { selectInboundImages, type GmailPart } from "./gmail/parts";
 import { stripQuotedReply } from "./gmail/strip";
 import { htmlToText } from "./gmail/html-text";
 
@@ -237,6 +238,12 @@ export interface ReceivedEmail {
   references: string[];
   /** Raw RFC 5322 headers from the inbound message (header name → value). */
   headers: Record<string, string>;
+  /**
+   * Images worth showing the agent, already filtered by
+   * {@link selectInboundImages} but not yet downloaded — metadata only, so a
+   * message that gets skipped costs no fetches. The handler downloads these.
+   */
+  imageParts: GmailPart[];
 }
 
 /** Return the first argument that has non-whitespace content, else "". */
@@ -299,6 +306,7 @@ export function receivedFromGmail(m: GmailInbound): ReceivedEmail {
     inReplyTo,
     references,
     headers: m.headers,
+    imageParts: selectInboundImages(m.parts),
   };
 }
 

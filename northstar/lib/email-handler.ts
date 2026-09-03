@@ -4,6 +4,11 @@
  * Processes inbound emails from the Gmail poller. Threads are grouped by Gmail's
  * `threadId`, so multiple messages in the same thread land in the same
  * conversation while different threads — even from the same sender — stay separate.
+ *
+ * Attached and inline images are downloaded to the thread's run-artifacts
+ * directory and passed as channel-agnostic Attachments, the same path Telegram
+ * uses. Selection happens at parse time (see ./gmail/parts), so a message we
+ * skip never costs a fetch.
  */
 
 import { handleInboundMessage } from "./messaging";
@@ -18,6 +23,8 @@ import {
 } from "./email";
 import { getConversationByExternalId, addSeenChannelIds } from "./db";
 import { selectInboundBody, isForwardedMessage, bareEmail } from "./email-threading";
+import { downloadInboundImages, collectThreadImages } from "./gmail/attachments";
+import { defaultAgentId } from "./harness";
 
 /**
  * Process a fully-parsed inbound email: loop-guard, body selection, identity
@@ -67,7 +74,11 @@ export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
     knownMessageIds: new Set(existing?.seen_channel_ids ?? []),
   });
   const body = selection.body.trim();
-  if (!body) {
+  // An image-only email (a forwarded screenshot, a photo with no caption) has
+  // nothing to say in text but is still a real message, so images alone are
+  // enough to dispatch on.
+  const imageParts = email.imageParts;
+  if (!body && imageParts.length === 0) {
     console.log(
       `[Email Handler] Skipping message: empty body from=${email.from} thread=${email.threadId} ` +
         `(after fetch: text=${email.text.length}b html=${email.html.length}b subject="${email.subject}")`,
@@ -86,6 +97,37 @@ export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
       `includedHistory=${selection.includedHistory} threadKnown=${!!existing}`,
   );
 
+  // Fetch image bytes only now that the message is known to be worth
+  // dispatching. The `[attachment:<fileName>]` markers matter as much as the
+  // files: the messaging layer matches attachments to turns by those markers,
+  // and they're stored with the message, so an image stays resolvable when the
+  // thread is re-read on a later turn.
+  const agentId = existing?.agent_id ?? (await defaultAgentId());
+  const savedImages = await downloadInboundImages(
+    imageParts,
+    email.messageId,
+    email.threadId,
+    agentId,
+  );
+  const markers = savedImages.map((a) => `[attachment:${a.fileName}]`).join("\n");
+  // An image-only email whose images all failed to download still has to say
+  // something: the poller marks a normally-returned message read, so returning
+  // early here would lose it silently. Tell the agent what arrived instead.
+  const bodyText =
+    body ||
+    (savedImages.length > 0
+      ? "[Email with no text body]"
+      : `[Email with no text body; ${imageParts.length} image(s) could not be retrieved]`);
+  const promptText = [bodyText, markers].filter(Boolean).join("\n");
+  // Pass everything saved for the thread, not just this message's — the
+  // messaging layer narrows it to what the conversation window references.
+  const attachments = await collectThreadImages(agentId, email.threadId);
+  if (savedImages.length > 0 || attachments.length > 0) {
+    console.log(
+      `[Email Handler] Images: saved=${savedImages.length} thread=${attachments.length}`,
+    );
+  }
+
   // Every email run responds via the `reply` tool — giving it the "no reply
   // necessary" escape hatch and history-from-sends. The tool is a minimal,
   // channel-agnostic capability granted at every trust tier (a guest can only
@@ -93,7 +135,7 @@ export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
   let replyAgentMessageId: string | undefined;
   try {
     const result = await handleInboundMessage({
-      text: body,
+      text: promptText,
       externalId,
       traceName: "email-message",
       identity,
@@ -104,6 +146,7 @@ export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
         threadId: email.threadId,
       },
       context: { originChannel: "email" },
+      attachments: attachments.length > 0 ? attachments : undefined,
       // Envelope (recipients, To vs Cc, group size, subject) so the agent can
       // judge whether a reply is warranted. Prompt-only; never stored.
       promptContext: await describeEnvelope(email),

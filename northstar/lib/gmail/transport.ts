@@ -10,6 +10,7 @@
 import { type gmail_v1 } from "googleapis";
 import { getGmailClient } from "./client";
 import { buildMimeMessage } from "./mime";
+import { extractParts, type GmailPart } from "./parts";
 
 // ── Address + header helpers ──────────────────────────────────────────
 
@@ -76,6 +77,30 @@ export function extractBodies(part: gmail_v1.Schema$MessagePart | undefined): {
   return { html, plain };
 }
 
+// ── Attachment bytes ──────────────────────────────────────────────────
+
+/**
+ * Fetch one attachment's bytes. Returns null when Gmail no longer has the part
+ * (404) — a message deleted mid-poll shouldn't fail the whole dispatch.
+ */
+export async function getAttachmentBytes(
+  messageId: string,
+  attachmentId: string,
+): Promise<Buffer | null> {
+  const gmail = await getGmailClient();
+  try {
+    const res = await gmail.users.messages.attachments.get({
+      userId: "me",
+      messageId,
+      id: attachmentId,
+    });
+    return res.data.data ? Buffer.from(res.data.data, "base64url") : null;
+  } catch (err: unknown) {
+    if ((err as { code?: number })?.code === 404) return null;
+    throw err;
+  }
+}
+
 // ── Parsed inbound message ────────────────────────────────────────────
 
 export interface GmailInbound {
@@ -87,6 +112,8 @@ export interface GmailInbound {
   subject: string;
   html: string;
   plain: string;
+  /** Attached and inline files (metadata only — see {@link extractParts}). */
+  parts: GmailPart[];
   headers: Record<string, string>;
   labelIds: string[];
   internalDate?: string;
@@ -95,6 +122,7 @@ export interface GmailInbound {
 function parseMessage(msg: gmail_v1.Schema$Message): GmailInbound {
   const headers = headerMap(msg.payload);
   const { html, plain } = extractBodies(msg.payload);
+  const parts = extractParts(msg.payload);
   return {
     id: msg.id!,
     threadId: msg.threadId!,
@@ -104,6 +132,7 @@ function parseMessage(msg: gmail_v1.Schema$Message): GmailInbound {
     subject: getHeaderCI(headers, "Subject") ?? "(no subject)",
     html,
     plain,
+    parts,
     headers,
     labelIds: msg.labelIds ?? [],
     internalDate: msg.internalDate ?? undefined,

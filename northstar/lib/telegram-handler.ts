@@ -18,13 +18,13 @@
  */
 
 import { resolve } from "path";
-import { mkdir, writeFile, readdir } from "fs/promises";
+import { writeFile, readdir } from "fs/promises";
 import {
   getConversationByExternalId,
   storeTelegramMessage,
 } from "./db";
 import { handleInboundMessage, type Attachment } from "./messaging";
-import { workspaceRoot, defaultAgentId } from "./harness";
+import { runArtifactsDir, defaultAgentId } from "./harness";
 import {
   sendTelegramMessage,
   isBotMentioned,
@@ -46,17 +46,8 @@ function isImageMime(mimeType: string): boolean {
  * Get the artifacts directory for Telegram attachments, scoped to a specific chat.
  * Keeps Telegram files separate from other agent artifacts (feed-scan snapshots, etc.).
  */
-async function getTelegramAttachmentsDir(agentId: string, chatId: string): Promise<string> {
-  const now = new Date();
-  const pst = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-  const year = pst.getFullYear();
-  const month = String(pst.getMonth() + 1).padStart(2, "0");
-  const day = String(pst.getDate());
-  const dayName = pst.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
-
-  const dir = resolve(workspaceRoot, agentId, "runs", `${year}-${month}`, `${day}_${dayName}`, "artifacts", `telegram-${chatId}`);
-  await mkdir(dir, { recursive: true });
-  return dir;
+function getTelegramAttachmentsDir(agentId: string, chatId: string): Promise<string> {
+  return runArtifactsDir(agentId, `telegram-${chatId}`);
 }
 
 /**

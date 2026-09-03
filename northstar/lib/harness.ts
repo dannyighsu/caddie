@@ -8,7 +8,7 @@
 import { resolve } from "path";
 import { createRuntime, createLauncher } from "@agints/harness";
 import type { AgentConfig, AgentInput, AgentResult } from "@agints/harness";
-import { readdir, readFile } from "fs/promises";
+import { mkdir, readdir, readFile } from "fs/promises";
 import { alertOwnerOnApiFailure } from "./run-alerts";
 
 // The harness package lives alongside northstar in the monorepo
@@ -23,6 +23,35 @@ export const resolversDir = resolve(harnessRoot, "resolvers");
 export const agentsDir = resolve(harnessRoot, "agents");
 /** Shared, instance-agnostic skills mounted for every agent. */
 export const coreSkillsDir = resolve(harnessRoot, "skills", "core");
+
+/**
+ * Create (if needed) and return today's run-artifacts directory for an agent,
+ * scoped by `scope` — e.g. `telegram-<chatId>`, `email-<threadId>`. Inbound
+ * attachments land here, kept apart from the agent's own artifacts (feed-scan
+ * snapshots and the like) and from each other's conversations.
+ *
+ * Dated in PST, matching the rest of the run tree.
+ */
+export async function runArtifactsDir(agentId: string, scope: string): Promise<string> {
+  const now = new Date();
+  const pst = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+  const year = pst.getFullYear();
+  const month = String(pst.getMonth() + 1).padStart(2, "0");
+  const day = String(pst.getDate());
+  const dayName = pst.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+
+  const dir = resolve(
+    workspaceRoot,
+    agentId,
+    "runs",
+    `${year}-${month}`,
+    `${day}_${dayName}`,
+    "artifacts",
+    scope,
+  );
+  await mkdir(dir, { recursive: true });
+  return dir;
+}
 
 let launcherInstance: ReturnType<typeof createLauncher> | null = null;
 
