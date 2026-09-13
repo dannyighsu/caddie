@@ -37,6 +37,12 @@ import {
   finishFromResult,
   failOrchestration,
 } from "./job-ledger";
+import {
+  REPLY_NUDGE_PROMPT,
+  countAssistantTurns,
+  needsReplyNudge,
+  mergeUsage,
+} from "./reply-check";
 
 /**
  * Where an agent's `reply()` tool should deliver, injected into the run as
@@ -231,7 +237,7 @@ export async function handleInboundMessage(
     );
 
     const launcher = getLauncher();
-    const result = await launcher.launch({
+    const launchInput = {
       agentId: conversation.agent_id,
       profile,
       identity: toRunIdentity(identity),
@@ -249,7 +255,42 @@ export async function handleInboundMessage(
           ? { NORTHSTAR_REPLY_TARGET: JSON.stringify(replyTarget) }
           : {}),
       },
-    });
+    };
+    let result = await launcher.launch(launchInput);
+
+    // In "tool" mode a run that delivered no reply leaves the sender with
+    // silence (e.g. it ended its turn "waiting" on background work). Resume the
+    // session once with a reminder; a second silent ending is accepted as
+    // deliberate. Delivered replies are recorded as assistant turns at send
+    // time, so an unchanged count means nothing went out. See ./reply-check.
+    if (deliveryMode === "tool" && result.success && result.sessionId) {
+      const repliesAfter = countAssistantTurns(
+        (await getConversationByExternalId(externalId))?.messages ?? []
+      );
+      const nudge = needsReplyNudge({
+        deliveryMode,
+        success: result.success,
+        sessionId: result.sessionId,
+        repliesBefore: countAssistantTurns(conversation.messages),
+        repliesAfter,
+      });
+      if (nudge) {
+        console.log(
+          `[Messaging] No reply delivered (${traceName}) — resuming session ${result.sessionId} once with a reply reminder`
+        );
+        const nudged = await launcher.launch({
+          ...launchInput,
+          prompt: REPLY_NUDGE_PROMPT,
+          sessionId: result.sessionId,
+          context: { ...launchInput.context, currentTime: currentTimePST() },
+        });
+        result = {
+          ...nudged,
+          sessionId: nudged.sessionId || result.sessionId,
+          usage: mergeUsage(result.usage, nudged.usage),
+        };
+      }
+    }
 
     const rawText = result.rawText;
 

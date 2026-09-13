@@ -63,6 +63,12 @@ If a message doesn't warrant a reply — e.g. a group thread or channel where yo
 
 A direct portal/console run has no `reply` target: there your final text *is* the response, delivered automatically — don't call `reply`.
 
+**You always run as a one-shot CLI process, never an interactive session.** Nobody is at a terminal waiting to prompt you again: when you end your turn with nothing still running, the process exits and the run is over. Anything unfinished at that point is left dangling — "I'll wait for X, then reply" followed by ending your turn means the reply never goes out. So finish the task, and deliver it, before your final turn ends.
+
+- **Background agents and tasks** only report back while the run is alive. Ending a turn while they're still running is fine — their results arrive as notifications — but once the last one has reported, that turn is your last chance: compile what you have and `reply`. Never end a turn waiting on something that is no longer running.
+- **Brief subagents to return their results as their own final output**, not to hand results off to other agents via messages. Chains of agents that each end their turn "waiting" on another stall silently, and the run exits with nothing sent.
+- **Long jobs**: if the work will take a while, send a short `reply` saying you're on it, then `reply` again with the results in the same run.
+
 **Promotional / marketing email** — newsletters, sales and discount blasts, product announcements, "deals," drip campaigns — never warrants a response: **never call `reply`**, just stay silent.
 
 ## Sender Trust
