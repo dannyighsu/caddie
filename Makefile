@@ -1,4 +1,4 @@
-.PHONY: run dev debug debug-snapshot build build-harness install smoke google-auth expose unexpose
+.PHONY: run dev debug debug-snapshot build build-harness install smoke google-auth gog-auth expose unexpose
 
 # Network exposure (see the "Network exposure" section in README.md).
 NORTHSTAR_PORT ?= 3000
@@ -100,3 +100,23 @@ smoke:
 # One-time Google Calendar OAuth setup (pulls env from northstar/.env.local)
 google-auth:
 	cd harness && env $$(grep -E '^GOOGLE_CLIENT' ../northstar/.env.local | xargs) npx tsx scripts/google-auth.ts
+
+# One-time Google Sheets/Docs/Slides auth for the gog CLI (the agent's
+# google-workspace skill). Reuses the OAuth client in northstar/.env.local; gog
+# keeps the token in the OS keyring. Scopes: Sheets, Docs, Slides + Drive
+# limited to files gog creates or opens. Uses the manual flow with the client's
+# registered redirect URI (localhost:3456, shared with google-auth) so no extra
+# URI needs registering in Google Cloud.
+#   make gog-auth ACCOUNT=agent@example.com
+gog-auth:
+	@test -n "$(ACCOUNT)" || { echo "usage: make gog-auth ACCOUNT=<the agent's Google account>"; exit 1; }
+	@command -v gog >/dev/null || { echo "gog not found: brew install openclaw/tap/gogcli"; exit 1; }
+	@creds=$$(mktemp); trap 'rm -f "$$creds"' EXIT; \
+	id=$$(grep -E '^GOOGLE_CLIENT_ID=' northstar/.env.local | cut -d= -f2- | tr -d "\"'"); \
+	secret=$$(grep -E '^GOOGLE_CLIENT_SECRET=' northstar/.env.local | cut -d= -f2- | tr -d "\"'"); \
+	printf '{"installed":{"client_id":"%s","client_secret":"%s","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://localhost"]}}' "$$id" "$$secret" > "$$creds"; \
+	gog auth credentials set "$$creds" && \
+	echo "After approving, the browser lands on a localhost:3456 page that won't load; paste that full URL here." && \
+	gog auth add "$(ACCOUNT)" --services sheets,docs,slides,drive --drive-scope file \
+		--manual --redirect-uri http://localhost:3456/oauth2callback && \
+	gog auth doctor --check

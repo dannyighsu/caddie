@@ -43,6 +43,15 @@ describe("ClaudeCodeRuntime", () => {
       expect(args).toContain("opus");
     });
 
+    it("always passes --strict-mcp-config so host/claude.ai MCP servers never load", () => {
+      const args: string[] = buildArgs({
+        prompt: "hi",
+        maxTurns: 5,
+        workingDirectory: "/tmp",
+      });
+      expect(args).toContain("--strict-mcp-config");
+    });
+
     it("disables all built-in tools with --tools \"\" when disableBuiltinTools is set", () => {
       const args: string[] = buildArgs({
         prompt: "hi",

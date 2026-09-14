@@ -68,6 +68,19 @@ make google-auth      # opens a browser; writes harness/credentials/ (gitignored
 Run it once per install. Skip this only if you want a portal-only agent with no
 email and no calendar.
 
+*Optional: Google Sheets, Docs & Slides* (the agent's `google-workspace` skill).
+Enable the Sheets, Docs, Slides and Drive APIs in the same Google Cloud project,
+install the
+[`gog`](https://github.com/openclaw/gogcli) CLI, and authorize the agent's
+Google account. This reuses the OAuth client above:
+
+```bash
+brew install openclaw/tap/gogcli
+make gog-auth ACCOUNT=agent@example.com   # opens a browser; token goes in the OS keyring
+```
+
+Then set `GOG_ACCOUNT` to the same address in `.env.local`.
+
 **4. Check it runs**
 
 ```bash
@@ -415,6 +428,7 @@ make build        # build harness + northstar
 make install      # install all dependencies
 make smoke        # run a quick smoke test via the harness
 make google-auth  # one-time Google Calendar + Gmail OAuth (opens browser, port 3456)
+make gog-auth ACCOUNT=...  # one-time Google Sheets/Docs/Slides auth for the gog CLI (opens browser)
 ```
 
 `make run` vs `make dev`: the dev server runs the Turbopack dev compiler, which

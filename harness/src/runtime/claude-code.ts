@@ -102,6 +102,11 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       "--output-format", "json",
       "--max-turns", String(input.maxTurns),
       "--dangerously-skip-permissions",
+      // Only the servers the harness mounts via --mcp-config. Without this the
+      // CLI also loads the host's own MCP servers — including claude.ai
+      // connectors (e.g. Google Drive) tied to the logged-in account — which
+      // bypass the capability/permission policy entirely.
+      "--strict-mcp-config",
     ];
 
     if (input.outputSchema) {
