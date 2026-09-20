@@ -59,7 +59,7 @@ function getRawLauncher() {
   if (!launcherInstance) {
     const runtime = createRuntime({
       options: {
-        model: process.env.CLAUDE_MODEL ?? "claude-sonnet-5",
+        model: process.env.CLAUDE_MODEL ?? "claude-opus-5",
         effort: process.env.CLAUDE_EFFORT ?? "medium",
       },
     });

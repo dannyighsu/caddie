@@ -21,7 +21,7 @@ const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 export interface ClaudeCodeRuntimeOptions {
   /** Path to the `claude` binary. Defaults to "claude" (on PATH). */
   claudeBinary?: string;
-  /** Model to use (e.g., "claude-sonnet-5"). If omitted, uses Claude Code default. */
+  /** Model to use (e.g., "claude-opus-5"). If omitted, uses Claude Code default. */
   model?: string;
   /**
    * Reasoning effort level (low | medium | high | xhigh | max). If omitted,

@@ -792,4 +792,33 @@ describe("skill mounting", () => {
       AGENT_SKILLS, "/workspace/test-agent/.claude/skills-src"
     );
   });
+
+  it("links tickets into the workspace, so a filed ticket outlives the run", async () => {
+    const AGENT_TICKETS = "/agents/test-agent/tickets";
+    mockFs.readdir.mockImplementation(dirs({ [AGENT_SKILLS]: ["feed-scan"] }));
+    mockFs.lstat.mockImplementation(async (p: any) =>
+      String(p) === AGENT_TICKETS
+        ? ({ isSymbolicLink: () => false } as any)
+        : Promise.reject(new Error("ENOENT"))
+    );
+
+    const runtime = mockRuntime();
+    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+
+    // Writes go through the link into the agent definition, not the scratch
+    // workspace — otherwise a bug report is swept away with the run that filed it.
+    expect(mockFs.symlink).toHaveBeenCalledWith(
+      AGENT_TICKETS, "/workspace/test-agent/tickets"
+    );
+  });
+
+  it("skips the tickets link for an agent that has no tickets directory", async () => {
+    mockFs.readdir.mockImplementation(dirs({ [AGENT_SKILLS]: ["feed-scan"] }));
+
+    const runtime = mockRuntime();
+    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+
+    const linked = mockFs.symlink.mock.calls.map((c: any) => String(c[1]));
+    expect(linked).not.toContain("/workspace/test-agent/tickets");
+  });
 });

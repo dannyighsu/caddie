@@ -81,12 +81,18 @@ async function loadPersona(
 }
 
 /**
- * Symlink a read-only directory from the agent definition into the workspace at
- * the same relative path, so the running agent sees the agent's stable
- * definitions natively. Used for `.claude/skills/` (native skill discovery) and
- * `jobs/` (recurring-job procedures injected as "Job instructions"). A no-op if
+ * Symlink a directory from the agent definition into the workspace at the same
+ * relative path, so the running agent sees the agent's stable definitions
+ * natively. Used for `.claude/skills/` (native skill discovery), `jobs/`
+ * (recurring-job procedures injected as "Job instructions"), and `tickets/`
+ * (the agent's own bug reports — see the `ticketing` core skill). A no-op if
  * the agent has no such directory or the workspace already links it — so an edit
  * to the agent definition propagates without a workspace rebuild.
+ *
+ * Most of what's linked this way is read-only in practice; `tickets/` is not,
+ * and that's the point. Writing through the link lands in the agent definition
+ * rather than the workspace, so a ticket outlives the run that filed it —
+ * the workspace is scratch, and a bug report swept away with it is worthless.
  */
 async function ensureDefinitionSymlink(
   agentDir: string,
@@ -364,10 +370,11 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     await bootstrapConfig(agentDir, workingDirectory);
 
     // 4. Mount skills (core + agent, or just what the profile grants), then
-    //    link job definitions and hooks into the workspace.
+    //    link job definitions, tickets, and hooks into the workspace.
     await mountSkills(agentDir, coreSkillsDir, workingDirectory, profile?.skills);
     await ensureSkillsSrcLink(agentDir, workingDirectory);
     await ensureDefinitionSymlink(agentDir, workingDirectory, "jobs");
+    await ensureDefinitionSymlink(agentDir, workingDirectory, "tickets");
     const harnessRoot = resolve(agentsDir, "..");
     await ensureHarnessClaudeConfig(harnessRoot, workingDirectory);
 
