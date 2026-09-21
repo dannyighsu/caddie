@@ -171,7 +171,7 @@ export async function getInboundMessage(id: string): Promise<GmailInbound | null
  * reliable label propagation — silently ate any sibling message that arrived in
  * the same thread while the handled one was still being dispatched: it was
  * de-queued without ever having been read, and no later poll would see it
- * again. See harness/agents/buri/tickets/2026-09-20-inbound-email-dropped-no-run.md.
+ * again — no run, no error, and no signal anywhere. Keep this message-level.
  */
 export async function markMessageRead(messageId: string): Promise<void> {
   const gmail = await getGmailClient();

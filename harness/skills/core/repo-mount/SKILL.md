@@ -1,6 +1,6 @@
 ---
 name: repo-mount
-description: Mount a local or remote git repo into the workspace temporarily so you can read, grep, and explore it. Mounts expire and are swept automatically. Use when the user asks you to look at a repo, clone a repo, or add access to a codebase.
+description: Mount a local or remote git repo into the workspace temporarily so you can read, grep, explore, and contribute changes back as a pull request. Mounts expire and are swept automatically. Use when the user asks you to look at a repo, clone a repo, add access to a codebase, or fix something in one — including this harness itself.
 ---
 
 ## Repo Mounts
@@ -15,7 +15,8 @@ You have a `mounts/` directory in your workspace for temporary access to git rep
 
 ## Mount a local repo (symlink)
 
-When the user points you at a path on their machine:
+When the user points you at a path on their machine. **Exception:** to work on
+the agints repo itself, clone it instead — see **Working on agints itself**.
 
 ```bash
 SRC="/abs/path/to/repo"
@@ -93,9 +94,77 @@ rm -f "mounts/.meta/$NAME.json"
 
 Rewrite the sidecar with a new `expiresAt` (re-run the metadata block from the mount step with a new `TTL_HOURS`).
 
-## Pushing changes
+## Contributing changes
 
-`git push` is blocked by default for the containing agints repo. It **is** allowed inside a mount — use `cd mounts/<name> && git push` or `git -C mounts/<name> push`. Only push when the user explicitly asks.
+`git push` is blocked for the containing agints repo. It **is** allowed inside a
+mount — `cd mounts/<name> && git push` or `git -C mounts/<name> push`.
+
+**Default to a pull request.** Push directly to the default branch only when the
+user explicitly asks you to.
+
+```bash
+cd mounts/<name>
+git checkout -b <short-kebab-branch>
+git add <specific paths>            # not -A, see below
+git commit -m "<what changed and why>"
+git push -u origin <short-kebab-branch>
+gh pr create --title "<title>" --body "<what, why, how you verified it>"
+```
+
+- **Stage specific paths.** `git add -A` sweeps up unrelated work already in the
+  tree — build artifacts, someone's half-finished edit — and puts it in the PR.
+- **Say in the PR body that you opened it**, and what prompted it (a ticket, a
+  request). `gh` is authenticated as the team member who owns this machine, so
+  the PR is authored under *their* GitHub account: a reviewer has no other way
+  to tell a human didn't write it.
+- **Say how you verified it** — the tests you ran and their result, or plainly
+  that you couldn't verify. A PR nobody can check is work for the reviewer, not
+  work saved.
+- Never force-push, never push to a branch you didn't create, never merge your
+  own PR. Review is the point.
+
+## Working on agints itself
+
+This repo is the harness you run on, so two extra rules apply.
+
+**Clone it — never symlink it.** The local-mount recipe above makes a symlink,
+which would point at the *live working tree*: your edits would hit the running
+install and your `git add` could stage the team's uncommitted work. Clone
+instead, even though the source is a local path — that gives you an isolated
+checkout at HEAD:
+
+```bash
+git clone /path/to/agints mounts/agints
+```
+
+**Never change what governs you.** These files decide what you are allowed to
+do, and most of them are read live rather than compiled — `permissions.json`,
+`persona.md`, `agent.json`, `jobs/` and `config/` are re-read on every run,
+skills take effect on the next one, and `.claude/settings.json` and `scripts/`
+take effect on the very next tool call, inside the run that changed them. So a
+change here is not a proposal for a human to review later; it is already in
+force.
+
+| Do not touch | Why |
+|---|---|
+| `harness/permissions.json` | the trust-tier policy — what each tier may do |
+| `harness/agents/*/agent.json` | which capabilities an agent is granted |
+| `harness/agents/*/persona.md` | your own instructions |
+| `harness/.claude/settings.json`, `harness/scripts/` | the hooks that enforce all of the above |
+
+If a fix genuinely seems to need one of these, **stop and say so** — in your
+reply, or in the ticket. Proposing it to a person is the whole job; making the
+change yourself is not.
+
+Everything else — `northstar/`, `harness/src/`, docs, tests — is fair game.
+Changes to compiled TypeScript (`harness/src/`, `northstar/`) need a rebuild and
+a restart before they take effect, so they cannot break the running install
+mid-PR.
+
+**Tickets don't travel.** Ticket bodies are gitignored, so a fresh clone's
+`harness/agents/<agent>/tickets/` holds only its README. Read the ticket from
+your own `tickets/` (the live one in your workspace) and carry what you need
+into the checkout — don't assume the clone has it.
 
 ## Notes
 
