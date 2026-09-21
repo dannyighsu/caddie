@@ -10,7 +10,7 @@
  */
 
 import { isGmailConfigured } from "./client";
-import { listUnreadInboxIds, getInboundMessage, markThreadRead } from "./transport";
+import { listUnreadInboxIds, getInboundMessage, markMessageRead } from "./transport";
 import { receivedFromGmail } from "../email";
 import { handleReceivedEmail } from "../email-handler";
 
@@ -60,8 +60,11 @@ async function pollOnce(): Promise<void> {
       dispatched.add(id);
       try {
         await handleReceivedEmail(receivedFromGmail(inbound));
+        // De-queue this message and only this message. Clearing UNREAD across
+        // the whole thread would also de-queue any sibling that arrived while
+        // this dispatch was in flight, losing it with no run and no error.
         // Only after successful dispatch — a throw leaves it UNREAD for retry.
-        await markThreadRead(inbound.threadId);
+        await markMessageRead(inbound.id);
       } catch (err) {
         console.error(`[Gmail Poller] Dispatch failed for ${id}, leaving UNREAD:`, err);
         dispatched.delete(id);

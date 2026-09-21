@@ -27,6 +27,7 @@ import { parseMessageRefs, normalizeMessageId, summarizeEnvelope } from "./email
 import { isGmailConfigured, getSelfAddress } from "./gmail/client";
 import {
   sendNewEmail,
+  sendThreadedEmail,
   sendReply,
   getRfcMessageId,
   getInboundMessage,
@@ -71,15 +72,55 @@ export async function getFromRawAddress(): Promise<string> {
  * HTML should derive `text` with {@link htmlToText} rather than passing the
  * markup — `text` is also what gets stored as conversation history, which the
  * agent re-reads on the next turn.
+ *
+ * `to` may be a comma-separated list, and `opts.cc`/`opts.bcc` reach the other
+ * header fields — so "send this and copy X" puts X on the thread rather than in
+ * a separate mail. `opts.threadId` continues an existing thread instead of
+ * opening a new one; see {@link sendThreadedEmail}.
  */
 export async function sendEmail(
   to: string,
   subject: string,
   text: string,
-  opts?: { threadContext?: ThreadContext; html?: string },
+  opts?: {
+    threadContext?: ThreadContext;
+    html?: string;
+    /** Comma-separated additional recipients. */
+    cc?: string;
+    bcc?: string;
+    /**
+     * Continue an existing Gmail thread instead of starting a new one — used
+     * for a follow-up on a thread the agent itself opened. Threading headers
+     * come from the thread's last message, so the follow-up lands in the same
+     * conversation for the recipient. A thread that can no longer be resolved
+     * (deleted, or not ours) falls back to sending as a new thread rather than
+     * failing the send.
+     */
+    threadId?: string;
+  },
 ): Promise<{ messageId: string; threadId: string }> {
   const self = await getSelfAddress();
-  const result = await sendNewEmail(self, to, subject, text, opts?.html);
+  const threaded = opts?.threadId
+    ? await sendThreadedEmail(self, opts.threadId, text, {
+        to,
+        // Blank means "reuse the thread's subject" — see sendThreadedEmail.
+        subject: subject || undefined,
+        html: opts.html,
+        cc: opts.cc,
+        bcc: opts.bcc,
+      })
+    : null;
+  if (opts?.threadId && !threaded) {
+    console.warn(
+      `[Email] Thread ${opts.threadId} could not be resolved — sending as a new thread instead.`,
+    );
+  }
+  const result =
+    threaded ??
+    (await sendNewEmail(self, to, subject, text, opts?.html, {
+      cc: opts?.cc,
+      bcc: opts?.bcc,
+    }));
 
   // Best-effort: a failed record must not fail the send itself.
   try {

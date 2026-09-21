@@ -20,6 +20,7 @@ import { defaultAgentId } from "./harness";
 import { teamMemberLabel } from "@agints/harness";
 import { currentTimePST } from "./helpers";
 import { renderThreadContext } from "./thread-context";
+import { HISTORY_WINDOW, renderHistoryLines } from "./conversation-history";
 import {
   toTrustTier,
   toRunIdentity,
@@ -236,6 +237,29 @@ export async function handleInboundMessage(
       }
     );
 
+    // Record the inbound turn BEFORE launching. Ordering in a conversation is
+    // insertion order (messages is a JSONB array), and in "tool" mode the
+    // agent's `reply()` appends its assistant turn *during* the run — so if the
+    // inbound message were appended afterwards, every turn-pair would be stored
+    // (and replayed into the next prompt) reversed: the answer before the
+    // question. Appending here makes the guarantee explicit: a mid-run reply
+    // can only land after the message that prompted it.
+    //
+    // The prompt above was built from the pre-append snapshot
+    // (`conversation.messages`) with `text` as the current message, so this
+    // does not double-render the inbound turn for this run.
+    await appendMessages(conversation.id, [
+      {
+        role: "user",
+        content: text,
+        timestamp: new Date().toISOString(),
+        sender:
+          identity.kind === "authenticated"
+            ? { kind: "authenticated", userId: identity.userId }
+            : { kind: "guest" },
+      },
+    ]);
+
     const launcher = getLauncher();
     const launchInput = {
       agentId: conversation.agent_id,
@@ -294,29 +318,21 @@ export async function handleInboundMessage(
 
     const rawText = result.rawText;
 
-    // Record the inbound turn. The assistant turn is recorded here only in
-    // "auto" mode; in "tool" mode the agent's `reply()` tool records what it
-    // actually sent (via the control `reply` action), so history always mirrors
-    // the real, user-visible conversation rather than the trace-only final text.
-    const now = new Date().toISOString();
-    const userMessage: Message = {
-      role: "user",
-      content: text,
-      timestamp: now,
-      sender:
-        identity.kind === "authenticated"
-          ? { kind: "authenticated", userId: identity.userId }
-          : { kind: "guest" },
-    };
-    const newMessages: Message[] = [userMessage];
+    // Record the assistant turn — only in "auto" mode. In "tool" mode the
+    // agent's `reply()` tool already recorded what it actually sent (via the
+    // control `reply` action) *during* the run, so history mirrors the real,
+    // user-visible conversation rather than the trace-only final text. The
+    // inbound turn was recorded before the launch, which is what keeps those
+    // mid-run appends landing after the message that prompted them.
     if (deliveryMode === "auto" && rawText) {
-      newMessages.push({
-        role: "assistant",
-        content: rawText,
-        timestamp: new Date().toISOString(),
-      });
+      await appendMessages(conversation.id, [
+        {
+          role: "assistant",
+          content: rawText,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     }
-    await appendMessages(conversation.id, newMessages);
 
     // Deliver. In "auto" mode the final text IS the reply. In "tool" mode the
     // agent already delivered (or deliberately stayed silent) via `reply()`, and
@@ -371,6 +387,11 @@ export async function handleInboundMessage(
   }
 }
 
+function currentMessageLabel(identity: ResolvedIdentity): string {
+  if (identity.kind === "guest") return "Guest";
+  return teamMemberLabel(identity.userId);
+}
+
 /**
  * Build a prompt that includes conversation history for context.
  * Keeps recent messages (last N exchanges) to avoid blowing up the prompt.
@@ -380,18 +401,6 @@ export async function handleInboundMessage(
  * - Images: referenced by path so the agent can read them (Claude Code is multimodal)
  * - Non-images: referenced by path so the agent knows where the file is
  */
-function senderLabel(m: Message): string {
-  if (m.role === "assistant") return "Assistant";
-  if (!m.sender) return "User";
-  if (m.sender.kind === "guest") return "Guest";
-  return teamMemberLabel(m.sender.userId);
-}
-
-function currentMessageLabel(identity: ResolvedIdentity): string {
-  if (identity.kind === "guest") return "Guest";
-  return teamMemberLabel(identity.userId);
-}
-
 function buildPromptWithHistory(
   messages: Message[],
   currentText: string,
@@ -400,21 +409,18 @@ function buildPromptWithHistory(
 ): string {
   const parts: string[] = [];
 
-  // Conversation history — last 20 messages
-  const recent = messages.length > 0 ? messages.slice(-20) : [];
+  // Conversation history — the last HISTORY_WINDOW turns, under a shared
+  // character budget.
+  const recent = messages.length > 0 ? messages.slice(-HISTORY_WINDOW) : [];
   if (recent.length > 0) {
-    const historyLines = recent.map((m) => {
-      const label = senderLabel(m);
-      const content = m.content.length > 1000
-        ? m.content.substring(0, 1000) + "..."
-        : m.content;
-      return `[${label}]: ${content}`;
-    });
+    const historyLines = renderHistoryLines(recent);
 
-    parts.push(
-      "Conversation history (for context — this is a continuing conversation):\n" +
-      historyLines.join("\n\n")
-    );
+    if (historyLines.length > 0) {
+      parts.push(
+        "Conversation history (for context — this is a continuing conversation):\n" +
+        historyLines.join("\n\n")
+      );
+    }
   }
 
   // Current message — labeled by sender so the agent sees who is speaking now

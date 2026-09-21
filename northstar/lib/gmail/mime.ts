@@ -11,6 +11,7 @@ export interface MimeMessageOpts {
   from: string;
   to: string;
   cc?: string;
+  bcc?: string;
   subject: string;
   text: string;
   html?: string;
@@ -23,6 +24,7 @@ export function buildMimeMessage(opts: MimeMessageOpts): Promise<Buffer> {
     from: opts.from,
     to: opts.to,
     cc: opts.cc,
+    bcc: opts.bcc,
     subject: opts.subject,
     text: opts.text,
     html: opts.html,

@@ -33,21 +33,59 @@ const tools = [
   {
     name: "send_email",
     description:
-      "Send an ad-hoc outbound email from your Gmail inbox to a recipient. " +
-      "Use this for NEW mail you initiate — reaching out to someone, sending a heads-up or notification. " +
+      "Send an outbound email from your Gmail inbox. " +
+      "Use this for mail you initiate — reaching out to someone, sending a heads-up or notification — and for FOLLOW-UPS on a thread you started (pass the `threadId` this tool returned). " +
       "DO NOT use this to answer an email someone just sent you: the harness already delivers your reply into the current thread automatically, and using this would start a new thread. " +
       "Any reply the recipient sends comes back to you with the full thread history attached, so you don't need to restate context you've already sent. " +
-      "Pass `html` instead of `message` when the mail benefits from real formatting.",
+      "`to`, `cc` and `bcc` each accept several addresses, so \"send this and copy me\" puts everyone on one thread. " +
+      "Pass `html` instead of `message` when the mail benefits from real formatting. " +
+      "Returns the sent message's `messageId` and `threadId` — keep the `threadId` if you may need to follow up.",
     inputSchema: {
       type: "object",
       properties: {
         to: {
+          description:
+            "Recipient email address, or several — either an array of addresses or one " +
+            "comma-separated string. Everyone listed here can see each other and stays on " +
+            "the same thread, so replies reach all of them.",
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        cc: {
+          description:
+            "Optional Cc recipients (array or comma-separated string). Use this to loop " +
+            "someone in — a teammate who should see the exchange — rather than sending them " +
+            "a separate copy, which would split the conversation across threads.",
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        bcc: {
+          description:
+            "Optional Bcc recipients (array or comma-separated string). They receive the " +
+            "mail but are not visible to the other recipients, and are not on the thread " +
+            "for replies.",
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        threadId: {
           type: "string",
-          description: "Recipient email address.",
+          description:
+            "Optional. Continue an existing thread you started, instead of opening a new " +
+            "one: pass the `threadId` a previous send returned (or one from " +
+            "`search_emails`/`get_email`). The follow-up then threads with the earlier " +
+            "messages in the recipient's mail client. Omit it for genuinely new mail. " +
+            "With a threadId, `subject` is optional — the thread's own subject is reused.",
         },
         subject: {
           type: "string",
-          description: "Email subject line.",
+          description:
+            "Email subject line. Optional when `threadId` is given (the thread's subject is reused).",
         },
         message: {
           type: "string",
@@ -65,22 +103,48 @@ const tools = [
             "HTML is for when the structure genuinely helps the reader.",
         },
       },
-      required: ["to", "subject"],
+      required: ["to"],
     },
   },
 ];
 
-async function handleSendEmail(args) {
-  const { to, subject, message, html } = args;
+/**
+ * Normalize a recipient field to the comma-separated header string the control
+ * API expects. Accepts an array or a single string so the model can pass either
+ * without the call failing on a shape mismatch; blank entries are dropped.
+ */
+function addressList(value) {
+  const parts = Array.isArray(value) ? value : String(value ?? "").split(",");
+  return parts.map((a) => String(a).trim()).filter(Boolean).join(", ");
+}
 
-  if (!to || !subject || (!message && !html)) {
+async function handleSendEmail(args) {
+  const { subject, message, html, threadId } = args;
+  const to = addressList(args.to);
+  const cc = addressList(args.cc);
+  const bcc = addressList(args.bcc);
+
+  if (!to) {
+    return {
+      content: [{ type: "text", text: "send_email requires at least one `to` recipient." }],
+      isError: true,
+    };
+  }
+  // A subject is required for new mail; a follow-up inherits the thread's.
+  if (!subject && !threadId) {
     return {
       content: [
         {
           type: "text",
-          text: "send_email requires `to`, `subject`, and a body — either `message` or `html`.",
+          text: "send_email requires a `subject` for new mail (omit it only when continuing a thread via `threadId`).",
         },
       ],
+      isError: true,
+    };
+  }
+  if (!message && !html) {
+    return {
+      content: [{ type: "text", text: "send_email requires a body — either `message` or `html`." }],
       isError: true,
     };
   }
@@ -101,7 +165,10 @@ async function handleSendEmail(args) {
       action: "notify",
       channel: "email",
       to,
-      subject,
+      ...(subject && { subject }),
+      ...(cc && { cc }),
+      ...(bcc && { bcc }),
+      ...(threadId && { threadId }),
       ...(message && { message }),
       ...(html && { html }),
       ...(threadContext && { threadContext }),
@@ -117,8 +184,25 @@ async function handleSendEmail(args) {
     };
   }
 
+  // Hand back the ids: `threadId` is what a later turn passes to `send_email`
+  // to follow up on this same thread rather than opening a second one.
+  const recipients = to + (cc ? ` (cc ${cc})` : "") + (bcc ? ` (bcc ${bcc})` : "");
+  const ids = [
+    result.threadId ? `threadId: ${result.threadId}` : null,
+    result.messageId ? `messageId: ${result.messageId}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return {
-    content: [{ type: "text", text: `Email sent to ${to}.` }],
+    content: [
+      {
+        type: "text",
+        text:
+          `Email sent to ${recipients}.` +
+          (ids ? `\n${ids}\nTo follow up in this same thread, call send_email again with threadId.` : ""),
+      },
+    ],
   };
 }
 

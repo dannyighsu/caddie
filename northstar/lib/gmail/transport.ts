@@ -163,12 +163,21 @@ export async function getInboundMessage(id: string): Promise<GmailInbound | null
   }
 }
 
-/** Mark a thread read (drops UNREAD) — thread-level is more robust for label propagation. */
-export async function markThreadRead(threadId: string): Promise<void> {
+/**
+ * Mark a single message read (drops UNREAD from that message only).
+ *
+ * UNREAD is the poll queue, so what gets cleared has to match exactly what was
+ * handled. Clearing at thread level instead — which this used to do, for more
+ * reliable label propagation — silently ate any sibling message that arrived in
+ * the same thread while the handled one was still being dispatched: it was
+ * de-queued without ever having been read, and no later poll would see it
+ * again. See harness/agents/buri/tickets/2026-09-20-inbound-email-dropped-no-run.md.
+ */
+export async function markMessageRead(messageId: string): Promise<void> {
   const gmail = await getGmailClient();
-  await gmail.users.threads.modify({
+  await gmail.users.messages.modify({
     userId: "me",
-    id: threadId,
+    id: messageId,
     requestBody: { removeLabelIds: ["UNREAD"] },
   });
 }
@@ -267,6 +276,7 @@ async function rawSend(opts: {
   from: string;
   to: string;
   cc?: string;
+  bcc?: string;
   subject: string;
   text: string;
   html?: string;
@@ -283,8 +293,17 @@ async function rawSend(opts: {
   return { messageId: res.data.id!, threadId: res.data.threadId! };
 }
 
+/** Extra recipients for an outbound send, already rendered as header strings. */
+export interface Recipients {
+  /** Comma-separated Cc list. */
+  cc?: string;
+  /** Comma-separated Bcc list. */
+  bcc?: string;
+}
+
 /**
- * Send a brand-new email (new thread). Supplying `html` produces a
+ * Send a brand-new email (new thread). `to` may be a comma-separated list, and
+ * `opts.cc`/`opts.bcc` add the other header fields. Supplying `html` produces a
  * `multipart/alternative` with `text` as the plain-text alternative.
  */
 export async function sendNewEmail(
@@ -293,8 +312,50 @@ export async function sendNewEmail(
   subject: string,
   text: string,
   html?: string,
+  opts?: Recipients,
 ): Promise<{ messageId: string; threadId: string }> {
-  return rawSend({ from: self, to, subject, text, html });
+  return rawSend({ from: self, to, subject, text, html, cc: opts?.cc, bcc: opts?.bcc });
+}
+
+/**
+ * Send into an existing thread — including one *we* started.
+ *
+ * {@link sendReply} covers answering an inbound message: it is keyed on that
+ * message's id and rebuilds the recipient set from the thread. This covers the
+ * other direction, a deliberate follow-up on a thread the agent is running, so
+ * `to`/`cc` are the caller's to choose. Threading headers (`In-Reply-To`,
+ * `References`) and the `Re:` subject still come from the thread's last message,
+ * which is what makes the follow-up land in the same conversation in the
+ * recipient's mail client rather than opening a second one.
+ *
+ * Falls back to the thread's own recipients and subject when the caller gives
+ * none. Returns null when the thread has no messages (nothing to thread onto) —
+ * the caller decides whether to send it as a new thread instead.
+ */
+export async function sendThreadedEmail(
+  self: string,
+  threadId: string,
+  text: string,
+  opts?: Recipients & { to?: string; subject?: string; html?: string },
+): Promise<{ messageId: string; threadId: string } | null> {
+  const ctx = await resolveReplyContext(threadId, self, /* replyAll */ false);
+  if (!ctx) return null;
+
+  const to = opts?.to ?? ctx.to;
+  if (!to) return null;
+
+  return rawSend({
+    from: self,
+    to,
+    cc: opts?.cc,
+    bcc: opts?.bcc,
+    subject: opts?.subject ?? ctx.subject ?? "(no subject)",
+    text,
+    html: opts?.html,
+    inReplyTo: ctx.inReplyTo,
+    references: ctx.references,
+    threadId,
+  });
 }
 
 /**

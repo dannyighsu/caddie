@@ -62,8 +62,20 @@ interface ControlRequest {
   from?: string;
   slackChannel?: string;
   threadTs?: string;
-  /** Telegram chat ID (numeric string) or email address */
+  /**
+   * Telegram chat ID (numeric string), or email recipient(s) — the email
+   * channel accepts a comma-separated list.
+   */
   to?: string;
+  /** Additional email recipients, comma-separated (email channel only). */
+  cc?: string;
+  bcc?: string;
+  /**
+   * Continue an existing Gmail thread (email channel only) rather than starting
+   * a new one — for a follow-up on a thread the agent itself opened. Without
+   * it, each follow-up is a separate thread in the recipient's mailbox.
+   */
+  threadId?: string;
   /** Email subject line */
   subject?: string;
   /**
@@ -361,7 +373,9 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
       return { success: false, error: "Email recipient (to) is required" };
     }
 
-    const subject = req.subject ?? "Notification";
+    // A follow-up on an existing thread inherits that thread's subject, so the
+    // generic default must not be substituted in and rename the conversation.
+    const subject = req.subject ?? (req.threadId ? "" : "Notification");
     // The `from` attribution is prefixed onto BOTH alternatives — prefixing only
     // the plain part would drop it for every recipient who reads the HTML.
     const html = req.html
@@ -371,8 +385,23 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
       : undefined;
     const formatted = req.from ? `[${req.from}] ${message}` : message;
 
-    await sendEmail(req.to, subject, formatted, { threadContext: req.threadContext, html });
-    return { success: true, channel: "email", to: req.to };
+    // Return the sent ids: `threadId` is what a later run passes back as
+    // `threadId` to continue this same thread instead of opening a new one.
+    const sent = await sendEmail(req.to, subject, formatted, {
+      threadContext: req.threadContext,
+      html,
+      cc: req.cc,
+      bcc: req.bcc,
+      threadId: req.threadId,
+    });
+    return {
+      success: true,
+      channel: "email",
+      to: req.to,
+      ...(req.cc && { cc: req.cc }),
+      messageId: sent.messageId,
+      threadId: sent.threadId,
+    };
   }
 
   return { success: false, error: `Unsupported channel: ${req.channel}` };
