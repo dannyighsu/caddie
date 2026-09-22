@@ -99,7 +99,6 @@ few kebab-case words naming the defect (`reply-drops-html`,
 ```markdown
 ---
 id: 2026-09-19-reply-drops-html
-status: open
 severity: medium
 area: email
 first_seen: 2026-09-19
@@ -131,8 +130,10 @@ Who or what this blocks, and how often it hits.
 
 Field rules:
 
-- `status` — always `open` when you file. You don't close tickets; the team does.
-  If a team member tells you a ticket is fixed, set it to `fixed` and say so.
+- There is no `status` field. A ticket on disk is open by definition; closing it
+  means deleting the file, which the team does. Never add a status line, and
+  never mark a ticket resolved, deferred, or wontfix — if a team member says a
+  ticket is done or no longer wanted, delete the file and say so.
 - `severity` — `low` (cosmetic, a workaround exists), `medium` (a task takes the
   long way round or silently degrades), `high` (work is lost, a message never
   goes out, or something behaves wrongly without any signal).

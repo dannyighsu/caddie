@@ -125,4 +125,10 @@ harness/agents/*/jobs/*
 # is kept so a fresh clone still explains the directory.
 harness/agents/*/tickets/*
 !harness/agents/*/tickets/README.md
+# Snapshots of the agent's durable memory, written by the harness on every run.
+# They are copies of one install's config — standing instructions, member
+# profiles — so they belong to the install and not the repo, same as the config
+# they back up. The README is kept so a fresh clone still explains the directory.
+harness/agents/*/config-history/*
+!harness/agents/*/config-history/README.md
 workspace/

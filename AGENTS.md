@@ -16,7 +16,6 @@ Read them from the repo — that's the whole point of where they live:
 
 ```bash
 ls harness/agents/buri/tickets/
-grep -rl "status: open" harness/agents/buri/tickets/
 ```
 
 ### How it works
@@ -54,8 +53,8 @@ file the agent silently gets no `tickets/` at all.
 
 ### Conventions worth preserving
 
-- The agent files with `status: open` and **never closes one**. Closing is a
-  human act: delete the file, or set `status: fixed`.
+- Tickets have **no status field** — a ticket that exists is open, and the agent
+  **never closes one**. Closing is a human act, and it means deleting the file.
 - A repeat of a known problem is appended under that ticket's `## Occurrences`
   rather than filed again — the occurrence list is the signal for how live a bug
   is, so a flood of near-duplicates destroys it.

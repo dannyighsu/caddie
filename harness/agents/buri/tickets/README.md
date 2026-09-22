@@ -20,7 +20,6 @@ appears **here**, in the repo working tree, where you can read and grep it:
 
 ```bash
 ls harness/agents/buri/tickets/
-grep -rl "status: open" harness/agents/buri/tickets/
 ```
 
 Without the link, a ticket would land in `workspace/`, which is scratch and
@@ -35,12 +34,13 @@ is where it's meant to be picked up; it just doesn't travel with a clone.
 
 ## Lifecycle
 
-The agent files with `status: open` and never closes one. A repeat of a known
-problem is appended under that ticket's `## Occurrences` rather than filed
-again, so the occurrence list is the signal for how live a bug is.
+There is no status field. A ticket that exists is open; the file is the state.
+A repeat of a known problem is appended under that ticket's `## Occurrences`
+rather than filed again, so the occurrence list is the signal for how live a
+bug is.
 
-Closing is yours: fix it, then either delete the file or set `status: fixed`.
-Telling the agent it's fixed also works — it will set the field.
+Closing is yours, and it means deleting the file — fix it, then remove it.
+Telling the agent it's fixed or no longer wanted works too; it will delete.
 
 ## What does not belong here
 

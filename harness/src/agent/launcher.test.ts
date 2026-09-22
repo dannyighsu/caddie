@@ -4,6 +4,7 @@ import type { AgentRuntime, AgentRuntimeOutput } from "../runtime/types.js";
 import * as fs from "fs/promises";
 import { resolveCapabilities } from "../capability/mcp-resolver.js";
 import { filterCapabilitiesByPolicy } from "../policy/permissions.js";
+import { journalConfig, detectConfigDrift, describeConfigDrift } from "./config-journal.js";
 
 vi.mock("fs/promises");
 vi.mock("../capability/mcp-resolver.js", () => ({
@@ -25,6 +26,14 @@ vi.mock("../policy/permissions.js", () => ({
 }));
 vi.mock("../resolver/runner.js", () => ({
   runResolvers: vi.fn().mockResolvedValue({}),
+}));
+// The journal does real filesystem work; fs is mocked here, so stub it out and
+// drive it per test. The launcher tolerates undefined returns from these (a
+// backup must never take down a run), which is what a restored mock gives back.
+vi.mock("./config-journal.js", () => ({
+  journalConfig: vi.fn().mockResolvedValue([]),
+  detectConfigDrift: vi.fn().mockResolvedValue([]),
+  describeConfigDrift: vi.fn().mockReturnValue(""),
 }));
 
 const mockFs = vi.mocked(fs);
@@ -820,5 +829,99 @@ describe("skill mounting", () => {
 
     const linked = mockFs.symlink.mock.calls.map((c: any) => String(c[1]));
     expect(linked).not.toContain("/workspace/test-agent/tickets");
+  });
+});
+
+describe("config journal", () => {
+  const drift = [
+    {
+      relPath: "config/team/betty.md",
+      snapshotPath: "/agents/test-agent/config-history/team/betty.md.stamp",
+      deleted: false,
+      removedLines: ["- Sign outside mail as \"Buri H.\" (Betty, 2026-09-19)"],
+    },
+  ];
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
+      if (p.endsWith("persona.md")) return "persona";
+      throw new Error(`Unmocked readFile: ${path}`);
+    });
+    mockFs.mkdir.mockResolvedValue(undefined as any);
+    mockFs.lstat.mockRejectedValue(new Error("ENOENT"));
+    mockFs.symlink.mockResolvedValue(undefined);
+    mockFs.readdir.mockResolvedValue([] as any);
+
+    // Module mocks accumulate calls across tests — clear before counting.
+    vi.mocked(journalConfig).mockClear().mockResolvedValue([]);
+    vi.mocked(detectConfigDrift).mockClear().mockResolvedValue([]);
+    vi.mocked(describeConfigDrift).mockClear().mockReturnValue("");
+  });
+
+  it("snapshots config before and after the run", async () => {
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+
+    await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+
+    // Both ends: the run-start snapshot preserves what was there, the run-end
+    // one becomes the baseline the next run's drift check compares against.
+    expect(journalConfig).toHaveBeenCalledTimes(2);
+    expect(journalConfig).toHaveBeenCalledWith("/agents/test-agent", expect.stringContaining("workspace/test-agent"));
+    // Detection runs before the snapshot, or the loss would be journaled as fact.
+    expect(detectConfigDrift).toHaveBeenCalledBefore(vi.mocked(journalConfig));
+  });
+
+  it("snapshots config even when the run throws", async () => {
+    const runtime = mockRuntime();
+    (runtime.execute as any).mockRejectedValue(new Error("boom"));
+    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+
+    await expect(
+      launcher.launch({ agentId: "test-agent", identity: ID, prompt: "go" })
+    ).rejects.toThrow("boom");
+
+    // A crashed run still edited files; a missed snapshot becomes phantom drift.
+    expect(journalConfig).toHaveBeenCalledTimes(2);
+  });
+
+  it("injects the drift note on a team turn, but not on a guest turn", async () => {
+    vi.mocked(detectConfigDrift).mockResolvedValue(drift);
+    vi.mocked(describeConfigDrift).mockReturnValue("DRIFT_NOTE");
+
+    const runtime = mockRuntime();
+    const team = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    await team.launch({
+      agentId: "test-agent",
+      identity: { trustTier: "team", senderIdentity: "Danny", originChannel: "email" },
+      prompt: "go",
+    });
+    expect((runtime.execute as any).mock.calls[0][0].prompt).toContain("DRIFT_NOTE");
+
+    // Guest turn: config content is team-private and never surfaces.
+    const guestRt = mockRuntime();
+    const guest = createLauncher(guestRt, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    await guest.launch({
+      agentId: "test-agent",
+      identity: { trustTier: "guest", senderIdentity: "stranger", originChannel: "email" },
+      prompt: "go",
+    });
+    expect((guestRt.execute as any).mock.calls[0][0].prompt).not.toContain("DRIFT_NOTE");
+  });
+
+  it("runs the agent anyway when journaling fails", async () => {
+    vi.mocked(detectConfigDrift).mockRejectedValue(new Error("disk full"));
+    vi.mocked(journalConfig).mockRejectedValue(new Error("disk full"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const result = await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+
+    expect(result.success).toBe(true);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Config journal failed"));
   });
 });

@@ -22,6 +22,12 @@ import {
 } from "../policy/permissions.js";
 import { runResolvers } from "../resolver/runner.js";
 import { teamRoster } from "../team/roster.js";
+import {
+  journalConfig,
+  detectConfigDrift,
+  describeConfigDrift,
+  type ConfigDrift,
+} from "./config-journal.js";
 import type { AgentConfig, AgentProfile, AgentInput, AgentResult } from "./types.js";
 
 const TEMPLATE_VAR_PATTERN = /\{\{(\w+)\}\}/g;
@@ -369,6 +375,25 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     // 3. Bootstrap config (seed files, never overwrites existing)
     await bootstrapConfig(agentDir, workingDirectory);
 
+    // 3b. Back up durable memory, and notice anything that vanished from it
+    // while no run was in progress. Detection runs before the snapshot, so it
+    // compares against what the previous run left behind — see
+    // config-journal.ts. A backup must never take down a run, hence the catch.
+    let configDrift: ConfigDrift[] = [];
+    try {
+      configDrift = (await detectConfigDrift(agentDir, workingDirectory)) ?? [];
+      for (const drift of configDrift) {
+        console.warn(
+          `[Launcher] ${drift.relPath} ${drift.deleted ? "was deleted" : "lost content"} ` +
+            `outside a run — ${drift.removedLines.length} line(s) gone. ` +
+            `Previous version: ${drift.snapshotPath}`
+        );
+      }
+      await journalConfig(agentDir, workingDirectory);
+    } catch (err) {
+      console.warn(`[Launcher] Config journal failed: ${(err as Error).message}`);
+    }
+
     // 4. Mount skills (core + agent, or just what the profile grants), then
     //    link job definitions, tickets, and hooks into the workspace.
     await mountSkills(agentDir, coreSkillsDir, workingDirectory, profile?.skills);
@@ -496,6 +521,12 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       } catch {
         // No config/team/ directory yet
       }
+
+      // Durable memory that disappeared between runs. Team-tier only: these
+      // files are private, and only a team member can settle whether a removed
+      // standing instruction still stands.
+      const driftNote = describeConfigDrift(configDrift);
+      if (driftNote) contextLines.push(driftNote);
     }
 
     // Profile/agent config files
@@ -571,18 +602,35 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       : `${persona}\n\n---\n\n${contextPreamble}${userPrompt}`;
 
     // 8. Execute via runtime
-    const result = await runtime.execute({
-      prompt: fullPrompt,
-      outputSchema: agent.outputSchema,
-      maxTurns: agent.maxTurns ?? DEFAULT_MAX_TURNS,
-      workingDirectory,
-      sessionId: input.sessionId,
-      mcpServers,
-      enableChrome,
-      disableBuiltinTools: !baseToolsAllowed,
-      harnessRoot,
-      additionalEnv: input.additionalEnv,
-    });
+    let result;
+    try {
+      result = await runtime.execute({
+        prompt: fullPrompt,
+        outputSchema: agent.outputSchema,
+        maxTurns: agent.maxTurns ?? DEFAULT_MAX_TURNS,
+        workingDirectory,
+        sessionId: input.sessionId,
+        mcpServers,
+        enableChrome,
+        disableBuiltinTools: !baseToolsAllowed,
+        harnessRoot,
+        additionalEnv: input.additionalEnv,
+      });
+    } finally {
+      // 9. Snapshot whatever the run left in config/. This is the baseline the
+      // next run's drift check compares against, so an edit the agent made
+      // itself never looks like an out-of-band loss. In a `finally` because a
+      // run that crashed still edited files, and a missed snapshot would show
+      // up as phantom drift on the next run.
+      try {
+        const journaled = await journalConfig(agentDir, workingDirectory);
+        if (journaled?.length) {
+          console.log(`[Launcher] Journaled config changes: ${journaled.join(", ")}`);
+        }
+      } catch (err) {
+        console.warn(`[Launcher] Config journal failed: ${(err as Error).message}`);
+      }
+    }
 
     return {
       success: !result.error,
