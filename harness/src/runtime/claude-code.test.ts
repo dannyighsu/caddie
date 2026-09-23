@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, mkdirSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { delimiter, join } from "path";
 import { ClaudeCodeRuntime, DEFAULT_TIMEOUT_MS } from "./claude-code.js";
 
 describe("ClaudeCodeRuntime", () => {
@@ -181,6 +184,33 @@ describe("ClaudeCodeRuntime", () => {
       expect(env.CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS).toBe(
         String(DEFAULT_TIMEOUT_MS)
       );
+    });
+
+    it("leaves PATH alone when the agent venv hasn't been built", () => {
+      const env = buildEnv({
+        prompt: "test",
+        maxTurns: 100,
+        workingDirectory: "/tmp",
+        harnessRoot: "/nonexistent/harness",
+      });
+      expect(env.PATH).toBeUndefined();
+    });
+
+    it("puts the agent venv first on PATH when it exists", () => {
+      const root = mkdtempSync(join(tmpdir(), "harness-"));
+      mkdirSync(join(root, ".agent-venv", "bin"), { recursive: true });
+      try {
+        const env = buildEnv({
+          prompt: "test",
+          maxTurns: 100,
+          workingDirectory: "/tmp",
+          harnessRoot: root,
+          additionalEnv: { PATH: "/usr/bin" },
+        });
+        expect(env.PATH).toBe(`${join(root, ".agent-venv", "bin")}${delimiter}/usr/bin`);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
     });
 
     it("uses an explicit bgWaitCeilingMs when provided", () => {

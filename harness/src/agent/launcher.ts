@@ -566,12 +566,16 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       : undefined;
 
     // Tell every capability server which agent it is serving, so tools can
-    // default to it instead of asking the model to name its own agent id.
+    // default to it instead of asking the model to name its own agent id — and
+    // where that agent's workspace is, for tools that hand it files.
     const mcpServers = resolved && Object.keys(resolved.servers).length > 0
       ? Object.fromEntries(
           Object.entries(resolved.servers).map(([name, server]) => [
             name,
-            { ...server, env: { ...server.env, NORTHSTAR_AGENT_ID: agent.id } },
+            {
+              ...server,
+              env: { ...server.env, NORTHSTAR_AGENT_ID: agent.id, NORTHSTAR_WORKSPACE: workingDirectory },
+            },
           ])
         )
       : undefined;

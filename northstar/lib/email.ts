@@ -33,7 +33,7 @@ import {
   getInboundMessage,
   type GmailInbound,
 } from "./gmail/transport";
-import { selectInboundImages, type GmailPart } from "./gmail/parts";
+import { selectInboundImages, selectInboundFiles, type GmailPart } from "./gmail/parts";
 import { stripQuotedReply } from "./gmail/strip";
 import { htmlToText } from "./gmail/html-text";
 
@@ -285,6 +285,17 @@ export interface ReceivedEmail {
    * message that gets skipped costs no fetches. The handler downloads these.
    */
   imageParts: GmailPart[];
+  /**
+   * Non-image files (PDFs, documents, invites) to download — see
+   * {@link selectInboundFiles}. Metadata only, like `imageParts`.
+   */
+  fileParts: GmailPart[];
+  /**
+   * Files that were attached but won't be downloaded (too large, or past the
+   * per-message cap). Reported to the agent by name so an attachment is never
+   * silently invisible.
+   */
+  unfetchedFileParts: GmailPart[];
 }
 
 /** Return the first argument that has non-whitespace content, else "". */
@@ -331,6 +342,7 @@ export function receivedFromGmail(m: GmailInbound): ReceivedEmail {
   const { inReplyTo, references } = parseMessageRefs(m.headers);
   const rawMessageId = getHeader(m.headers, "Message-ID");
   const rfcMessageId = rawMessageId ? normalizeMessageId(rawMessageId) : undefined;
+  const files = selectInboundFiles(m.parts);
 
   return {
     from: m.from,
@@ -348,6 +360,8 @@ export function receivedFromGmail(m: GmailInbound): ReceivedEmail {
     references,
     headers: m.headers,
     imageParts: selectInboundImages(m.parts),
+    fileParts: files.fetch,
+    unfetchedFileParts: files.listOnly,
   };
 }
 

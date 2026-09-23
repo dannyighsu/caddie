@@ -34,7 +34,11 @@ outside world.
 
 ```bash
 pnpm install
+make agent-tools   # poppler + a Python venv with pypdf, so the agent can read PDFs
 ```
+
+The agent runs directly on this machine, so the command-line tools it reaches
+for from Bash have to be installed here — `make agent-tools` covers them.
 
 **2. Configure**
 
@@ -343,7 +347,7 @@ see [PERMISSIONS.md](docs/PERMISSIONS.md).
 | `web-search` | Bun | Web search and fetching |
 | `email` | Google | Send ad-hoc outbound email; records the thread so replies come back with context |
 | `google-calendar` | Google | Calendar read/write |
-| `google-gmail` | Google | Gmail search and read — the agent's inbox |
+| `google-gmail` | Google | Gmail search and read, plus attachment download — the agent's inbox |
 | `notion` | `NOTION_INTERNAL_TOKEN` | Notion workspace access |
 
 There is also a `google-calendar` **resolver** (`harness/resolvers/`), which is a
@@ -426,6 +430,7 @@ make dev          # DEV: next dev with hot reload (active development only)
 make debug        # DEV + memory diagnostics (see below)
 make build        # build harness + northstar
 make install      # install all dependencies
+make agent-tools  # host tools the agent uses (poppler, pypdf venv)
 make smoke        # run a quick smoke test via the harness
 make google-auth  # one-time Google Calendar + Gmail OAuth (opens browser, port 3456)
 make gog-auth ACCOUNT=...  # one-time Google Sheets/Docs/Slides auth for the gog CLI (opens browser)

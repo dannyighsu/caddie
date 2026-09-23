@@ -5,10 +5,12 @@
  * `threadId`, so multiple messages in the same thread land in the same
  * conversation while different threads — even from the same sender — stay separate.
  *
- * Attached and inline images are downloaded to the thread's run-artifacts
+ * Attached files and inline images are downloaded to the thread's run-artifacts
  * directory and passed as channel-agnostic Attachments, the same path Telegram
  * uses. Selection happens at parse time (see ./gmail/parts), so a message we
- * skip never costs a fetch.
+ * skip never costs a fetch. A file that was attached but couldn't be fetched is
+ * still named in the prompt — an attachment the agent can't see at all is one
+ * it will tell the sender never arrived.
  */
 
 import { handleInboundMessage } from "./messaging";
@@ -23,7 +25,8 @@ import {
 } from "./email";
 import { getConversationByExternalId, addSeenChannelIds } from "./db";
 import { selectInboundBody, isForwardedMessage, bareEmail } from "./email-threading";
-import { downloadInboundImages, collectThreadImages } from "./gmail/attachments";
+import { downloadInboundAttachments, collectThreadAttachments } from "./gmail/attachments";
+import { formatBytes, type GmailPart } from "./gmail/parts";
 import { defaultAgentId } from "./harness";
 
 /**
@@ -74,11 +77,12 @@ export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
     knownMessageIds: new Set(existing?.seen_channel_ids ?? []),
   });
   const body = selection.body.trim();
-  // An image-only email (a forwarded screenshot, a photo with no caption) has
-  // nothing to say in text but is still a real message, so images alone are
-  // enough to dispatch on.
-  const imageParts = email.imageParts;
-  if (!body && imageParts.length === 0) {
+  // An attachment-only email (a forwarded screenshot, a PDF with no cover note)
+  // has nothing to say in text but is still a real message, so attachments
+  // alone are enough to dispatch on.
+  const toFetch = [...email.imageParts, ...email.fileParts];
+  const unfetched = email.unfetchedFileParts;
+  if (!body && toFetch.length === 0 && unfetched.length === 0) {
     console.log(
       `[Email Handler] Skipping message: empty body from=${email.from} thread=${email.threadId} ` +
         `(after fetch: text=${email.text.length}b html=${email.html.length}b subject="${email.subject}")`,
@@ -97,34 +101,37 @@ export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
       `includedHistory=${selection.includedHistory} threadKnown=${!!existing}`,
   );
 
-  // Fetch image bytes only now that the message is known to be worth
+  // Fetch attachment bytes only now that the message is known to be worth
   // dispatching. The `[attachment:<fileName>]` markers matter as much as the
   // files: the messaging layer matches attachments to turns by those markers,
-  // and they're stored with the message, so an image stays resolvable when the
+  // and they're stored with the message, so a file stays resolvable when the
   // thread is re-read on a later turn.
   const agentId = existing?.agent_id ?? (await defaultAgentId());
-  const savedImages = await downloadInboundImages(
-    imageParts,
+  const { saved, failed } = await downloadInboundAttachments(
+    toFetch,
     email.messageId,
     email.threadId,
     agentId,
   );
-  const markers = savedImages.map((a) => `[attachment:${a.fileName}]`).join("\n");
-  // An image-only email whose images all failed to download still has to say
+  const markers = saved.map((a) => `[attachment:${a.fileName}]`);
+  // Anything attached but not in the workspace is still named, with why — the
+  // agent should say "I see report.pdf but can't open it", never "nothing came".
+  const notices = [
+    ...failed.map((p) => unretrievedNotice(p, "download failed")),
+    ...unfetched.map((p) => unretrievedNotice(p, "too large or too many to download")),
+  ];
+  // An attachment-only email whose files all failed still has to say
   // something: the poller marks a normally-returned message read, so returning
-  // early here would lose it silently. Tell the agent what arrived instead.
-  const bodyText =
-    body ||
-    (savedImages.length > 0
-      ? "[Email with no text body]"
-      : `[Email with no text body; ${imageParts.length} image(s) could not be retrieved]`);
-  const promptText = [bodyText, markers].filter(Boolean).join("\n");
+  // early here would lose it silently.
+  const bodyText = body || "[Email with no text body]";
+  const promptText = [bodyText, ...markers, ...notices].join("\n");
   // Pass everything saved for the thread, not just this message's — the
   // messaging layer narrows it to what the conversation window references.
-  const attachments = await collectThreadImages(agentId, email.threadId);
-  if (savedImages.length > 0 || attachments.length > 0) {
+  const attachments = await collectThreadAttachments(agentId, email.threadId);
+  if (toFetch.length > 0 || unfetched.length > 0 || attachments.length > 0) {
     console.log(
-      `[Email Handler] Images: saved=${savedImages.length} thread=${attachments.length}`,
+      `[Email Handler] Attachments: saved=${saved.length} failed=${failed.length} ` +
+        `unfetched=${unfetched.length} thread=${attachments.length}`,
     );
   }
 
@@ -174,4 +181,10 @@ export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
   } catch (err) {
     console.error("[Email Handler] Error:", err);
   }
+}
+
+/** One line naming an attachment the agent can't open, and why. */
+function unretrievedNotice(part: GmailPart, reason: string): string {
+  const name = part.fileName || "(unnamed)";
+  return `[attachment not retrieved: ${name} (${part.mimeType}, ${formatBytes(part.sizeBytes)}) — ${reason}]`;
 }

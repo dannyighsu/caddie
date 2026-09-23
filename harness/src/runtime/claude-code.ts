@@ -7,7 +7,8 @@
 
 import { spawn } from "child_process";
 import { writeFile, unlink } from "fs/promises";
-import { join } from "path";
+import { existsSync } from "fs";
+import { delimiter, join } from "path";
 import { tmpdir } from "os";
 import { v4 as uuid } from "uuid";
 import type {
@@ -17,6 +18,24 @@ import type {
 } from "./types.js";
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Put the agent's Python venv (`make agent-tools` → harness/.agent-venv) first
+ * on PATH, so `python3` in a run is the one with pypdf and friends installed.
+ * System pip refuses installs under PEP 668, which is why it's a venv at all.
+ * Returns nothing when the venv hasn't been built — the run just gets the
+ * host's PATH, as before.
+ */
+export function agentToolsPath(
+  harnessRoot: string | undefined,
+  basePath: string | undefined,
+): { PATH?: string } {
+  if (!harnessRoot) return {};
+  const venvBin = join(harnessRoot, ".agent-venv", "bin");
+  if (!existsSync(venvBin)) return {};
+  const rest = basePath ?? process.env.PATH ?? "";
+  return { PATH: rest ? `${venvBin}${delimiter}${rest}` : venvBin };
+}
 
 export interface ClaudeCodeRuntimeOptions {
   /** Path to the `claude` binary. Defaults to "claude" (on PATH). */
@@ -145,6 +164,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   private buildEnv(input: AgentRuntimeInput): Record<string, string> {
     return {
       ...input.additionalEnv,
+      ...agentToolsPath(input.harnessRoot, input.additionalEnv?.PATH),
       // Let background Bash tasks run for the full process budget instead of
       // the CLI's built-in 600s ceiling before print mode terminates them.
       CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: String(this.bgWaitCeilingMs),

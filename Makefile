@@ -1,4 +1,4 @@
-.PHONY: run dev debug debug-snapshot build build-harness install smoke google-auth gog-auth expose unexpose
+.PHONY: run dev debug debug-snapshot build build-harness install agent-tools smoke google-auth gog-auth expose unexpose
 
 # Network exposure (see the "Network exposure" section in README.md).
 NORTHSTAR_PORT ?= 3000
@@ -92,6 +92,25 @@ build: build-harness
 # Install all dependencies
 install:
 	pnpm install
+
+# Host tools the agent uses from Bash. Runs go straight onto this machine (no
+# container), so anything the agent needs has to be installed here:
+#   • poppler — pdftoppm (the Read tool's PDF path shells out to it), pdftotext
+#   • pypdf, in harness/.agent-venv — reads encrypted PDFs (empty user password)
+#     that poppler-less inflation silently reads as blank. A venv because system
+#     pip refuses installs under PEP 668; the runtime puts its bin/ first on the
+#     agent's PATH. Idempotent — re-run to pick up additions.
+AGENT_VENV := harness/.agent-venv
+AGENT_PY_PACKAGES := pypdf
+agent-tools:
+	@if command -v pdftoppm >/dev/null 2>&1; then echo "[agent-tools] poppler already installed"; \
+	elif command -v brew >/dev/null 2>&1; then brew install poppler; \
+	elif command -v apt-get >/dev/null 2>&1; then sudo apt-get install -y poppler-utils; \
+	else echo "[agent-tools] install poppler (pdftoppm) manually"; exit 1; fi
+	@test -x $(AGENT_VENV)/bin/python3 || python3 -m venv $(AGENT_VENV)
+	$(AGENT_VENV)/bin/pip install --quiet --upgrade $(AGENT_PY_PACKAGES)
+	@$(AGENT_VENV)/bin/python3 -c "import pypdf; print('[agent-tools] pypdf', pypdf.__version__)"
+	@pdftoppm -v 2>&1 | head -1
 
 # Run a quick smoke test via the harness directly
 smoke:

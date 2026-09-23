@@ -54,7 +54,9 @@ file the agent silently gets no `tickets/` at all.
 ### Conventions worth preserving
 
 - Tickets have **no status field** — a ticket that exists is open, and the agent
-  **never closes one**. Closing is a human act, and it means deleting the file.
+  **never closes one on its own**. Whoever implements the fix closes it by
+  deleting the file as the last step of that work — don't leave it for someone
+  else to clean up.
 - A repeat of a known problem is appended under that ticket's `## Occurrences`
   rather than filed again — the occurrence list is the signal for how live a bug
   is, so a flood of near-duplicates destroys it.

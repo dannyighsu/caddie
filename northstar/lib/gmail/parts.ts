@@ -1,15 +1,18 @@
 /**
- * Inbound email MIME parts — discovery and image-selection policy.
+ * Inbound email MIME parts — discovery and selection policy.
  *
  * Pure: no API client, no filesystem. Two jobs, both decided from the payload
  * Gmail already handed us, so nothing is fetched for a message that turns out
  * not to be worth dispatching:
  *
  *   1. {@link extractParts} — which MIME parts are files rather than body text.
- *   2. {@link selectInboundImages} — which of those files are worth showing the
- *      agent. Email attachments are mostly noise (tracking pixels, signature
- *      logos, the image scaffolding of marketing mail), and handing all of it
- *      over would bury the one screenshot somebody actually sent.
+ *   2. {@link selectInboundImages} / {@link selectInboundFiles} — which of those
+ *      files are worth handing the agent. Email *images* are mostly noise
+ *      (tracking pixels, signature logos, the image scaffolding of marketing
+ *      mail), so they are filtered hard. Every other file — a PDF, a contract,
+ *      a spreadsheet — is something a person deliberately attached, so it is
+ *      kept, and one too large to fetch is still reported rather than dropped:
+ *      an agent that can't see an attachment will tell the sender it never came.
  *
  * Images referenced by remote URL in an HTML body are deliberately out of scope:
  * those are the tracking-beacon vector, and retrieving one tells the sender the
@@ -113,8 +116,8 @@ function envInt(name: string, fallback: number): number {
  * Viewable raster images only. SVG is excluded on purpose: it's markup that can
  * carry script, and it isn't something the agent can view as an image anyway.
  */
-function isViewableImage(mimeType: string): boolean {
-  const type = mimeType.toLowerCase().split(";")[0].trim();
+export function isViewableImage(mimeType: string): boolean {
+  const type = baseMime(mimeType);
   return type.startsWith("image/") && type !== "image/svg+xml";
 }
 
@@ -144,6 +147,66 @@ export function selectInboundImages(parts: GmailPart[]): GmailPart[] {
   return eligible.filter((p) => keep.has(p.partId));
 }
 
+/** Largest non-image file fetched into the workspace; Gmail itself caps messages at 25MB. */
+const MAX_FILE_BYTES = envInt("EMAIL_MAX_FILE_BYTES", 25 * 1024 * 1024);
+
+/** More than this in one message is unusual enough that the rest are listed, not fetched. */
+const MAX_FILES_PER_MESSAGE = envInt("EMAIL_MAX_FILES", 10);
+
+/**
+ * MIME types that ride along as parts but aren't anything a person attached:
+ * S/MIME and PGP signatures, and the delivery-status machinery of bounces.
+ */
+const NON_CONTENT_TYPES = new Set([
+  "application/pkcs7-signature",
+  "application/x-pkcs7-signature",
+  "application/pgp-signature",
+  "application/pgp-keys",
+  "message/delivery-status",
+  "message/disposition-notification",
+]);
+
+/**
+ * Pick the non-image files worth handing the agent.
+ *
+ * `fetch` is what to download; `listOnly` is what was attached but won't be
+ * fetched (too large, or past the per-message cap). The handler reports the
+ * latter by name so the agent can say "I see report.pdf but couldn't open it"
+ * instead of "nothing arrived".
+ *
+ * Images are left to {@link selectInboundImages} — including the small ones it
+ * drops, which are chrome rather than something the sender meant to send.
+ */
+export function selectInboundFiles(parts: GmailPart[]): {
+  fetch: GmailPart[];
+  listOnly: GmailPart[];
+} {
+  const fetch: GmailPart[] = [];
+  const listOnly: GmailPart[] = [];
+  for (const p of parts) {
+    const type = baseMime(p.mimeType);
+    if (type.startsWith("image/") || NON_CONTENT_TYPES.has(type)) continue;
+    if (p.sizeBytes > MAX_FILE_BYTES || fetch.length >= MAX_FILES_PER_MESSAGE) {
+      listOnly.push(p);
+    } else {
+      fetch.push(p);
+    }
+  }
+  return { fetch, listOnly };
+}
+
+/** Lower-cased mime type without parameters (`; charset=…`). */
+function baseMime(mimeType: string): string {
+  return mimeType.toLowerCase().split(";")[0].trim();
+}
+
+/** "1.2 MB"-style size for the agent's run context. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 // --- Filenames ---
 
 const EXT_BY_MIME: Record<string, string> = {
@@ -156,6 +219,18 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/tiff": "tiff",
   "image/heic": "heic",
   "image/heif": "heif",
+  "application/pdf": "pdf",
+  "text/calendar": "ics",
+  "text/csv": "csv",
+  "text/plain": "txt",
+  "application/zip": "zip",
+  "message/rfc822": "eml",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-powerpoint": "ppt",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
 };
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -168,10 +243,22 @@ const MIME_BY_EXT: Record<string, string> = {
   tiff: "image/tiff",
   heic: "image/heic",
   heif: "image/heif",
+  pdf: "application/pdf",
+  ics: "text/calendar",
+  csv: "text/csv",
+  txt: "text/plain",
+  zip: "application/zip",
+  eml: "message/rfc822",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 
 /**
- * A safe, collision-resistant name for a saved image.
+ * A safe, collision-resistant name for a saved attachment.
  *
  * Sender-supplied filenames reach us verbatim, so directory components and
  * anything outside a conservative character set are stripped — the name becomes
@@ -179,13 +266,15 @@ const MIME_BY_EXT: Record<string, string> = {
  * message id is prefixed because the directory is per *thread*: two messages in
  * one thread both attaching `image.png` would otherwise overwrite each other.
  */
-export function safeImageFileName(part: GmailPart, messageId: string, index: number): string {
-  const ext = EXT_BY_MIME[part.mimeType.toLowerCase().split(";")[0].trim()] ?? "img";
+export function safeAttachmentFileName(part: GmailPart, messageId: string, index: number): string {
+  const type = baseMime(part.mimeType);
+  const isImage = type.startsWith("image/");
+  const ext = EXT_BY_MIME[type] ?? (isImage ? "img" : "bin");
   const base = (part.fileName.split(/[\\/]/).pop() ?? "")
     .replace(/[^A-Za-z0-9._-]/g, "-")
     .replace(/^[.-]+/, "")
     .slice(0, 64);
-  const name = base || `image-${index + 1}.${ext}`;
+  const name = base || `${isImage ? "image" : "file"}-${index + 1}.${ext}`;
   return `${messageId}-${name.includes(".") ? name : `${name}.${ext}`}`;
 }
 

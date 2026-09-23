@@ -87,6 +87,7 @@ temp/
 # Browser profiles #
 ####################
 harness/.browser-profile/
+harness/.agent-venv/
 
 # Project specific #
 ####################
