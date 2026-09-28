@@ -1,0 +1,61 @@
+id: rosewood-ooo-autoreply
+title: Out-of-office auto-reply
+tags:
+  - triage/drop
+  - automated
+source:
+  session: deecfb42
+  extracted: 2026-09-25
+now: Sunday, September 20, 2026 at 11:08 AM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: "Automatic reply: Wedding venue showing request – Friday, September 25"
+  from: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+  to:
+    - buri@assistant.example
+  cc: []
+history: []
+message: "Gracias por su interés por Rosewood San Miguel de Allende.\r
+
+  \r
+
+  En estos momentos me encuentro fuera de oficina, sin acceso a llamadas y correos electrónicos; por lo que estaré en contacto a mi regreso el próximo 21 de septiembre.\r
+
+  \r
+
+  Muchas gracias,\r
+
+  Daniela Cossio Álvarez\r
+
+  --------------------------------------------------------------------------------------------\r
+
+  Good Day,\r
+
+  Thank you for your interest in Rosewood San Miguel de Allende.\r
+
+  \r
+
+  I am currently out of the office with no access to emails or phone calls. I will be in touch upon my return next September 21st.\r
+
+  \r
+
+  Thank you,\r
+
+  Daniela Cossio Álvarez\r
+
+  \r
+
+  \r
+
+  \r
+
+  ***** IMPORTANT INFORMATION *****\r
+
+  This message and any attachment are confidential and may be privileged or otherwise protected from disclosure. If you are not the intended recipient, please notify the sender and delete this message and any attachment from your system immediately. Any unauthorized use or dissemination of this message in whole or in part is strictly prohibited."
+expect:
+  - not_called: reply
+    why: Auto-replies never warrant a response.
+  - no_external_send: true
+    why: Nothing to act on, so nothing goes to the vendor.
+  - not_called: email_team
+    why: "Danny's standing instruction: don't notify about auto-replies."

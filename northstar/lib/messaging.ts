@@ -17,10 +17,8 @@ import {
   type Message,
 } from "./db";
 import { defaultAgentId } from "./harness";
-import { teamMemberLabel } from "@agints/harness";
 import { currentTimePST } from "./helpers";
-import { renderThreadContext } from "./thread-context";
-import { HISTORY_WINDOW, renderHistoryLines } from "./conversation-history";
+import { assembleInboundPrompt, type Attachment } from "./inbound-prompt";
 import {
   toTrustTier,
   toRunIdentity,
@@ -64,17 +62,7 @@ export interface ReplyTarget {
   telegram?: { chatId: string; replyToMessageId?: number };
 }
 
-/** A file attachment from any channel, already downloaded to the workspace. */
-export interface Attachment {
-  /** Absolute path to the downloaded file in the workspace artifacts directory */
-  filePath: string;
-  /** Original filename */
-  fileName: string;
-  /** MIME type */
-  mimeType: string;
-  /** Whether this is an image that should be included in prompt context */
-  isImage: boolean;
-}
+export type { Attachment } from "./inbound-prompt";
 
 export interface InboundMessageParams {
   /** The message text (already cleaned of mention markup, etc.) */
@@ -191,35 +179,18 @@ export async function handleInboundMessage(
     }
 
     // Build prompt with conversation history for continuity. Each run is a
-    // fresh session — no --resume — so we prepend prior messages so the agent
-    // has context from previous exchanges, tagged with each turn's sender so
-    // mixed authenticated/guest threads remain attributable.
-    //
-    // If this thread was created by one of the agent's own tasks (e.g. a
-    // recurring reminder), prepend the source-task facts so the agent can trace
-    // the reply back to the task and act on it (e.g. stop the reminder).
-    const taskPreamble = conversation.thread_context
-      ? renderThreadContext(conversation.thread_context) + "\n\n---\n\n"
-      : "";
-    // Make the delivery contract explicit for this run rather than leaving the
-    // agent to infer it — driven by the same `deliveryMode` flag that actually
-    // governs delivery, so instruction and behavior can't drift. Only emitted in
-    // "tool" mode; "auto" runs (portal, Slack, Telegram) deliver the final text.
-    const deliveryPreamble =
-      deliveryMode === "tool"
-        ? "This is an inbound-message run: respond with the `reply` tool (your final " +
-          "text is not delivered), or stay silent by not calling it if no reply is " +
-          "warranted.\n\n---\n\n"
-        : "";
-    // Channel run-context (e.g. the email envelope) sits between any task
-    // preamble and the conversation history. It's prompt-only — never persisted.
-    const channelPreamble = promptContext ? promptContext + "\n\n---\n\n" : "";
-    const fullPrompt = taskPreamble + deliveryPreamble + channelPreamble + buildPromptWithHistory(
-      conversation.messages,
+    // fresh session — no --resume — so prior messages are prepended, tagged with
+    // each turn's sender so mixed authenticated/guest threads stay attributable.
+    // See ./inbound-prompt (shared with the eval runner).
+    const fullPrompt = assembleInboundPrompt({
+      messages: conversation.messages,
       text,
       identity,
+      deliveryMode,
+      promptContext,
+      threadContext: conversation.thread_context,
       attachments,
-    );
+    });
 
     // Open the ledger row before launching, with the full inbound params (minus
     // the non-serializable replyFn closure) as the replay envelope. If the
@@ -387,63 +358,3 @@ export async function handleInboundMessage(
   }
 }
 
-function currentMessageLabel(identity: ResolvedIdentity): string {
-  if (identity.kind === "guest") return "Guest";
-  return teamMemberLabel(identity.userId);
-}
-
-/**
- * Build a prompt that includes conversation history for context.
- * Keeps recent messages (last N exchanges) to avoid blowing up the prompt.
- *
- * Attachments are filtered to only include files referenced in the
- * conversation window (via [attachment:<fileName>] markers in message content).
- * - Images: referenced by path so the agent can read them (Claude Code is multimodal)
- * - Non-images: referenced by path so the agent knows where the file is
- */
-function buildPromptWithHistory(
-  messages: Message[],
-  currentText: string,
-  identity: ResolvedIdentity,
-  attachments?: Attachment[],
-): string {
-  const parts: string[] = [];
-
-  // Conversation history — the last HISTORY_WINDOW turns, under a shared
-  // character budget.
-  const recent = messages.length > 0 ? messages.slice(-HISTORY_WINDOW) : [];
-  if (recent.length > 0) {
-    const historyLines = renderHistoryLines(recent);
-
-    if (historyLines.length > 0) {
-      parts.push(
-        "Conversation history (for context — this is a continuing conversation):\n" +
-        historyLines.join("\n\n")
-      );
-    }
-  }
-
-  // Current message — labeled by sender so the agent sees who is speaking now
-  parts.push(`New message from [${currentMessageLabel(identity)}]:\n` + currentText);
-
-  // Filter attachments to only those referenced in the conversation window
-  // or the current message. Messages store [attachment:<fileName>] markers.
-  if (attachments && attachments.length > 0) {
-    const windowText = recent.map((m) => m.content).join("\n") + "\n" + currentText;
-    const referencedAttachments = attachments.filter((a) =>
-      windowText.includes(`[attachment:${a.fileName}]`)
-    );
-
-    if (referencedAttachments.length > 0) {
-      const attachmentLines = referencedAttachments.map((a) => {
-        if (a.isImage) {
-          return `Attached image: ${a.fileName} — saved to ${a.filePath} (read this file to view the image)`;
-        }
-        return `Attached file: ${a.fileName} (${a.mimeType}) — saved to ${a.filePath}`;
-      });
-      parts.push("Attachments:\n" + attachmentLines.join("\n"));
-    }
-  }
-
-  return parts.join("\n\n---\n\n");
-}

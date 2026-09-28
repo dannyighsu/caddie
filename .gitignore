@@ -133,3 +133,8 @@ harness/agents/*/tickets/*
 harness/agents/*/config-history/*
 !harness/agents/*/config-history/README.md
 workspace/
+
+# Eval runs: per-run sandboxes and results (transcripts quote real prompts).
+evals/.sandbox/
+evals/results/
+evals/.scrub.json

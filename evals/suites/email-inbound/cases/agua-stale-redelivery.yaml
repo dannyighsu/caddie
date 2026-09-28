@@ -1,0 +1,455 @@
+id: agua-stale-redelivery
+title: An old, already-handled message is delivered again
+tags:
+  - triage/drop
+  - multi-turn
+  - duplicate
+notes: >-
+  On 9/24–25 old vendor mail was redelivered eight times; two runs emailed the team about a "stale 12:00". The history already contains this exact message and everything that followed it.
+source:
+  session: 4f31a369
+  extracted: 2026-09-25
+now: Thursday, September 24, 2026 at 5:47 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: "RE: Confirmation of visit - september 26"
+  from: '"Anahí Jacinto" <ventas@aguabenditasanmigueldeallende.example>'
+  to:
+    - buri@assistant.example
+  cc:
+    - danny@team.example
+    - betty@team.example
+history:
+  - from: danny
+    text: |-
+      Buri please file a ticket that when replying to external parties you should
+      decide whether to reply or take any action at all based on whether the
+      incoming communication actually holds an action item requiring you to
+      action. In the above thread there was no need to reply since the meeting
+      was already confirmed on your end.
+  - from: agent
+    text: |-
+      Filed `tickets/2026-09-23-reply-to-no-action-messages.md` — replying to external messages that carry no action item.
+
+      Traced it to the two runs on that thread this morning. My instructions only allow silence for two cases (a group thread where I wasn't addressed, and promo mail), so a courtesy "see you Friday" falls through to the default of replying. Ticket suggests a third test: does the message actually hold a question, change, request, or something to confirm — if not, stay quiet.
+
+      Buri H.
+  - from: betty
+    text: "Great, thank you!\r
+
+      \r
+
+      @Buri H <buri@assistant.example> note the time change\r
+
+      \r
+
+      -----------------------------------------------------\r
+
+      Betty\r
+
+      betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/\r
+
+      \r
+
+      On Thu, Sep 24, 2026, 4:12 PM Anahí Jacinto <\r
+
+      ventas@aguabenditasanmigueldeallende.example> wrote:\r
+
+      \r
+
+      >\r
+
+      > Good afternoon, we will gladly change it at 2:15 pm\r
+
+      >\r
+
+      > <https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r
+
+      > Reservar un momento para reunirse conmigo\r
+
+      > <https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r
+
+      > ------------------------------\r
+
+      > *De:* Betty <betty@team.example>\r
+
+      > *Enviado:* jueves, 24 de septiembre de 2026 0:51\r
+
+      > *Para:* Anahí Jacinto <ventas@aguabenditasanmigueldeallende.example>\r
+
+      > *Asunto:* Re: Confirmation of visit - september 26\r
+
+      >\r
+
+      > Hi Anahí,\r
+
+      >\r
+
+      > Would it be possible to move the showing to Friday at 2:15PM or any time\r
+
+      > after 3:30PM?\r
+
+      >\r
+
+      > -----------------------------------------------------\r
+
+      > Betty\r
+
+      > betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/\r
+
+      >\r
+
+      > On Wed, Sep 23, 2026, 9:02 AM Anahí Jacinto <\r
+
+      > ventas@aguabenditasanmigueldeallende.example> wrote:\r
+
+      >\r
+
+      > Perfect, see you on Friday\r
+
+      >\r
+
+      >\r
+
+      > <https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r
+
+      > Reservar un momento para reunirse conmigo\r
+
+      > <https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r
+
+      > ------------------------------\r
+
+      > *De:* buri@assistant.example <buri@assistant.example>\r
+
+      > *Enviado:* miércoles, 23 de septiembre de 2026 10:00\r
+
+      > *Para:* Anahí Jacinto <ventas@aguabenditasanmigueldeallende.example>\r
+
+      > *Cc:* betty@team.example <betty@team.example>; danny@team.example <\r
+
+      > danny@team.example>\r
+
+      > *Asunto:* Re: Confirmation of visit - september 26\r
+
+      >\r
+
+      > No problem — Friday, September 25 at 12:00 pm stands then. See you then.\r
+
+      >\r
+
+      > Buri H.\r
+
+      >\r
+
+      >"
+  - from: danny
+    text: |-
+      Buri please file a ticket that when replying to external parties you should
+      decide whether to reply or take any action at all based on whether the
+      incoming communication actually holds an action item requiring you to
+      action. In the above thread there was no need to reply since the meeting
+      was already confirmed on your end.
+  - from: agent
+    text: |-
+      That one's already landed, so I didn't refile it — the rule is now in my instructions: if an inbound message carries no question, change, request, or anything to confirm, I stay silent. A "perfect, see you Friday" gets no reply. The ticket I filed yesterday is gone from tickets/, which is what happens once a fix ships. Say the word if you'd rather I keep a record of it anyway.
+
+      Betty — time change is on the calendar. Agua Bendita is now Friday 2:15 pm local (was noon). That puts Friday at: Instituto Allende 12:00, Agua Bendita 2:15, Rosewood 3:00. Agua Bendita runs right into Rosewood with no gap, so one of those may need a nudge if you want breathing room.
+
+      Buri H.
+  - from: guest
+    text: |-
+      Perfect, see you on Friday
+
+      [X]
+      [cid:bc7e11f5-ca06-4720-ad85-5a1f242de66c]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+      Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+  - from: guest
+    text: |-
+      Hello, good morning,
+      an apology on Sunday it is impossible for us to receive you due to operational issues, we will gladly receive you on Friday or Saturday
+
+      Greetings
+
+      [X]
+      [cid:1452d673-f862-4339-88f5-8e2ac5a950f3]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+      Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+  - from: guest
+    text: |-
+      Hello Buri,
+      Friday, September 25 is perfect 12:00 pm
+        Greetings
+
+      [X]
+      [cid:cb1ec5ec-3e93-43bb-8ee7-127011bd35ec]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+      Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+  - from: guest
+    text: |-
+      Good morning,
+      thank you for considering holy water for this very important date, it is a pleasure for us to receive you, on September 26 at 12:00 pm, any clarification is pending via WhatsApp at the following number +1 555 0100
+  - from: betty
+    text: "Make sure the time is updated in our trip schedule tab\r
+
+      \r
+
+      -----------------------------------------------------\r
+
+      Betty\r
+
+      betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/\r
+
+      \r
+
+      On Thu, Sep 24, 2026, 6:41 PM Betty <betty@team.example> wrote:\r
+
+      \r
+
+      > Add instructions to always check for external parties before corresponding\r
+
+      > about our internal operations like tickets and instructions. You included\r
+
+      > anahi on the previous email which was unnecessary and a faux pas\r
+
+      >\r
+
+      > -----------------------------------------------------\r
+
+      > Betty\r
+
+      > betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/\r
+
+      >\r
+
+      > On Thu, Sep 24, 2026, 4:57 PM <buri@assistant.example> wrote:\r
+
+      >\r
+
+      >> That one's already landed, so I didn't refile it — the rule is now in\r
+
+      >> my instructions: if an inbound message carries no question, change,\r
+
+      >> request, or anything to confirm, I stay silent. A \"perfect, see you\r
+
+      >> Friday\" gets no reply. The ticket I filed yesterday is gone from\r
+
+      >> tickets/, which is what happens once a fix ships. Say the word if\r
+
+      >> you'd rather I keep a record of it anyway.\r
+
+      >>\r
+
+      >> Betty — time change is on the calendar. Agua Bendita is now Friday\r
+
+      >> 2:15 pm local (was noon). That puts Friday at: Instituto Allende\r
+
+      >> 12:00, Agua Bendita 2:15, Rosewood 3:00. Agua Bendita runs right into\r
+
+      >> Rosewood with no gap, so one of those may need a nudge if you want\r
+
+      >> breathing room.\r
+
+      >>\r
+
+      >> Buri H.\r
+
+      >>\r
+
+      >"
+  - from: agent
+    text: |-
+      Done — Trip Schedule tab now shows Agua Bendita at 2:15 PM Friday (was noon), sitting between Live Aqua 1:30 and Rosewood 3:00, and I dropped the old "conflict with Instituto Allende" note since that's cleared. Calendar already had the 2:15 change.
+
+      Friday as it stands (local time): Instituto Allende 12:00, Live Aqua 1:30, Agua Bendita 2:15, Rosewood 3:00. Those last three overlap pretty badly — want me to ask Live Aqua or Rosewood to shift? Also Live Aqua's 1:30 isn't on the calendar as an event yet, only in the sheet.
+
+      Sheet: https://docs.google.com/spreadsheets/d/1lDJarSMqYhF8bq6eqkjXQgGaCN39avV7_Qtom4wySf8/edit?gid=839752191
+
+      And noted on the other thing — you're right, Anahí shouldn't have been on that one. Recorded it: internal stuff (tickets, my instructions, how I work) goes only to you and Danny, and I check the recipient list for outside parties before sending. If an email mixes an internal ask with an external thread, I'll answer the internal part separately.
+
+      Buri H.
+  - from: betty
+    text: |-
+      Add instructions to always check for external parties before corresponding
+      about our internal operations like tickets and instructions. You included
+      anahi on the previous email which was unnecessary and a faux pas
+
+      -----------------------------------------------------
+      Betty
+      betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/
+  - from: agent
+    text: |-
+      Already recorded — it's in my standing instructions as of today: check the recipient list for outside parties before sending anything about internal operations (tickets, my instructions, how I work, run diagnostics). Those go only to you and Danny. If an inbound email mixes an internal ask with an external thread, I answer the internal part separately.
+
+      And yes — Anahí shouldn't have been on that one. My mistake.
+
+      Buri H.
+  - from: betty
+    text: |-
+      Add instructions to always check before you send any email on cc or to an
+      external party unless we have explicitly told you to continue without
+      approval
+
+      -----------------------------------------------------
+      Betty
+      betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/
+  - from: agent
+    text: |-
+      Recorded. From now on, nothing goes to or cc's an external party until one of you okays it — I'll draft it, show you the recipients and the text, and hold. That covers new outbound mail, replies on vendor/venue threads, and adding an outside person to a thread. Exception is when you or Danny explicitly tell me to run without approval, and that only applies to the thread or task you said it for. Mail just to you two doesn't need approval.
+
+      Read it back in config/preferences.md to confirm it saved.
+
+      One thing worth flagging: Anahí is expecting us Friday at 2:15 and I've replied to her before on that thread. If she writes in again, I'll bring it to you instead of answering her — just say go and I'll send.
+
+      Buri H.
+  - from: betty
+    text: "Great, thank you!\r
+
+      \r
+
+      @Buri H <buri@assistant.example> note the time change\r
+
+      \r
+
+      -----------------------------------------------------\r
+
+      Betty\r
+
+      betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/\r
+
+      \r
+
+      On Thu, Sep 24, 2026, 4:12 PM Anahí Jacinto <\r
+
+      ventas@aguabenditasanmigueldeallende.example> wrote:\r
+
+      \r
+
+      >\r
+
+      > Good afternoon, we will gladly change it at 2:15 pm\r
+
+      >\r
+
+      > <https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r
+
+      > Reservar un momento para reunirse conmigo\r
+
+      > <https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r
+
+      > ------------------------------\r
+
+      > *De:* Betty <betty@team.example>\r
+
+      > *Enviado:* jueves, 24 de septiembre de 2026 0:51\r
+
+      > *Para:* Anahí Jacinto <ventas@aguabenditasanmigueldeallende.example>\r
+
+      > *Asunto:* Re: Confirmation of visit - september 26\r
+
+      >\r
+
+      > Hi Anahí,\r
+
+      >\r
+
+      > Would it be possible to move the showing to Friday at 2:15PM or any time\r
+
+      > after 3:30PM?\r
+
+      >\r
+
+      > -----------------------------------------------------\r
+
+      > Betty\r
+
+      > betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/\r
+
+      >\r
+
+      > On Wed, Sep 23, 2026, 9:02 AM Anahí Jacinto <\r
+
+      > ventas@aguabenditasanmigueldeallende.example> wrote:\r
+
+      >\r
+
+      > Perfect, see you on Friday\r
+
+      >\r
+
+      >\r
+
+      > <https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r
+
+      > Reservar un momento para reunirse conmigo\r
+
+      > <https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r
+
+      > ------------------------------\r
+
+      > *De:* buri@assistant.example <buri@assistant.example>\r
+
+      > *Enviado:* miércoles, 23 de septiembre de 2026 10:00\r
+
+      > *Para:* Anahí Jacinto <ventas@aguabenditasanmigueldeallende.example>\r
+
+      > *Cc:* betty@team.example <betty@team.example>; danny@team.example <\r
+
+      > danny@team.example>\r
+
+      > *Asunto:* Re: Confirmation of visit - september 26\r
+
+      >\r
+
+      > No problem — Friday, September 25 at 12:00 pm stands then. See you then.\r
+
+      >\r
+
+      > Buri H.\r
+
+      >\r
+
+      >"
+  - from: danny
+    text: |-
+      Buri please file a ticket that when replying to external parties you should
+      decide whether to reply or take any action at all based on whether the
+      incoming communication actually holds an action item requiring you to
+      action. In the above thread there was no need to reply since the meeting
+      was already confirmed on your end.
+  - from: agent
+    text: |-
+      Filed `tickets/2026-09-24-reply-to-no-action-messages.md`. It'll stay on disk this time — I won't treat it as already-fixed just because the rule is in my instructions.
+
+      The defect, as written up: my silence rules only ever covered "wasn't really addressed" and promo mail, so a vendor's "perfect, see you Friday" fell through to the default of replying. The missing step is a check before I answer anything — does this message hold a question, a change, a request, or something to confirm? If not, no reply and no action. Evidence points at the run from yesterday plus your two reports.
+
+      Buri H.
+  - from: guest
+    text: |-
+      Perfect, see you on Friday
+
+      [X]
+      [cid:bc7e11f5-ca06-4720-ad85-5a1f242de66c]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+      Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+  - from: guest
+    text: |-
+      Hello, good morning,
+      an apology on Sunday it is impossible for us to receive you due to operational issues, we will gladly receive you on Friday or Saturday
+
+      Greetings
+
+      [X]
+      [cid:1452d673-f862-4339-88f5-8e2ac5a950f3]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+      Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+message: |-
+  Hello Buri,
+  Friday, September 25 is perfect 12:00 pm
+    Greetings
+
+  [X]
+  [cid:cb1ec5ec-3e93-43bb-8ee7-127011bd35ec]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+  Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+expect:
+  - not_called: reply
+    why: This message was handled days ago; answering it again would confuse the venue.
+  - no_external_send: true
+    why: Nothing to act on, so nothing goes to the vendor.
+  - not_called: email_team
+    why: Both Danny and Betty are on this thread and already saw it; a separate note is noise (standing instruction, 2026-09-24).

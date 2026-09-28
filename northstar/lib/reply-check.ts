@@ -2,27 +2,28 @@
  * Reply check for inbound ("tool" delivery) runs.
  *
  * On an inbound run the agent's final text is never delivered — only a `reply`
- * tool call reaches the person who wrote in. A run that ends without one (e.g.
- * it ended its turn "waiting" on background work that never came back) leaves
- * the sender with silence while the ledger records a success. So when a run
- * ends with no reply delivered, the messaging layer resumes the session ONCE
- * with REPLY_NUDGE_PROMPT. Once only: deliberate silence (promotional mail, a
- * group thread the agent wasn't addressed in) is still allowed, and a second
- * silent ending is accepted as final — no loops.
+ * tool call reaches the person who wrote in. The failure this guards against is
+ * narrow: the agent *wrote* its answer, but as final text instead of calling
+ * `reply` (2026-09-17: a full answer to "have you been running the golf job?"
+ * that nobody would have seen). So when a run ends with no reply delivered, the
+ * messaging layer resumes the session ONCE with REPLY_NUDGE_PROMPT.
+ *
+ * The prompt is deliberately only about that case. Silence is usually a
+ * decision — an acknowledgement, auto-mail, something taken to the team — and
+ * an earlier wording ("reply with what you have and what's still open") pushed
+ * runs that had correctly stayed silent into sending vendors holding replies.
+ * A second silent ending is accepted as final — no loops.
  *
  * Pure logic, no imports, so it's unit-testable under `node --test`.
  */
 
 export const REPLY_NUDGE_PROMPT =
-  "[Harness reminder] This run ended without a `reply` being delivered, so the person " +
-  "who wrote in hasn't heard anything back — your final text is never sent to them. " +
-  "You run as a one-shot CLI process: once you end your turn here, the run is over for " +
-  "good and any unfinished work is dropped.\n\n" +
-  "- If you have results (including anything your background agents already reported), " +
-  "send them now with `reply`.\n" +
-  "- If the work isn't finished, `reply` with what you have and what's still open.\n" +
-  "- If you deliberately decided no reply is warranted (e.g. promotional mail, or a group " +
-  "thread you weren't addressed in), or you did already reply, just end without calling it.\n\n" +
+  "[Harness reminder] This run ended without calling `reply`. Your final text is never " +
+  "delivered — only `reply` reaches the person who wrote in.\n\n" +
+  "- If your final text was an answer you meant to send them, send it now with `reply`.\n" +
+  "- If you decided not to reply (nothing to act on, it wasn't for you, or you took it to " +
+  "the team instead), end now without calling it. Don't send a holding message or an " +
+  "acknowledgement because of this reminder.\n\n" +
   "This reminder is sent only once.";
 
 /**

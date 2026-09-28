@@ -1,0 +1,78 @@
+id: agua-sunday-declined
+title: Venue declines an optional alternate day; Friday already stands
+tags:
+  - triage/drop
+  - multi-turn
+  - from-correction
+notes: >-
+  Sunday was only a maybe; Friday 12:00 was already confirmed, so nothing changes. The original run replied "Friday stands then."
+source:
+  session: d466e22c
+  extracted: 2026-09-25
+now: Wednesday, September 23, 2026 at 9:00 AM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: "RE: Confirmation of visit - september 26"
+  from: '"Anahí Jacinto" <ventas@aguabenditasanmigueldeallende.example>'
+  to:
+    - buri@assistant.example
+  cc:
+    - betty@team.example
+    - danny@team.example
+history:
+  - from: guest
+    text: |-
+      Good morning,
+      thank you for considering holy water for this very important date, it is a pleasure for us to receive you, on September 26 at 12:00 pm, any clarification is pending via WhatsApp at the following number +1 555 0100
+  - from: agent
+    text: |-
+      Thanks Anahí — got it. Saturday September 26 at 12:00 pm, noted on our side.
+
+      I'll confirm the final headcount for the visit before then. If anything changes I'll let you know here.
+
+      Buri H.
+  - from: agent
+    text: |-
+      Hi Anahí — sorry, one change: Saturday no longer works for us. Could we do Friday September 25 instead, any time you have available? Sunday September 27 before 2:00 pm would also work.
+
+      Let me know what's open and I'll confirm.
+
+      Buri H.
+  - from: guest
+    text: |-
+      Hello Buri,
+      Friday, September 25 is perfect 12:00 pm
+        Greetings
+
+      [X]
+      [cid:cb1ec5ec-3e93-43bb-8ee7-127011bd35ec]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+      Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+  - from: agent
+    text: |-
+      Perfect — Friday, September 25 at 12:00 pm it is. We'll see you then.
+
+      I'll send the final headcount before the visit.
+
+      Buri H.
+  - from: agent
+    text: |-
+      Hi Anahí — one more question. Do you also have availability on Sunday, September 27 before 2:00 pm? We're keeping Friday at 12:00 pm, but Sunday may work better for our group and I'd like to know if it's an option.
+
+      Thanks,
+      Buri H.
+message: |-
+  Hello, good morning,
+  an apology on Sunday it is impossible for us to receive you due to operational issues, we will gladly receive you on Friday or Saturday
+
+  Greetings
+
+  [X]
+  [cid:1452d673-f862-4339-88f5-8e2ac5a950f3]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+  Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+expect:
+  - not_called: reply
+    why: Nothing new to act on; Friday was already confirmed.
+  - no_external_send: true
+    why: Nothing to act on, so nothing goes to the vendor.
+  - not_called: email_team
+    why: Both Danny and Betty are on this thread and already saw it; a separate note is noise (standing instruction, 2026-09-24).

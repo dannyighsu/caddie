@@ -1,0 +1,329 @@
+id: luna-not-available-cc
+title: Venue can't do the requested days; the couple is on Cc
+tags:
+  - triage/drop
+  - multi-turn
+notes: >-
+  Informational: the venue is unavailable Fri/Sun and points at its Calendly. Danny and Betty are on the thread and see it directly.
+source:
+  session: c24f992d
+  extracted: 2026-09-25
+now: Thursday, September 24, 2026 at 8:41 AM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: "Re: Wedding venue showing request – Luna Escondida (Sat 9/26)"
+  from: Gardenia Meza <gardenia@grupoarreca.example>
+  to:
+    - buri@assistant.example
+  cc:
+    - danny@team.example
+    - betty@team.example
+history:
+  - from: agent
+    text: |-
+      Hello,
+
+      I'm the executive assistant for a couple exploring wedding venues in San Miguel de Allende, and Luna Escondida is on our shortlist. We would like to schedule a showing.
+
+      - Preferred date: Saturday, September 26, any time after 11 AM
+      - Wedding date: 2028
+      - Guest count: 150+
+      - Budget: flexible
+
+      Could you let us know what showing times are available that day, and send any brochures and pricing information for weddings?
+
+      Thank you,
+      Executive Assistant for the team
+  - from: agent
+    text: |-
+      Hi Gardenia,
+
+      Thank you — this is helpful.
+
+      To answer your questions: the event is a wedding, for 150+ guests, planned for 2028. The month is not locked in yet, so I'd welcome your input on which parts of the year work best at Luna Escondida.
+
+      Yes, we would very much like to schedule a scouting visit. Our request is for Saturday, September 26, any time after 11 AM — could you let me know which times that day are open?
+
+      Two follow-ups on the pricing you sent:
+
+      1. The Day Rental and Weekend Rental both list a 150+ capacity question mark for us — can you confirm the maximum seated guest count for Jardin Colibri and Salon Luna?
+      2. Does either rate include food and beverage, or is catering contracted separately? A sample per-person F&B range would be useful.
+
+      I'll take a look at the brochure link in the meantime.
+
+      Best regards,
+      Buri H.
+      Executive assistant
+  - from: guest
+    text: |-
+      Hello! 🌙
+
+      Hope you are having an amazing day! Tell me what type of event are you
+      interested in having at our venue? Do you have a particular month or date
+      that you’re interested in? Here are our prices and a link with more
+      information about our  Luna Escondida:
+
+      *VENUE RENTAL*
+
+      *Day Rental $45,000 US Dollars (venue)*
+      1. Venue (Jardin Colibri, Salon Luna, Stables)
+      2. Getting ready areas (Beauty salon blossom, speakeasy Dos Caras una Luna).
+      3. Access to the property from 8am-2am.
+
+      *Weekend Rental $75,000 US dollars  (venue+accommodations)*
+      1. 2 night stay for 24 people (12 rooms)
+      2. Venue (Jardin Colibri, Salon Luna, Stables) main event curfew 2am.
+      3. Getting ready areas (Beauty salon blossom, speakeasy Dos Caras una Luna).
+      4. Farm to table breakfast from our organic farm.
+      I would love to show you the property! I´ll be looking forward to your
+      comments and to schedule a scouting visit so you can see the property.
+
+      https://www.lunaescondida.com
+       Eng-LunaEscondida_2026 3.pdf
+      <https://drive.google.com/open?id=1Lggl35GsbpeDsc8Gv2mmIwVMxM-j2mu_>
+  - from: agent
+    text: |-
+      Hi Gardenia,
+
+      Thank you — that answers both questions. 450 max capacity gives us plenty of room at 150+, and knowing that vendors and catering are open is useful for budgeting.
+
+      A few notes and one follow-up:
+
+      1. Calendly — thank you, I have the link and have noted that your times are shown in CDMX / Central Time (UTC-6). Before I book, could you confirm whether Saturday, September 26 has showing slots open after 11 AM CT? If that date isn't workable on your side, please let me know the next Saturdays with availability and I'll work from those.
+      2. Accommodations — with the Weekend Rental covering 12 rooms / 24 people (26 max), do you have recommended partner hotels or nearby properties for the rest of a 150+ guest list?
+      3. 2028 timing — I'd still value your read on which months work best at Luna Escondida, in terms of both weather and how far ahead those dates typically book.
+
+      I'll confirm the visit once I have the date settled on our end.
+
+      Best regards,
+      Buri H.
+      Executive assistant
+  - from: guest
+    text: |-
+      I´ve added on our previous mail our brochure, our max capacity is 450
+      guests :) with accommodations for max 26 people. You can work with vendors
+      and catering of your preference.
+
+      Here is our calendly, we would be happy to receive you in the property!
+      Agenda tu cita ✨🌙 (Schedule your appointment, take in consideration we are
+      in CDMX- Central Time (CT) — UTC-6- GMT-6
+
+      https://calendly.com/gardenia-lunaescondida
+  - from: agent
+    text: |-
+      Hi Gardenia,
+
+      Thank you — the hotel suggestions and the season windows are both helpful. Pueblo Bonito, Live Aqua and Rosewood at 10 minutes from downtown should work well for the wider guest list, and noting January–May and August–December as your main seasons for 2028 planning.
+
+      One item is still open: the answer to my first question came back with the hotel recommendations, so I don't yet have availability. Could you confirm whether **Saturday, September 26** has showing slots open after 11 AM CT? If that Saturday isn't workable on your side, please send the next two or three Saturdays that are open and I'll book from those on Calendly.
+
+      Also, for the 2028 dates specifically — how far in advance do Saturdays in your peak months typically get reserved? That will tell us how quickly we need to move once we've visited.
+
+      Best regards,
+      Buri H.
+      Executive assistant
+  - from: guest
+    text: |-
+      *1. Calendly — thank you, I have the link and have noted that your times
+      are shown in CDMX / Central Time (UTC-6). Before I book, could you confirm
+      whether Saturday, September 26 has showing slots open after 11 AM CT? If
+      that date isn't workable on your side, please let*
+      *me know the next Saturdays with availability and I'll work from those.*
+
+
+      Yes, like Pueblo Bonito, Live Aqua, Rosewood, etc. We are just 10 min away
+      from downtown.
+
+
+
+      *3. 2028 timing — I'd still value your read on which months work best at
+      Luna Escondida, in terms of both weather and how far ahead those*
+      * dates typically book.*
+
+      Our 2 main seasons are January-May and August-December.
+
+      Looking forward to your comments, 🌜
+  - from: agent
+    text: |-
+      Hi Gardenia,
+
+      Understood — I'll work from the Calendly directly and book a slot on Saturday, September 26 after 11 AM CT.
+
+      One question is still open, and it's the one that matters most for our planning: for 2028 dates in your peak seasons (January–May and August–December), how far in advance do Saturdays typically get reserved? Knowing the usual booking lead time will tell us how quickly we need to move after the visit.
+
+      Thank you for the hotel suggestions — Pueblo Bonito, Live Aqua and Rosewood at 10 minutes from downtown should work well for the wider guest list.
+
+      I'll confirm once the appointment is booked.
+
+      Best regards,
+      Buri H.
+      Executive assistant
+  - from: guest
+    text: |-
+      *1. Calendly — thank you, I have the link and have noted that your times
+      are shown in CDMX / Central Time (UTC-6). Before I book, could you confirm
+      whether Saturday, September 26 has showing slots open after 11 AM CT? If
+      that date isn't workable on your side, please let*
+      *me know the next Saturdays with availability and I'll work from those.*
+      You can see my availability directly in my calendly :).
+
+
+
+      *2. Accommodations — with the Weekend Rental covering 12 rooms / 24 people
+      (26 max), do you have recommended partner hotels or nearby*
+      * properties for the rest of a 150+ guest list?*
+      Yes, like Pueblo Bonito, Live Aqua, Rosewood, etc. We are just 10 min away
+      from downtown.
+
+
+
+      *3. 2028 timing — I'd still value your read on which months work best at
+      Luna Escondida, in terms of both weather and how far ahead those*
+      * dates typically book.*
+      Our 2 main seasons are January-May and August-December.
+
+      Looking forward to your comments, 🌜
+  - from: agent
+    text: |-
+      Hi Gardenia,
+
+      That's exactly what I needed — a year to eighteen months of lead time for a popular destination is very useful to know, and it tells us how quickly we'll want to move on a 2028 Saturday after seeing the property.
+
+      Thank you for walking through all of it: pricing, the 450 capacity, open vendor and catering policy, the nearby hotels, and your two main seasons. I have everything needed on our side now.
+
+      I'll confirm the scouting visit shortly and will book through your Calendly.
+
+      Best regards,
+      Buri H.
+      Executive assistant
+  - from: guest
+    text: |-
+      Normally dates get scheduled as soon as possible, our destination is really
+      popular so normally everything gets booked a year or a year and half ahead
+      of time. Would be happy to receive you at the property.
+
+      Thanks,
+  - from: guest
+    text: Sounds perfect! Happy to help, looking forward to see you at our property!
+message: "Hi Buri,\r
+
+  \r
+
+  Hope you’re having a nice day! My Calendly reflects my real-time\r
+
+  availability, and unfortunately, I’m not available on Friday 9/25 or Sunday\r
+
+  9/27.\r
+
+  \r
+
+  We do have other days when we’d be happy to welcome you and the couple. If\r
+
+  their availability changes, please feel free to check my Calendly and\r
+
+  choose any available time that works for them.\r
+
+  \r
+
+  I’ll also keep you posted if anything opens up on either of those dates.\r
+
+  \r
+
+  Best,\r
+
+  Gardenia\r
+
+  *Gardenia Meza Curiel*\r
+
+  *Commercial Director*\r
+
+  +1 555 0100\r
+
+  www.lunaescondida.com\r
+
+  \r
+
+  \r
+
+  \r
+
+  El jue, 24 sept 2026 a las 0:44, Buri H (<buri@assistant.example>) escribió:\r
+
+  \r
+
+  > Hi Gardenia,\r
+
+  >\r
+
+  > I don't see any availability on your calendly for Friday 9/25 or Sunday\r
+
+  > 9/27. Those are the only two days the couple is available. Please let me\r
+
+  > know if anything changes and those dates free up.\r
+
+  >\r
+
+  > Thanks,\r
+
+  > Buri H.\r
+
+  >\r
+
+  > On Sun, Sep 20, 2026, 8:26 PM Gardenia Meza <gardenia@grupoarreca.example>\r
+
+  > wrote:\r
+
+  >\r
+
+  >> Sounds perfect! Happy to help, looking forward to see you at our property!\r
+
+  >>\r
+
+  >> El dom, 20 sept 2026 a las 21:22, <buri@assistant.example> escribió:\r
+
+  >>\r
+
+  >>> Hi Gardenia,\r
+
+  >>>\r
+
+  >>> That's exactly what I needed — a year to eighteen months of lead time\r
+
+  >>> for a popular destination is very useful to know, and it tells us how\r
+
+  >>> quickly we'll want to move on a 2028 Saturday after seeing the\r
+
+  >>> property.\r
+
+  >>>\r
+
+  >>> Thank you for walking through all of it: pricing, the 450 capacity,\r
+
+  >>> open vendor and catering policy, the nearby hotels, and your two main\r
+
+  >>> seasons. I have everything needed on our side now.\r
+
+  >>>\r
+
+  >>> I'll confirm the scouting visit shortly and will book through your\r
+
+  >>> Calendly.\r
+
+  >>>\r
+
+  >>> Best regards,\r
+
+  >>> Buri H.\r
+
+  >>> Executive assistant\r
+
+  >>>\r
+
+  >>"
+expect:
+  - not_called: reply
+    why: Nothing for Buri to answer; the couple decides whether to pick another day.
+  - no_external_send: true
+    why: Nothing to act on, so nothing goes to the vendor.
+  - not_called: email_team
+    why: Both Danny and Betty are on this thread and already saw it; a separate note is noise (standing instruction, 2026-09-24).

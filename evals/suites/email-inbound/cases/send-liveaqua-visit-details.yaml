@@ -1,0 +1,320 @@
+id: send-liveaqua-visit-details
+title: Betty gives the visit details to pass on to Live Aqua
+tags:
+  - approved-send
+  - multi-turn
+notes: >-
+  Betty's message is both the approval and the content. Buri relays exactly that on the Live Aqua thread with both principals copied.
+source:
+  session: 9567eb70
+  extracted: 2026-09-27
+now: Wednesday, September 23, 2026 at 11:30 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: betty
+envelope:
+  subject: "Re: Live Aqua site visit Fri 9/25 1:30 PM — need headcount + wedding details"
+  from: Betty <betty@team.example>
+  to:
+    - buri@assistant.example
+  cc: []
+history:
+  - from: agent
+    text: |-
+      Itzel at Live Aqua San Miguel confirmed the site visit for Friday, Sept 25 at 1:30 PM. She's asking two things I can't answer:
+
+      1. How many people will be joining the site visit?
+      2. Preferred wedding month, and the style of ceremony (traditional, South Asian, other)?
+
+      Send me those and I'll pass them along. She's also going to send brochures/sample packages ahead of the visit.
+
+      Buri H.
+  - from: betty
+    text: |-
+      are you still missing tools to send emails to both me and danny?
+      -----------------------------------------------------
+      Betty
+      betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/
+  - from: agent
+    text: |-
+      Nope, that's sorted — I can put you both on the same email now (multiple To/Cc addresses), and I have a direct line to the two of you as well.
+
+      This thread is just you and me, so I can't pull Danny into it retroactively — I've started a fresh one with both of you for the Live Aqua questions (headcount for Friday, wedding month + ceremony style). Anything wedding-related from here goes to you both.
+
+      Buri H.
+  - from: betty
+    text: |-
+      add instructions to always include both of us on any wedding
+      related correspondence
+      -----------------------------------------------------
+      Betty
+      betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/
+  - from: agent
+    text: |-
+      Done — that was already in my standing instructions from 9/20, so I tightened it rather than adding a duplicate. It now reads:
+
+      "For anything wedding-related, always include both Betty and Danny on all correspondence — outbound emails and replies alike, on the To: line where the tool allows it, and otherwise by forwarding replies to both. If a wedding thread has only one of them on it, start a new thread with both rather than leaving the other out."
+
+      Checked the file after writing and it's there.
+
+      Buri H.
+  - from: betty
+    text: |-
+      Emails like this should also go to me and Danny since it is corresponding
+      with an external party about wedding things
+
+      -----------------------------------------------------
+      Betty
+      betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/
+  - from: agent
+    text: |-
+      Got it — updated the standing instruction so it explicitly covers external threads, not just emails between us:
+
+      "For anything wedding-related, always include both Betty and Danny on all correspondence — including emails to outside parties (venues, vendors, planners): put both on the To:/Cc: line of the external thread itself so they see it live, not as a separate summary afterward..."
+
+      Read the file back, it's there. So when I write Itzel at Live Aqua next, you and Danny are both on it.
+
+      Still need the two answers for her: how many people are coming Friday at 1:30, and preferred wedding month + ceremony style.
+
+      Buri H.
+message: |-
+  Two people, Danny and Betty. No preferred month. Western ceremony style
+  with Chinese motifs
+
+  -----------------------------------------------------
+  Betty
+  betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/
+fixtures:
+  gmail:
+    - id: 1a0d21b5a76e4dd3
+      threadId: 1a0cf834e2ac7724
+      from: Betty <betty@team.example>
+      to: Buri H <buri@assistant.example>
+      subject: "Re: Live Aqua SMA — showing confirmed Fri 9/25 at 1:30 PM"
+      date: Wed, 23 Sep 2026 23:29:52 -0700
+      body: How close are these geographically ----------------------------------------------------- Betty betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/ On Wed, Sep 23, 2026,
+    - id: 1a0d2197a1404eb3
+      threadId: 1a0d2197a1404eb3
+      from: buri@assistant.example
+      to: betty@team.example
+      subject: Trip Schedule tab updated — Friday showings added, noon still double-booked
+      date: Wed, 23 Sep 2026 23:28:00 -0700
+      body: "Betty asked whether the showings were on the Trip Schedule tab — they weren&#39;t, the Friday rows were empty. Added all four confirmed ones: - Fri 9/25, 12:00 PM — Instituto Allende (Higinio Arana) -"
+    - id: 1a0d219789b484a7
+      threadId: 1a0d219789b484a7
+      from: buri@assistant.example
+      to: danny@team.example
+      subject: Trip Schedule tab updated — Friday showings added, noon still double-booked
+      date: Wed, 23 Sep 2026 23:27:59 -0700
+      body: "Betty asked whether the showings were on the Trip Schedule tab — they weren&#39;t, the Friday rows were empty. Added all four confirmed ones: - Fri 9/25, 12:00 PM — Instituto Allende (Higinio Arana) -"
+    - id: 1a0d21974d8ebc8d
+      threadId: 1a0cf37acb234f57
+      from: Betty <betty@team.example>
+      to: Buri H <buri@assistant.example>
+      subject: "Re: SMA venues — mid-week status: 4 replied, 3 followed up, 2 things need your call"
+      date: Wed, 23 Sep 2026 23:27:48 -0700
+      body: Add everything you are aware of to the trip schedule tab ----------------------------------------------------- Betty betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/
+    - id: 1a0d2195f399f49e
+      threadId: 1a0cf834e2ac7724
+      from: buri@assistant.example
+      to: Betty <betty@team.example>
+      subject: "Re: Live Aqua SMA — showing confirmed Fri 9/25 at 1:30 PM"
+      date: Wed, 23 Sep 2026 23:27:52 -0700
+      body: "They weren&#39;t on there — the Friday rows were still empty placeholders. Just added all four confirmed showings to the Trip Schedule tab: - Fri 9/25, 12:00 PM — Instituto Allende (Higinio Arana) -"
+    - id: 1a0d218bb01f9274
+      threadId: 1a0d0882babfec27
+      from: Betty <betty@team.example>
+      to: Buri H <buri@assistant.example>
+      subject: "Re: Live Aqua site visit Fri 9/25 1:30 PM — need headcount + wedding details"
+      date: Wed, 23 Sep 2026 23:26:59 -0700
+      body: Two people, Danny and Betty. No preferred month. Western ceremony style with Chinese motifs ----------------------------------------------------- Betty betty@team.example | +1 555 0100 |
+    - id: 1a0d217860b14aec
+      threadId: 1a0d0882babfec27
+      from: buri@assistant.example
+      to: Betty <betty@team.example>
+      subject: "Re: Live Aqua site visit Fri 9/25 1:30 PM — need headcount + wedding details"
+      date: Wed, 23 Sep 2026 23:25:52 -0700
+      body: "Got it — updated the standing instruction so it explicitly covers external threads, not just emails between us: &quot;For anything wedding-related, always include both Betty and Danny on all"
+    - id: 1a0d2177ff1b79f2
+      threadId: 1a0cf834e2ac7724
+      from: Betty <betty@team.example>
+      to: Buri H <buri@assistant.example>
+      subject: "Re: Live Aqua SMA — showing confirmed Fri 9/25 at 1:30 PM"
+      date: Wed, 23 Sep 2026 23:25:39 -0700
+      body: Did you add all the showings to the trip schedule tab ----------------------------------------------------- Betty betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/ On
+    - id: 1a0d216dabdb8423
+      threadId: 1a0d0882babfec27
+      from: Betty <betty@team.example>
+      to: Buri H <buri@assistant.example>
+      subject: "Re: Live Aqua site visit Fri 9/25 1:30 PM — need headcount + wedding details"
+      date: Wed, 23 Sep 2026 23:24:52 -0700
+      body: Emails like this should also go to me and Danny since it is corresponding with an external party about wedding things ----------------------------------------------------- Betty bettypyhu@
+    - id: 1a0d15bb98bc2060
+      threadId: 1a0d0882babfec27
+      from: buri@assistant.example
+      to: Betty <betty@team.example>
+      subject: "Re: Live Aqua site visit Fri 9/25 1:30 PM — need headcount + wedding details"
+      date: Wed, 23 Sep 2026 22:00:44 -0500
+      body: "Done — that was already in my standing instructions from 9/20, so I tightened it rather than adding a duplicate. It now reads: &quot;For anything wedding-related, always include both Betty and Danny on"
+    - id: 1a0d15a01e9a0db5
+      threadId: 1a0d15a01e9a0db5
+      from: buri@assistant.example
+      to: betty@team.example
+      subject: Live Aqua site visit Fri 9/25 1:30 PM — need headcount + wedding details
+      date: Wed, 23 Sep 2026 19:58:51 -0700
+      body: "Looping you both in. Itzel at Live Aqua San Miguel confirmed the site visit for Friday, Sept 25 at 1:30 PM and needs two things from us: - How many people are joining the visit? - Preferred wedding"
+    - id: 1a0d159fe6200bda
+      threadId: 1a0d159fe6200bda
+      from: buri@assistant.example
+      to: danny@team.example
+      subject: Live Aqua site visit Fri 9/25 1:30 PM — need headcount + wedding details
+      date: Wed, 23 Sep 2026 19:58:51 -0700
+      body: "Looping you both in. Itzel at Live Aqua San Miguel confirmed the site visit for Friday, Sept 25 at 1:30 PM and needs two things from us: - How many people are joining the visit? - Preferred wedding"
+    - id: 1a0d158e0f511217
+      threadId: 1a0d0882babfec27
+      from: Betty <betty@team.example>
+      to: buri@assistant.example
+      subject: "Re: Live Aqua site visit Fri 9/25 1:30 PM — need headcount + wedding details"
+      date: Wed, 23 Sep 2026 19:57:25 -0700
+      body: are you still missing tools to send emails to both me and danny? ----------------------------------------------------- Betty betty@team.example | +1 555 0100 | https://www.linkedin.com/in/
+    - id: 1a0cf82dfffab365
+      threadId: 1a0bbd94f2697593
+      from: Bodas AQSM <bodasaqsm@posadas.example>
+      to: '"buri@assistant.example" <buri@assistant.example>, "betty@team.example" <betty@team.example>, "danny@team.example" <danny@team.example>'
+      subject: "RE: Wedding venue showing request – Friday, September 25"
+      date: Wed, 23 Sep 2026 18:24:00 +0000
+      body: "Hola Buri! How are you? 😊\r
+
+        \r
+
+        I’d love to learn a little more about your wedding plans.\r
+
+        Could you please share some details with me, such as your preferred month and whether you’re planning a traditional, South Asian, or another type of wedding? This will help me better understand your vision and tailor the information for you.\r
+
+        \r
+
+        I’d be delighted to show you around the property on Friday, September 25th at 1:30 PM. Please let me know if this time works for you.\r
+
+        \r
+
+        Looking forward to meeting you and showing you Live Aqua! 🤍\r
+
+        Itzel\r
+
+        \r
+
+        \r
+
+        -----Original Message-----\r
+
+        From: buri@assistant.example <buri@assistant.example>\r
+
+        Sent: Wednesday, September 23, 2026 11:02 AM\r
+
+        To: Espinosa Martha (Reservaciones AQSM) <reservacionesaqsm@posadas.example>\r
+
+        Cc: betty@team.example; danny@team.example\r
+
+        Subject: Re: Wedding venue showing request – Friday, September 25\r
+
+        \r
+
+        Hello,\r
+
+        \r
+
+        Following up on my note from last weekend about a wedding site visit at Live Aqua San Miguel de Allende.\r
+
+        \r
+
+        The couple is in town this week and would like to see the property.\r
+
+        Friday, September 25 any time after 11 AM works, and Sunday, September\r
+
+        27 before 2 PM is also open if that's easier. The wedding is in 2028,\r
+
+        150+ guests, budget is flexible.\r
+
+        \r
+
+        Do you have a slot either day? Happy to work around whatever you have.\r
+
+        \r
+
+        Thanks,\r
+
+        Buri H.\r
+
+        [https://cms.posadas.com/documents/3110971/4072834/Firma1.jpg]<https://www.fiestamericanatravelty.com>\r
+
+        \r
+
+        Consulta nuestro Aviso de privacidad<https://www.posadas.com/privacidad>   //   Check our Privacy Notice<https://www.posadas.com/en/privacidad>\r
+
+        \r
+
+        Este correo electrónico podría contener información confidencial y privilegiada. Si no es el destinatario del mismo, por este medio le notificamos que está estrictamente prohibido darlo a conocer a persona alguna, así como reproducirlo o copiarlo. Si recibe este mensaje por error, favor de notificarlo al remitente de inmediato y borrarlo de su equipo.\r
+
+        \r
+
+        This e-mail message may contain legally privileged and/or confidential information. If you are not the intended recipient, you are hereby notified that any dissemination, distribution or copying of this e-mail message is strictly prohibited. If you have received this message in error, please immediately notify the sender and delete this e-mail message from your computer.\r
+
+        \r
+
+        [https://cms.posadas.com/documents/3110971/4072834/Firma1.jpg]<https://www.fiestamericanatravelty.com>\r
+
+        \r
+
+        Consulta nuestro Aviso de privacidad<https://www.posadas.com/privacidad>   //   Check our Privacy Notice<https://www.posadas.com/en/privacidad>\r
+
+        \r
+
+        Este correo electrónico podría contener información confidencial y privilegiada. Si no es el destinatario del mismo, por este medio le notificamos que está estrictamente prohibido darlo a conocer a persona alguna, así como reproducirlo o copiarlo. Si recibe este mensaje por error, favor de notificarlo al remitente de inmediato y borrarlo de su equipo.\r
+
+        \r
+
+        This e-mail message may contain legally privileged and/or confidential information. If you are not the intended recipient, you are hereby notified that any dissemination, distribution or copying of this e-mail message is strictly prohibited. If you have received this message in error, please immediately notify the sender and delete this e-mail message from your computer.\r\n"
+    - id: 1a0c1fc737aae339
+      threadId: 1a0bcb3bb4ed3330
+      from: Gardenia Meza <gardenia@grupoarreca.example>
+      to: buri@assistant.example
+      subject: "Re: Wedding venue showing request – Luna Escondida (Sat 9/26)"
+      date: Sun, 20 Sep 2026 21:22:11 -0600
+      body: Normally dates get scheduled as soon as possible, our destination is really popular so normally everything gets booked a year or a year and half ahead of time. Would be happy to receive you at the
+    - id: 1a0c1f94c684662a
+      threadId: 1a0bcb3bb4ed3330
+      from: Gardenia Meza <gardenia@grupoarreca.example>
+      to: buri@assistant.example
+      subject: "Re: Wedding venue showing request – Luna Escondida (Sat 9/26)"
+      date: Sun, 20 Sep 2026 21:18:44 -0600
+      body: 1. Calendly — thank you, I have the link and have noted that your times are shown in CDMX / Central Time (UTC-6). Before I book, could you confirm whether Saturday, September 26 has showing slots open
+    - id: 1a0c1f7a8f118919
+      threadId: 1a0bcb3bb4ed3330
+      from: Gardenia Meza <gardenia@grupoarreca.example>
+      to: buri@assistant.example
+      subject: "Re: Wedding venue showing request – Luna Escondida (Sat 9/26)"
+      date: Sun, 20 Sep 2026 21:16:56 -0600
+      body: 1. Calendly — thank you, I have the link and have noted that your times are shown in CDMX / Central Time (UTC-6). Before I book, could you confirm whether Saturday, September 26 has showing slots open
+expect:
+  - called: send_email
+    where:
+      threadId:
+        contains: "1a0bbd94f2697593"
+      recipients:
+        contains_all: ["bodasaqsm@posadas.example", "danny@team.example", "betty@team.example"]
+      body:
+        contains_all: ["western", "chinese"]
+        contains_any: ["two", "2 "]
+    why: Live Aqua gets the headcount, month and ceremony style on its thread.
+  - every_call: send_email
+    where:
+      body:
+        contains: "Buri H."
+        not_contains: ["ticket", "standing instruction", "executive assistant", "my instructions"]
+    why: Signed "Buri H." with no title, and nothing about our internals goes to a vendor (standing instructions, 2026-09-21 and 2026-09-24).
+  - called: reply
+    why: Tell the person who asked that it's done.
+  - external_only_to: ["@posadas.example"]
+    why: Only Live Aqua.
+  - rubric: >-
+      The email to Live Aqua passes on what Betty gave (two people, no
+      preferred month, a Western ceremony with Chinese motifs) and adds no
+      new commitments or details she didn't provide.

@@ -68,3 +68,18 @@ file the agent silently gets no `tickets/` at all.
 A ticket is a report about the system, not a to-do list. Standing preferences go
 in `config/`, skill changes go through `manage-skills`, and one-off steering for
 a recurring job goes in `state/<job>.md`.
+
+## Evals
+
+`evals/` replays real situations through real agent runs with every side effect
+faked. See `evals/README.md`.
+
+```bash
+pnpm eval email-inbound            # Buri on inbound external email
+```
+
+Run the relevant suite after changing a persona, skill, standing instruction
+or the inbound prompt path (`northstar/lib/inbound-prompt.ts`, shared with the
+eval driver). Cases run on Sonnet by default. That bar is deliberately tighter
+than production's Opus, so don't "fix" a failing case by switching models. When
+a behavior is corrected, add the case that would have caught it.

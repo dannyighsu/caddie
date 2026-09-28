@@ -1,0 +1,29 @@
+id: rosewood-invite-cc-only
+title: Calendar invite to the couple with Buri only on Cc
+tags:
+  - triage/drop
+  - cc-only
+source:
+  session: fc01d3d6
+  extracted: 2026-09-25
+now: Monday, September 21, 2026 at 4:49 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: Wedding Site Betty & Danny
+  from: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+  to:
+    - betty@team.example
+    - danny@team.example
+  cc:
+    - buri@assistant.example
+history: []
+message: |-
+  ***** IMPORTANT INFORMATION *****
+  This message and any attachment are confidential and may be privileged or otherwise protected from disclosure. If you are not the intended recipient, please notify the sender and delete this message and any attachment from your system immediately. Any unauthorized use or dissemination of this message in whole or in part is strictly prohibited.
+expect:
+  - not_called: reply
+    why: Buri is copied, not addressed, and there's nothing to answer.
+  - no_external_send: true
+    why: Nothing to act on, so nothing goes to the vendor.
+  - not_called: email_team
+    why: Both Danny and Betty are on this thread and already saw it; a separate note is noise (standing instruction, 2026-09-24).
