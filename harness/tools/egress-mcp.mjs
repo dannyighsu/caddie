@@ -62,6 +62,39 @@ const tools = [
     },
   },
   {
+    name: "list_slack_channels",
+    description:
+      "List the Slack channels in the workspace — use this to resolve a channel by NAME into the channel ID that post_to_slack takes, or to check whether posting somewhere will work at all. " +
+      "Each result has: id, name, isPrivate, isMember, isArchived, and (when Slack reports them) numMembers, topic, purpose. " +
+      "isMember is the one that decides success: post_to_slack fails for a channel the bot has not been invited to, public or not. Channels the bot is in are listed first. " +
+      "Pass nameFilter to search by substring instead of pulling the whole workspace.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        nameFilter: {
+          type: "string",
+          description:
+            "Case-insensitive substring to match against channel names, e.g. 'eng' matches 'engineering'. Omit to list everything.",
+        },
+        types: {
+          type: "string",
+          description:
+            "Slack conversation types to include, comma-separated: public_channel, private_channel, mpim, im. Defaults to 'public_channel,private_channel'.",
+        },
+        includeArchived: {
+          type: "boolean",
+          description:
+            "Include archived channels. Defaults to false — archived channels cannot be posted to.",
+        },
+        limit: {
+          type: "number",
+          description:
+            "Maximum channels to return after filtering. Defaults to 200. Narrow with nameFilter rather than raising this.",
+        },
+      },
+    },
+  },
+  {
     name: "schedule_reminder",
     description:
       "Schedule a one-shot notification (reminder) to be sent at a specific time. " +
@@ -304,6 +337,60 @@ async function handlePostToSlack(args) {
   };
 }
 
+async function handleListSlackChannels(args) {
+  const { nameFilter, types, includeArchived, limit } = args;
+
+  const res = await fetch(`${PORTAL_URL}/api/control`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "list_slack_channels",
+      ...(nameFilter && { nameFilter }),
+      ...(types && { types }),
+      ...(includeArchived !== undefined && { includeArchived }),
+      ...(limit !== undefined && { limit }),
+    }),
+  });
+
+  const result = await res.json();
+
+  if (!result.success) {
+    return {
+      content: [{ type: "text", text: `Failed to list channels: ${result.error}` }],
+      isError: true,
+    };
+  }
+
+  const channels = result.channels ?? [];
+  if (channels.length === 0) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: nameFilter
+            ? `No channels matched "${nameFilter}". The bot only sees public channels plus private ones it belongs to.`
+            : "No channels visible to the bot.",
+        },
+      ],
+    };
+  }
+
+  // Note truncation explicitly: without it, "not in the list" reads as
+  // "doesn't exist" when it really means "we stopped paging".
+  const note = result.truncated
+    ? "\n\n(Results truncated — narrow with nameFilter or raise limit.)"
+    : "";
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: `${channels.length} channel(s):\n${JSON.stringify(channels, null, 2)}${note}`,
+      },
+    ],
+  };
+}
+
 // --- Schedule tool handlers ---
 
 async function callControl(body) {
@@ -410,6 +497,7 @@ async function handleDeleteSchedule(args) {
 
 const handlers = {
   post_to_slack: handlePostToSlack,
+  list_slack_channels: handleListSlackChannels,
   schedule_reminder: handleScheduleReminder,
   schedule_recurring: handleScheduleRecurring,
   schedule_oneshot_run: handleScheduleOneshotRun,

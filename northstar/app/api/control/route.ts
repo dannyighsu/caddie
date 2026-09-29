@@ -11,6 +11,7 @@
  *   notify  — Send a message to Slack, Telegram, or email (immediately or scheduled)
  *   run     — Execute an agent (immediately or scheduled)
  *   schedule — Create a recurring job
+ *   list_slack_channels — List the workspace's Slack channels (id, name, bot membership)
  *
  * Supports `scheduledFor` for one-shot deferred execution,
  * or `cron` for recurring jobs.
@@ -22,10 +23,11 @@
  *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"extended"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","scheduledFor":"2026-03-28T09:00:00Z"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","cron":"0,30 * * * *","description":"Feed scan every 30 min"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"list_slack_channels","nameFilter":"eng"}'
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { sendMessage, replyInThread, recordOutboundSlackThread, isSlackConfigured } from "@/lib/slack";
+import { sendMessage, replyInThread, recordOutboundSlackThread, isSlackConfigured, listChannels } from "@/lib/slack";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
 import { sendEmail, replyToEmail, recordEmailReply, isEmailConfigured, htmlToText } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
@@ -40,7 +42,14 @@ import { executeJob, isJobActive } from "@/lib/scheduler";
 import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 
 interface ControlRequest {
-  action: "notify" | "reply" | "run" | "schedule" | "update_schedule" | "trigger";
+  action:
+    | "notify"
+    | "reply"
+    | "run"
+    | "schedule"
+    | "update_schedule"
+    | "trigger"
+    | "list_slack_channels";
 
   // --- reply fields ---
   /**
@@ -119,6 +128,20 @@ interface ControlRequest {
    * Telegram chat ID, or email). If omitted, uses the channel's configured default.
    */
   notificationRecipient?: string;
+
+  // --- list_slack_channels fields ---
+  /**
+   * Slack conversation types to include, as `conversations.list` takes them
+   * (e.g. "public_channel", "public_channel,private_channel"). Defaults to
+   * public plus the private channels the bot is in.
+   */
+  types?: string;
+  /** Case-insensitive substring match on the channel name. */
+  nameFilter?: string;
+  /** Include archived channels. Off by default — they can't be posted to. */
+  includeArchived?: boolean;
+  /** Cap on channels returned after filtering. */
+  limit?: number;
 }
 
 // --- Action execution ---
@@ -137,6 +160,8 @@ async function executeAction(req: ControlRequest, portalOwner: UserId): Promise<
       return executeUpdateSchedule(req);
     case "trigger":
       return executeTrigger(req);
+    case "list_slack_channels":
+      return executeListSlackChannels(req);
     default:
       return { success: false, error: `Unknown action: ${req.action}` };
   }
@@ -264,6 +289,29 @@ async function executeTrigger(req: ControlRequest): Promise<Record<string, unkno
     });
 
   return { success: true, started: true, recurring: !!job.cron, consumed };
+}
+
+/**
+ * List the workspace's Slack channels so a caller can resolve a channel by name
+ * instead of being handed an ID. Read-only: it touches no conversation state.
+ *
+ * `isMember` is the field that matters — `notify` posts through
+ * `chat.postMessage`, which fails for a channel the bot was never invited to,
+ * public or not.
+ */
+async function executeListSlackChannels(req: ControlRequest): Promise<Record<string, unknown>> {
+  if (!isSlackConfigured()) {
+    return { success: false, error: "SLACK_BOT_TOKEN not configured" };
+  }
+
+  const { channels, truncated } = await listChannels({
+    types: req.types,
+    nameFilter: req.nameFilter,
+    includeArchived: req.includeArchived,
+    limit: req.limit,
+  });
+
+  return { success: true, count: channels.length, truncated, channels };
 }
 
 async function executeNotify(req: ControlRequest): Promise<Record<string, unknown>> {
@@ -558,7 +606,7 @@ export async function POST(request: NextRequest) {
 
   if (!req.action) {
     return NextResponse.json(
-      { success: false, error: "action is required (notify | run | schedule)" },
+      { success: false, error: "action is required (notify | reply | run | schedule | update_schedule | trigger | list_slack_channels)" },
       { status: 400 }
     );
   }
