@@ -19,6 +19,12 @@ import {
   type Message,
 } from "./db";
 import type { ThreadContext } from "./thread-context";
+import {
+  collectChannels,
+  type ConversationsListPage,
+  type ListChannelsOptions,
+  type SlackChannelSummary,
+} from "./slack-channels";
 import { defaultAgentId } from "./harness";
 import { teamLookup } from "@agints/harness";
 
@@ -61,6 +67,41 @@ export async function replyInThread(
 export function isSlackConfigured(): boolean {
   return !!process.env.SLACK_BOT_TOKEN;
 }
+
+// --- Channel discovery ---
+
+/** Public channels plus the private ones the bot has been invited to. */
+const DEFAULT_CHANNEL_TYPES = "public_channel,private_channel";
+
+/** Slack's own per-page maximum for `conversations.list`. */
+const PAGE_SIZE = 200;
+
+/**
+ * List the workspace's channels, following the `conversations.list` cursor to
+ * the end rather than returning only the first page.
+ *
+ * Needs `channels:read` on the bot token for public channels and `groups:read`
+ * for the private ones it belongs to; without a scope Slack omits that class of
+ * channel rather than erroring, so a missing scope shows up as a short list.
+ */
+export async function listChannels(
+  options: ListChannelsOptions & { types?: string } = {},
+): Promise<{ channels: SlackChannelSummary[]; truncated: boolean }> {
+  const client = getWebClient();
+  const types = options.types?.trim() || DEFAULT_CHANNEL_TYPES;
+
+  return collectChannels(async (cursor) => {
+    const page = await client.conversations.list({
+      types,
+      limit: PAGE_SIZE,
+      exclude_archived: !options.includeArchived,
+      ...(cursor && { cursor }),
+    });
+    return page as ConversationsListPage;
+  }, options);
+}
+
+export type { SlackChannelSummary } from "./slack-channels";
 
 /**
  * Register (or append to) the local conversation for an outbound Slack message,
