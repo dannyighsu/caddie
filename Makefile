@@ -1,4 +1,4 @@
-.PHONY: run dev debug debug-snapshot build build-harness install agent-tools smoke google-auth gog-auth expose unexpose
+.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke google-auth gog-auth expose unexpose
 
 # Network exposure (see the "Network exposure" section in README.md).
 NORTHSTAR_PORT ?= 3000
@@ -13,7 +13,35 @@ FUNNEL_PATHS := /api/telegram/webhook /api/email/webhook
 # compiler, so memory stays flat/bounded. The dev server (`make dev`) leaks
 # compiled-module strings over long uptime — see northstar/scripts/mem-logger.cjs.
 # Override workspace: make run WORKSPACE_ROOT=/path/to/workspace
-run: build
+#
+# `make run` wraps `make serve` in a tmux session (TMUX_SESSION, default
+# "northstar") so the server outlives the terminal. Detach with C-b d, reattach
+# with `tmux attach -t northstar`. If the session already exists, its run is
+# stopped (C-c, wait for the port to free) and replaced with a fresh one — so
+# `make run` doubles as "restart". Runs in the foreground when tmux is
+# missing, when already inside tmux, or with `make run TMUX_SESSION=`.
+TMUX_SESSION ?= northstar
+run:
+	@if [ -z "$(TMUX_SESSION)" ] || [ -n "$$TMUX" ] || ! command -v tmux >/dev/null 2>&1; then \
+		exec $(MAKE) --no-print-directory serve; \
+	fi; \
+	if tmux has-session -t "=$(TMUX_SESSION)" 2>/dev/null; then \
+		echo "[run] stopping existing run in tmux session '$(TMUX_SESSION)'…"; \
+		tmux send-keys -t "=$(TMUX_SESSION):" C-c; \
+		for i in 1 2 3 4 5 6 7 8 9 10; do \
+			lsof -ti tcp:$(NORTHSTAR_PORT) -sTCP:LISTEN >/dev/null 2>&1 || break; \
+			sleep 1; \
+		done; \
+		tmux kill-session -t "=$(TMUX_SESSION)" 2>/dev/null || true; \
+	fi; \
+	tmux new-session -d -s "$(TMUX_SESSION)" -c "$(CURDIR)" \
+		"$(MAKE) --no-print-directory serve $(if $(WORKSPACE_ROOT),WORKSPACE_ROOT=$(WORKSPACE_ROOT)); echo '[run] server exited.'; exec \$$SHELL"; \
+	echo "[run] started tmux session '$(TMUX_SESSION)'."; \
+	if [ -t 1 ]; then exec tmux attach -t "=$(TMUX_SESSION)"; \
+	else echo "[run] no TTY — attach with: tmux attach -t $(TMUX_SESSION)"; fi
+
+# The actual production server (what `make run` runs inside tmux).
+serve: build
 	@$(MAKE) --no-print-directory expose
 	cd northstar && WORKSPACE_ROOT=$(or $(WORKSPACE_ROOT),$(CURDIR)/workspace) pnpm start
 
