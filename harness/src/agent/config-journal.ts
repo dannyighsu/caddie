@@ -10,9 +10,10 @@
  * lost on 2026-09-19 — the agent had already confirmed "saved that as a standing
  * instruction" and nothing afterwards said otherwise.
  *
- * So the harness keeps its own copy. At the start and end of every run, each
- * config file whose contents have changed is written to a new timestamped
- * snapshot under the agent *definition* (`harness/agents/<agent>/config-history/`).
+ * So the harness keeps its own copy. At the start and end of every run, and
+ * whenever a file changes while a run is in progress, each config file whose
+ * contents have changed is written to a new timestamped snapshot under the agent
+ * *definition* (`harness/agents/<agent>/config-history/`).
  * Living outside the workspace is the point: a write that clobbers the live file
  * cannot reach the backup. Snapshots are append-only — nothing here is ever
  * overwritten or pruned, since deletion is the failure mode being defended
@@ -24,13 +25,33 @@
  * was in progress — an out-of-band write. `detectConfigDrift` reports exactly
  * that, and reports only *removals*: a human adding a line is ordinary, a line
  * disappearing is the thing nobody notices.
+ *
+ * `state/` (per-job state, where one-off steering for a recurring job lives) is
+ * journaled the same way but not drift-checked: the agent consumes and clears
+ * directives there as a matter of course, so a removal is expected, not a sign
+ * of loss. What it needs is the mid-run snapshots: a directive added at 07:05 to
+ * a job that runs 07:00–07:10 and rewrites its state file at the end would
+ * otherwise exist in no snapshot at all. `watchJournal` takes those.
  */
 
 import { readFile, writeFile, mkdir, readdir, stat } from "fs/promises";
+import { watch, type FSWatcher } from "fs";
 import { resolve, dirname, basename, posix } from "path";
 
 /** Directory under the agent definition that holds the snapshots. */
 export const JOURNAL_DIRNAME = "config-history";
+
+/**
+ * Workspace directories that are journaled. Each keeps its own subtree in the
+ * journal, e.g. `config-history/state/news-digest.md.<stamp>`.
+ */
+export const JOURNALED_DIRS = ["config", "state"] as const;
+
+/** The one journaled directory that is drift-checked (see the header). */
+const DRIFT_CHECKED_DIR = "config";
+
+/** How long file events settle before a mid-run snapshot is taken. */
+const WATCH_DEBOUNCE_MS = 500;
 
 /**
  * Snapshot suffix: the ISO timestamp with `:` swapped for `-` so it is a legal
@@ -146,34 +167,37 @@ async function newestSnapshot(
 }
 
 /**
- * Snapshot every config file whose contents differ from its newest snapshot.
+ * Snapshot every journaled file whose contents differ from its newest snapshot.
  * Returns the workspace-relative paths that were written, for logging.
  */
 export async function journalConfig(
   agentDir: string,
   workingDirectory: string
 ): Promise<string[]> {
-  const configRoot = resolve(workingDirectory, "config");
-  const journalRoot = resolve(agentDir, JOURNAL_DIRNAME);
   const written: string[] = [];
 
-  for (const relPath of await listFiles(configRoot)) {
-    const livePath = resolve(configRoot, relPath);
-    const size = await stat(livePath).then((s) => s.size).catch(() => Infinity);
-    if (size > MAX_SNAPSHOT_BYTES) continue;
+  for (const dir of JOURNALED_DIRS) {
+    const liveRoot = resolve(workingDirectory, dir);
+    const journalRoot = resolve(agentDir, JOURNAL_DIRNAME, dir);
 
-    let live: string;
-    try {
-      live = await readFile(livePath, "utf-8");
-    } catch {
-      continue; // Vanished or unreadable mid-walk — drift detection will say so.
+    for (const relPath of await listFiles(liveRoot)) {
+      const livePath = resolve(liveRoot, relPath);
+      const size = await stat(livePath).then((s) => s.size).catch(() => Infinity);
+      if (size > MAX_SNAPSHOT_BYTES) continue;
+
+      let live: string;
+      try {
+        live = await readFile(livePath, "utf-8");
+      } catch {
+        continue; // Vanished or unreadable mid-walk — drift detection will say so.
+      }
+
+      const previous = await newestSnapshot(journalRoot, relPath);
+      if (previous?.content === live) continue;
+
+      await writeSnapshot(journalRoot, relPath, live);
+      written.push(posix.join(dir, relPath));
     }
-
-    const previous = await newestSnapshot(journalRoot, relPath);
-    if (previous?.content === live) continue;
-
-    await writeSnapshot(journalRoot, relPath, live);
-    written.push(posix.join("config", relPath));
   }
 
   return written;
@@ -189,8 +213,8 @@ export async function detectConfigDrift(
   agentDir: string,
   workingDirectory: string
 ): Promise<ConfigDrift[]> {
-  const configRoot = resolve(workingDirectory, "config");
-  const journalRoot = resolve(agentDir, JOURNAL_DIRNAME);
+  const configRoot = resolve(workingDirectory, DRIFT_CHECKED_DIR);
+  const journalRoot = resolve(agentDir, JOURNAL_DIRNAME, DRIFT_CHECKED_DIR);
   const drifts: ConfigDrift[] = [];
 
   for (const relPath of await listJournaledPaths(journalRoot)) {
@@ -213,7 +237,7 @@ export async function detectConfigDrift(
     if (removedLines.length === 0) continue; // Additions only — ordinary editing.
 
     drifts.push({
-      relPath: posix.join("config", relPath),
+      relPath: posix.join(DRIFT_CHECKED_DIR, relPath),
       snapshotPath: previous.path,
       deleted: live === null,
       removedLines,
@@ -221,6 +245,58 @@ export async function detectConfigDrift(
   }
 
   return drifts;
+}
+
+/**
+ * Snapshot journaled files as they change for the length of a run, so an edit
+ * made mid-run is kept even if the agent overwrites the file before the run
+ * ends. Returns a stop function; call it before the run-end journal.
+ *
+ * Creates the journaled directories if missing, since a directory that doesn't
+ * exist can't be watched and `state/` only appears once a job first writes it.
+ * Snapshot errors are logged, never thrown — a backup must not take down a run.
+ */
+export async function watchJournal(
+  agentDir: string,
+  workingDirectory: string
+): Promise<() => Promise<void>> {
+  const watchers: FSWatcher[] = [];
+  let timer: NodeJS.Timeout | undefined;
+  let pending: Promise<unknown> = Promise.resolve();
+
+  const snapshot = () => {
+    timer = undefined;
+    pending = pending
+      .then(() => journalConfig(agentDir, workingDirectory))
+      .then((written) => {
+        if (written.length) {
+          console.log(`[Journal] Mid-run snapshot: ${written.join(", ")}`);
+        }
+      })
+      .catch((err) => console.warn(`[Journal] Mid-run snapshot failed: ${(err as Error).message}`));
+  };
+
+  for (const dir of JOURNALED_DIRS) {
+    const liveRoot = resolve(workingDirectory, dir);
+    try {
+      await mkdir(liveRoot, { recursive: true });
+      watchers.push(
+        watch(liveRoot, { recursive: true }, () => {
+          clearTimeout(timer);
+          timer = setTimeout(snapshot, WATCH_DEBOUNCE_MS);
+        })
+      );
+    } catch (err) {
+      console.warn(`[Journal] Can't watch ${dir}/: ${(err as Error).message}`);
+    }
+  }
+
+  return async () => {
+    // A change still settling is picked up by the run-end journal.
+    for (const w of watchers) w.close();
+    clearTimeout(timer);
+    await pending;
+  };
 }
 
 /** Files listed in the run-context note before it stops enumerating. */

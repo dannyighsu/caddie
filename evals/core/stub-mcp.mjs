@@ -120,6 +120,9 @@ if (kind === "gmail") {
     async ({ query, maxResults }) => {
       const hits = emails
         .filter((e) => matchesQuery(e, query))
+        // Newest first, as Gmail returns them — fixture order would let
+        // maxResults cut off the most recent thread.
+        .sort((a, b) => new Date(b.date ?? 0) - new Date(a.date ?? 0))
         .slice(0, Math.min(maxResults ?? 10, 20))
         .map(({ body, ...meta }) => ({ ...meta, snippet: (body ?? "").replace(/\s+/g, " ").slice(0, 200) }));
       return text(hits.length ? hits : "No emails found matching the query.");

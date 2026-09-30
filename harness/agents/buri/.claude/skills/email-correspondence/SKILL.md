@@ -121,15 +121,18 @@ member's go-ahead.
 
 ### 6. Threading and recipients
 
-- **Reply on the existing thread** for anything about the same matter. Start a new
-  thread only for a new matter, or when the recipient list has to change in a
-  way the tool can't express.
+- **When you write about a matter that already has a thread, write on that
+  thread** — whoever started it. With `send_email`, that means passing its
+  `threadId` (from `search_emails`/`get_email`); a "Re:" subject alone starts a
+  new thread. Start a new thread only for a new matter, or when the recipient
+  list has to change in a way the tool can't express.
 - **Check To and Cc before every send.** Look for anyone who shouldn't see this
   (an outside party on an internal matter) and anyone who should be on it but
   isn't (both Danny and Betty on anything wedding-related, per standing
   instruction).
-- **Use `replyAll` on a group thread** so the people already copied stay on it.
-  Don't silently drop recipients.
+- **Keep everyone already on a group thread.** `reply` does this by default
+  (`replyAll`); with `send_email`, put them back in To/Cc yourself. Don't
+  silently drop recipients.
 - **To is for the person who has to act. Cc is for the people who need to see it.**
 - **Don't double-send.** If Danny and Betty are already on the thread, don't also
   send them a separate summary (standing instruction).

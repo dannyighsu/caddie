@@ -34,8 +34,9 @@ const tools = [
     name: "send_email",
     description:
       "Send an outbound email from your Gmail inbox. " +
-      "Use this for mail you initiate — reaching out to someone, sending a heads-up or notification — and for FOLLOW-UPS on a thread you started (pass the `threadId` this tool returned). " +
-      "DO NOT use this to answer an email someone just sent you: the harness already delivers your reply into the current thread automatically, and using this would start a new thread. " +
+      "Use this for mail you initiate — reaching out to someone, sending a heads-up or notification — and for writing on another existing thread you're on, whoever started it, when the situation calls for a message there (e.g. a teammate asks you to tell a vendor something). " +
+      "To write on an existing thread, pass its `threadId` (from a previous send, or from `search_emails`/`get_email`) — a matching \"Re:\" subject alone does not thread. " +
+      "DO NOT use this to answer the message you are currently handling: that goes through `reply`, which delivers into the current thread. " +
       "Any reply the recipient sends comes back to you with the full thread history attached, so you don't need to restate context you've already sent. " +
       "`to`, `cc` and `bcc` each accept several addresses, so \"send this and copy me\" puts everyone on one thread. " +
       "Pass `html` instead of `message` when the mail benefits from real formatting. " +
@@ -76,10 +77,11 @@ const tools = [
         threadId: {
           type: "string",
           description:
-            "Optional. Continue an existing thread you started, instead of opening a new " +
-            "one: pass the `threadId` a previous send returned (or one from " +
-            "`search_emails`/`get_email`). The follow-up then threads with the earlier " +
-            "messages in the recipient's mail client. Omit it for genuinely new mail. " +
+            "Optional. Put this message on an existing thread you're on — whether you or the " +
+            "other side started it — instead of opening a new one: pass the `threadId` a " +
+            "previous send returned, or one from `search_emails`/`get_email`. The message then " +
+            "threads with the earlier ones in the recipient's mail client. Omit it for " +
+            "genuinely new mail. " +
             "With a threadId, `subject` is optional — the thread's own subject is reused.",
         },
         subject: {

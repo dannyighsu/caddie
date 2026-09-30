@@ -118,6 +118,13 @@ export interface AgentInput {
    * human directives. Omit for runs with no associated job (e.g. ad-hoc chat).
    */
   stateKey?: string;
+  /**
+   * The run's "now", for values the launcher derives from the clock (the
+   * run-record path). Defaults to the real time. Evals replaying a past
+   * situation set it so nothing in the run context contradicts the
+   * `currentTime` header.
+   */
+  now?: Date;
 }
 
 /**

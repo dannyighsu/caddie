@@ -41,8 +41,9 @@ const tools = [
       "Reply to the person you are currently talking to, in the SAME thread they contacted you on. " +
       "This is how you respond to a message you received — it delivers in-thread, correctly threaded. " +
       "You do not choose the destination: it is always the current conversation. " +
-      "Your final text output is used only for logging/tracing, so you MUST call this tool to actually say anything. " +
-      "If no response is warranted (e.g. a group thread where you weren't really addressed — check the email envelope in your run context), simply DO NOT call this tool. " +
+      "Your final text output is used only for logging/tracing, so if you mean to respond, this tool is the only way it reaches them. " +
+      "Not every message needs a response. If none is warranted (e.g. a group thread where you weren't really addressed — check the email envelope in your run context), simply end the run without calling this tool. " +
+      "Calling it with a blank `message` does nothing — nothing is sent — so it is not a way to signal silence. " +
       "You may call it more than once to send multiple messages.",
     inputSchema: {
       type: "object",
@@ -69,7 +70,7 @@ async function handleReply(args) {
 
   if (!message) {
     return {
-      content: [{ type: "text", text: "reply requires a `message`." }],
+      content: [{ type: "text", text: "Nothing sent: `reply` needs a non-empty `message`. If you meant not to reply, just end the run." }],
       isError: true,
     };
   }

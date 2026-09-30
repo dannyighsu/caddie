@@ -32,6 +32,7 @@ vi.mock("../resolver/runner.js", () => ({
 // backup must never take down a run), which is what a restored mock gives back.
 vi.mock("./config-journal.js", () => ({
   journalConfig: vi.fn().mockResolvedValue([]),
+  watchJournal: vi.fn().mockResolvedValue(async () => {}),
   detectConfigDrift: vi.fn().mockResolvedValue([]),
   describeConfigDrift: vi.fn().mockReturnValue(""),
 }));
@@ -184,6 +185,25 @@ describe("createLauncher", () => {
     expect(prompt).toContain("Trust tier: team");
     expect(iTime).toBeGreaterThan(iIdentity);
     expect(iUser).toBeGreaterThan(iTime);
+  });
+
+  it("derives the run-record path from an injected clock", async () => {
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: ID,
+      prompt: "go",
+      now: new Date("2026-09-22T19:03:00Z"),
+    });
+
+    // A replayed run must not show the real date anywhere in its context.
+    const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    expect(prompt).toContain("Run record path: runs/2026-09/22_tuesday/run-record-2026-09-22T19-03-00.jsonl");
   });
 
   it("skips persona prefix on session resume", async () => {

@@ -64,6 +64,82 @@ export async function replyInThread(
   });
 }
 
+/** The scope `files.getUploadURLExternal` needs; Slack reports it on failure. */
+const FILE_UPLOAD_SCOPE = "files:write";
+
+/**
+ * Upload a file into a channel (or thread), with `text` as the message that
+ * introduces it. Returns the ts of the message the file was shared in, when
+ * Slack reports one — the share is finalized asynchronously, so it can be
+ * missing even on success.
+ *
+ * Unlike a text post, sharing a file needs channel membership even with
+ * `chat:write.public`. So on `not_in_channel` the bot joins (public channels
+ * only, via `channels:join`) and retries once; a private channel still needs
+ * an invite.
+ *
+ * Needs `files:write` on the bot token. Without it Slack answers
+ * `missing_scope`, which is rethrown with the fix spelled out, because the raw
+ * error names neither the scope nor where to add it.
+ */
+export async function uploadFile(
+  channel: string,
+  file: { filename: string; data: Buffer; title?: string },
+  text: string,
+  threadTs?: string,
+): Promise<string | undefined> {
+  const client = getWebClient();
+  const upload = {
+    channel_id: channel,
+    file: file.data,
+    filename: file.filename,
+    title: file.title ?? file.filename,
+    initial_comment: text,
+  };
+  const send = () =>
+    client.filesUploadV2(threadTs ? { ...upload, thread_ts: threadTs } : upload);
+
+  let result;
+  try {
+    try {
+      result = await send();
+    } catch (err) {
+      if (slackError(err)?.error !== "not_in_channel") throw err;
+      await client.conversations.join({ channel });
+      console.log(`[Slack] Joined ${channel} to share ${file.filename}`);
+      result = await send();
+    }
+  } catch (err) {
+    const data = slackError(err);
+    if (data?.error === "missing_scope") {
+      throw new Error(
+        `Slack bot token lacks the ${data.needed ?? FILE_UPLOAD_SCOPE} scope. ` +
+          `Add it under OAuth & Permissions in the Slack app settings and reinstall the app.`,
+      );
+    }
+    if (data?.error === "method_not_supported_for_channel_type" || data?.error === "channel_not_found") {
+      throw new Error(
+        `Can't share a file in ${channel}: the bot isn't in it and can't join it on its own ` +
+          `(a private channel needs someone to invite the bot).`,
+      );
+    }
+    throw err;
+  }
+
+  // The SDK types only `public` shares; private channels come back under `private`.
+  type Share = { ts?: string; thread_ts?: string };
+  const shared = result.files?.[0]?.files?.[0]?.shares as
+    | { public?: Record<string, Share[]>; private?: Record<string, Share[]> }
+    | undefined;
+  const share = shared?.public?.[channel]?.[0] ?? shared?.private?.[channel]?.[0];
+  return threadTs ?? share?.thread_ts ?? share?.ts;
+}
+
+/** The `data` a Slack Web API error carries, if it is one. */
+function slackError(err: unknown): { error?: string; needed?: string } | undefined {
+  return (err as { data?: { error?: string; needed?: string } }).data;
+}
+
 export function isSlackConfigured(): boolean {
   return !!process.env.SLACK_BOT_TOKEN;
 }

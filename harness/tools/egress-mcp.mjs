@@ -13,11 +13,19 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { readFile, realpath, stat } from "node:fs/promises";
+import { basename, relative, resolve, isAbsolute } from "node:path";
 
 const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 // The agent this server is mounted for — injected by the launcher, so schedule
 // tools default to "run me" instead of making the model name itself.
 const AGENT_ID = process.env.IGNIS_AGENT_ID || "buri";
+// The agent's working directory, injected by the launcher. File attachments
+// must resolve inside it, so the tool can't be used to post arbitrary files
+// off the host.
+const WORKSPACE = process.env.IGNIS_WORKSPACE || process.cwd();
+// Upload bytes travel as base64 JSON through the control API; keep it sane.
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 const server = new Server(
   { name: "egress", version: "0.1.0" },
@@ -34,7 +42,10 @@ const tools = [
       "DO NOT use this for your final response or summary: the system automatically delivers your final output to the originating channel (which may not even be Slack). " +
       "Calling this with your final summary will cause duplicate messages. " +
       "Legitimate uses: posting a long-running task progress update, alerting a different Slack channel about an event, or proactively raising an issue in Slack while the user is interacting via another channel. " +
-      "Messages support Slack mrkdwn formatting (*bold*, _italic_, `code`, >quotes, <url|text> links).",
+      "Messages support Slack mrkdwn formatting (*bold*, _italic_, `code`, >quotes, <url|text> links). " +
+      "To share a file (a PDF report, a CSV, an image), pass filePath: the file is uploaded into the channel and `message` becomes the text that introduces it. " +
+      "Readers can't reach your workspace, so attach the file rather than linking to its path. " +
+      "Sharing a file in a public channel the bot isn't in makes it join that channel first.",
     inputSchema: {
       type: "object",
       properties: {
@@ -57,6 +68,15 @@ const tools = [
           description:
             "Thread timestamp to reply in. Omit to post as a new message.",
         },
+        filePath: {
+          type: "string",
+          description:
+            "Path of a file to attach, relative to your working directory (e.g. runs/2026-09/29_tuesday/artifacts/report.pdf). Must be inside your working directory; max 25 MB.",
+        },
+        fileTitle: {
+          type: "string",
+          description: "Display title for the attached file. Defaults to its filename.",
+        },
       },
       required: ["message"],
     },
@@ -65,8 +85,8 @@ const tools = [
     name: "list_slack_channels",
     description:
       "List the Slack channels in the workspace — use this to resolve a channel by NAME into the channel ID that post_to_slack takes, or to check whether posting somewhere will work at all. " +
-      "Each result has: id, name, isPrivate, isMember, isArchived, and (when Slack reports them) numMembers, topic, purpose. " +
-      "isMember is the one that decides success: post_to_slack fails for a channel the bot has not been invited to, public or not. Channels the bot is in are listed first. " +
+      "Each result has: id, name, isPrivate, isMember, isArchived, canPost, and (when Slack reports them) numMembers, topic, purpose. " +
+      "canPost is the one that decides success — NOT isMember: the bot can post to public channels it hasn't joined, so isMember:false with canPost:true is normal. Postable channels are listed first. " +
       "Pass nameFilter to search by substring instead of pulling the whole workspace.",
     inputSchema: {
       type: "object",
@@ -294,8 +314,43 @@ const tools = [
 
 // --- Tool handlers ---
 
+/**
+ * Read a workspace file for upload. Throws with a message meant for the model
+ * when the path escapes the workspace (symlinks included), is missing, or is
+ * too large.
+ */
+async function readWorkspaceFile(filePath) {
+  const root = await realpath(WORKSPACE);
+  let full;
+  try {
+    full = await realpath(resolve(root, filePath));
+  } catch {
+    throw new Error(`File not found: ${filePath}`);
+  }
+  const rel = relative(root, full);
+  if (rel.startsWith("..") || isAbsolute(rel)) {
+    throw new Error(`File must be inside your working directory: ${filePath}`);
+  }
+  const info = await stat(full);
+  if (!info.isFile()) throw new Error(`Not a file: ${filePath}`);
+  if (info.size > MAX_FILE_BYTES) {
+    throw new Error(`File is ${info.size} bytes; the limit is ${MAX_FILE_BYTES}.`);
+  }
+  return { filename: basename(full), data: await readFile(full) };
+}
+
 async function handlePostToSlack(args) {
-  const { message, from, channel, threadTs } = args;
+  const { message, from, channel, threadTs, filePath, fileTitle } = args;
+
+  let file;
+  if (filePath) {
+    const { filename, data } = await readWorkspaceFile(filePath);
+    file = {
+      filename,
+      contentBase64: data.toString("base64"),
+      ...(fileTitle && { title: fileTitle }),
+    };
+  }
 
   // If this run was created by one of the agent's own tasks, its source-task
   // facts arrive via IGNIS_THREAD_CONTEXT (inherited from the run env, set
@@ -314,6 +369,7 @@ async function handlePostToSlack(args) {
     ...(from && { from }),
     ...(channel && { slackChannel: channel }),
     ...(threadTs && { threadTs }),
+    ...(file && { file }),
     ...(threadContext && { threadContext }),
   };
 
@@ -333,7 +389,12 @@ async function handlePostToSlack(args) {
   }
 
   return {
-    content: [{ type: "text", text: "Message posted to Slack." }],
+    content: [
+      {
+        type: "text",
+        text: file ? `Posted to Slack with ${file.filename} attached.` : "Message posted to Slack.",
+      },
+    ],
   };
 }
 

@@ -25,6 +25,7 @@ import { runResolvers } from "../resolver/runner.js";
 import { teamRoster } from "../team/roster.js";
 import {
   journalConfig,
+  watchJournal,
   detectConfigDrift,
   describeConfigDrift,
   type ConfigDrift,
@@ -398,7 +399,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     ];
 
     // Generated per-run values
-    const now = new Date();
+    const now = input.now ?? new Date();
     const pst = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
     const year = pst.getFullYear();
     const month = String(pst.getMonth() + 1).padStart(2, "0");
@@ -570,7 +571,9 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       ? userPrompt
       : `${persona}\n\n---\n\n${contextPreamble}${userPrompt}`;
 
-    // 8. Execute via runtime
+    // 8. Execute via runtime, snapshotting journaled files as they change so a
+    // team member's mid-run edit survives the agent overwriting the file.
+    const stopWatching = await watchJournal(agentDir, workingDirectory);
     let result;
     try {
       result = await runtime.execute({
@@ -586,7 +589,8 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
         additionalEnv: input.additionalEnv,
       });
     } finally {
-      // 9. Snapshot whatever the run left in config/. This is the baseline the
+      await stopWatching();
+      // 9. Snapshot whatever the run left in config/ and state/. This is the baseline the
       // next run's drift check compares against, so an edit the agent made
       // itself never looks like an out-of-band loss. In a `finally` because a
       // run that crashed still edited files, and a missed snapshot would show
