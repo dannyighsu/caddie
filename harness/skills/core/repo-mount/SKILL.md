@@ -1,98 +1,61 @@
 ---
 name: repo-mount
-description: Mount a local or remote git repo into the workspace temporarily so you can read, grep, explore, and contribute changes back as a pull request. Mounts expire and are swept automatically. Use when the user asks you to look at a repo, clone a repo, add access to a codebase, or fix something in one — including this harness itself.
+description: Mount a git repo (always a fresh clone of its remote main) into the workspace temporarily so you can read, grep, explore, and contribute changes back as a pull request. Mounts expire and are swept automatically. Use when the user asks you to look at a repo, clone a repo, add access to a codebase, or fix something in one — including this harness itself.
 ---
 
 ## Repo Mounts
 
-You have a `mounts/` directory in your workspace for temporary access to git repos — either existing local clones on the user's machine or remote URLs that get cloned in. Mounts have an expiry (default 24h) and a SessionStart hook sweeps expired ones at the start of every run.
+You have a `mounts/` directory in your workspace for temporary access to git repos. Every mount is a shallow clone of the repo's **remote `main`** — never a local copy. Each remote is mounted at most once, and mounts expire (default 24h).
 
 **Mount layout:**
-- `mounts/<name>/` — the repo itself (symlink for local, directory for clones)
+- `mounts/<name>/` — the cloned repo
 - `mounts/.meta/<name>.json` — sidecar with `name`, `kind`, `source`, `mountedAt`, `expiresAt`
 
-**Choose a short, kebab-case `<name>`** — the directory name the user will see when you reference paths. Usually derived from the repo name (e.g. `ignis`, `northstar-legacy`).
+## Mount a repo
 
-## Mount a local repo (symlink)
-
-When the user points you at a path on their machine. **Exception:** to work on
-the ignis repo itself, clone it instead — see **Working on ignis itself**.
+Always use the script — don't `git clone` or `ln -s` into `mounts/` by hand:
 
 ```bash
-SRC="/abs/path/to/repo"
-NAME="repo-name"
-TTL_HOURS=24
-
-mkdir -p mounts/.meta
-ln -s "$SRC" "mounts/$NAME"
-python3 -c "
-import json, datetime
-now = datetime.datetime.now(datetime.timezone.utc)
-exp = now + datetime.timedelta(hours=$TTL_HOURS)
-json.dump({
-    'name': '$NAME',
-    'kind': 'symlink',
-    'source': '$SRC',
-    'mountedAt': now.isoformat(),
-    'expiresAt': exp.isoformat(),
-}, open('mounts/.meta/$NAME.json', 'w'), indent=2)
-"
+python3 "$HARNESS_ROOT/scripts/mount-repo.py" <url-or-local-path>
 ```
 
-The symlink is instant and uses no storage. The underlying repo is **not** modified by sweep — sweep only removes the symlink.
+It handles the rules for you:
 
-## Mount a remote repo (shallow clone)
+- **A local path is resolved to its `origin` remote** and that is cloned. A
+  local tree can be on another branch, behind, or full of someone's
+  uncommitted work — you'd read code that isn't what's shipped, and your edits
+  would land in their tree. If the path has no `origin`, the script fails:
+  tell the user rather than working around it.
+- **Mounting a repo that's already mounted reuses it.** A clean mount on `main`
+  is reset to the latest `origin/main`; one with work in progress is left
+  alone (with `origin/main` fetched, so branch new work from it). Either way
+  its expiry is extended. So when you need a repo, just run the script —
+  there's no need to check first, and you never end up with two copies.
+- **If the remote has no `main`**, the default branch is cloned and the output
+  says which — pass that on to the user.
 
-When the user gives you a git URL:
-
-```bash
-URL="https://github.com/org/repo"
-NAME="repo"
-TTL_HOURS=24
-
-mkdir -p mounts/.meta
-git clone --depth=1 "$URL" "mounts/$NAME"
-python3 -c "
-import json, datetime
-now = datetime.datetime.now(datetime.timezone.utc)
-exp = now + datetime.timedelta(hours=$TTL_HOURS)
-json.dump({
-    'name': '$NAME',
-    'kind': 'clone',
-    'source': '$URL',
-    'mountedAt': now.isoformat(),
-    'expiresAt': exp.isoformat(),
-}, open('mounts/.meta/$NAME.json', 'w'), indent=2)
-"
-```
-
-Use `--depth=1` by default to keep clones small. If the user asks for full history, drop the flag.
+Options: `--ttl HOURS` (default 24; longer only when the user explicitly wants
+to keep a repo around) and `--name NAME` (default: the repo name; needed only
+if the script says the name is taken). The script prints the mount path —
+refer to it by that path.
 
 ## List mounts
-
-```bash
-ls mounts/.meta/ 2>/dev/null | sed 's/\.json$//' || echo "(no mounts)"
-```
-
-Or for details including expiry:
 
 ```bash
 for f in mounts/.meta/*.json; do [ -e "$f" ] && cat "$f" && echo; done
 ```
 
-## Unmount early
+## Unmount
 
-If the user wants a mount removed before its TTL:
+Mounts are swept at the start of a run once they've expired, except a mount
+with uncommitted changes or unpushed commits: that one is kept, and you'll be
+told about it at session start. Push the work (or tell the user it's stranded),
+then unmount it. To unmount early:
 
 ```bash
 NAME="repo-name"
-if [ -L "mounts/$NAME" ]; then unlink "mounts/$NAME"; else rm -rf "mounts/$NAME"; fi
-rm -f "mounts/.meta/$NAME.json"
+rm -rf "mounts/$NAME" "mounts/.meta/$NAME.json"
 ```
-
-## Extend a TTL
-
-Rewrite the sidecar with a new `expiresAt` (re-run the metadata block from the mount step with a new `TTL_HOURS`).
 
 ## Contributing changes
 
@@ -127,15 +90,15 @@ gh pr create --title "<title>" --body "<what, why, how you verified it>"
 
 This repo is the harness you run on, so two extra rules apply.
 
-**Clone it — never symlink it.** The local-mount recipe above makes a symlink,
-which would point at the *live working tree*: your edits would hit the running
-install and your `git add` could stage the team's uncommitted work. Clone
-instead, even though the source is a local path — that gives you an isolated
-checkout at HEAD:
+**Mount it like any other repo.** `$HARNESS_ROOT` is inside the ignis checkout
+you run from, so this clones that checkout's remote `main`:
 
 ```bash
-git clone /path/to/ignis mounts/ignis
+python3 "$HARNESS_ROOT/scripts/mount-repo.py" "$HARNESS_ROOT"
 ```
+
+Never work in the local checkout itself: that tree is the *live install*, on
+whatever branch and uncommitted state it happens to be in.
 
 **Never change what governs you.** These files decide what you are allowed to
 do, and most of them are read live rather than compiled — `permissions.json`,
@@ -170,4 +133,3 @@ into the checkout — don't assume the clone has it.
 
 - Mounts are under `mounts/` in your workspace, which lives outside the ignis repo, so nothing leaks into it.
 - Nested git repos are fine: git walks up from cwd to find the nearest `.git/`, so git commands run inside a mount operate on that mount, not ignis.
-- Default TTL is 24h. Use longer only when the user explicitly wants to keep a repo around.
