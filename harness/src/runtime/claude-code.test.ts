@@ -67,6 +67,23 @@ describe("ClaudeCodeRuntime", () => {
       expect(args[idx + 1]).toBe("");
     });
 
+    it("passes disallowed tools as one comma-separated --disallowedTools value", () => {
+      const args: string[] = buildArgs({
+        prompt: "hi",
+        maxTurns: 5,
+        workingDirectory: "/tmp",
+        disallowedTools: ["mcp__local-rag__ingest_file", "mcp__local-rag__delete_file"],
+      });
+      const idx = args.indexOf("--disallowedTools");
+      expect(idx).toBeGreaterThan(-1);
+      expect(args[idx + 1]).toBe("mcp__local-rag__ingest_file,mcp__local-rag__delete_file");
+    });
+
+    it("omits --disallowedTools when nothing is disallowed", () => {
+      const args: string[] = buildArgs({ prompt: "hi", maxTurns: 5, workingDirectory: "/tmp", disallowedTools: [] });
+      expect(args).not.toContain("--disallowedTools");
+    });
+
     it("does not pass --tools when built-in tools are allowed", () => {
       const args: string[] = buildArgs({
         prompt: "hi",

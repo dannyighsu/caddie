@@ -23,6 +23,15 @@ export async function register() {
     const { startScheduler } = await import("./lib/scheduler");
     startScheduler();
 
+    // Workspace search: mirror conversations into each agent's workspace and
+    // keep its local index in sync (a no-op for the index without LOCAL_RAG_ENTRY).
+    const { listAgents } = await import("./lib/harness");
+    const { backfillMirror } = await import("./lib/conversation-mirror");
+    const { startWorkspaceIndex } = await import("./lib/workspace-index");
+    listAgents()
+      .then((agents) => startWorkspaceIndex(agents.map((a) => a.id), backfillMirror))
+      .catch((err) => console.error("[RagIndex] Startup failed:", err));
+
     // Start Slack Socket Mode
     const { startSocketMode } = await import("./lib/slack");
     const { handleSlackMessage } = await import("./lib/slack-handler");

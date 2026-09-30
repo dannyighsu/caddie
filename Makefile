@@ -1,4 +1,4 @@
-.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke google-auth gog-auth expose unexpose
+.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke google-auth gog-auth expose unexpose rag-setup rag-rebuild
 
 # Network exposure (see the "Network exposure" section in README.md).
 IGNIS_PORT ?= 3000
@@ -138,6 +138,29 @@ agent-tools:
 	$(AGENT_VENV)/bin/pip install --quiet --upgrade $(AGENT_PY_PACKAGES)
 	@$(AGENT_VENV)/bin/python3 -c "import pypdf; print('[agent-tools] pypdf', pypdf.__version__)"
 	@pdftoppm -v 2>&1 | head -1
+
+# Workspace search (the `local-rag` capability): clone/build the mcp-local-rag
+# server beside this repo and print the LOCAL_RAG_ENTRY line for .env.local.
+# Idempotent. The portal builds and maintains the index itself once restarted.
+rag-setup:
+	portal/scripts/setup-rag.sh
+
+# Drop and rebuild an agent's search index — after an embedding-model change or
+# a workspace move (portal health says when). Asks the running portal to do it,
+# so it can't race a sync; with the portal down, deletes the index and the next
+# start rebuilds it.
+#   make rag-rebuild AGENT=buri
+rag-rebuild:
+	@test -n "$(AGENT)" || { echo "usage: make rag-rebuild AGENT=<agent id>"; exit 1; }
+	@if curl -sf -o /dev/null http://localhost:$(IGNIS_PORT)/api/control; then \
+		echo "[rag-rebuild] asking the portal to rebuild $(AGENT)'s index (this can take a while)…"; \
+		curl -sS -X POST http://localhost:$(IGNIS_PORT)/api/control \
+			-H 'Content-Type: application/json' -d '{"action":"rag_rebuild","agentId":"$(AGENT)"}'; echo; \
+	else \
+		ws="$${WORKSPACE_ROOT:-$$HOME/.ignis}"; case "$$ws" in "~"*) ws="$$HOME$${ws#\~}";; esac; ws="$$ws/$(AGENT)"; \
+		rm -rf "$$ws/.rag/db" "$$ws/.rag/manifest.json"; \
+		echo "[rag-rebuild] portal not running — removed $$ws/.rag/db; the next start rebuilds it."; \
+	fi
 
 # Run a quick smoke test via the harness directly
 smoke:

@@ -55,7 +55,15 @@ const InboundCase = z
     history: z.array(Turn).default([]),
     message: z.string(),
     /** Data behind the stubbed Google tools. Only faked backends can be seeded. */
-    fixtures: z.object({ gmail: z.array(z.unknown()).optional(), calendar: z.array(z.unknown()).optional() }).strict().optional(),
+    fixtures: z
+      .object({
+        gmail: z.array(z.unknown()).optional(),
+        calendar: z.array(z.unknown()).optional(),
+        /** Documents the stub search index serves, written into the workspace at `path`. Mounts `local-rag`. */
+        rag: z.array(z.object({ path: z.string(), text: z.string() }).strict()).optional(),
+      })
+      .strict()
+      .optional(),
     /** Replay the one-time "you didn't reply" reminder, as production does. */
     nudge: z.boolean().default(true),
   })
@@ -94,7 +102,12 @@ const FAKED_TOOLS = new Set([
   "reply", "send_email", "email_team", "post_to_slack",
   "list_events", "create_event", "update_event", "delete_event",
   "search_emails", "get_email", "download_attachment",
+  "purge_content",
+  "query_documents", "read_chunk_neighbors", "list_files",
 ]);
+
+/** The inbound message's identity in a case: what `purge_content` with `current: true` targets. */
+const EVAL_CONVERSATION_ID = "00000000-0000-4000-8000-000000000000";
 
 function identityFor(sender: string, rawSender: string): ResolvedIdentity {
   return sender === "guest"
@@ -159,6 +172,7 @@ export const inboundMessage: Driver = {
           PORTAL_URL: portal.url,
           PATH: `${sandbox.binDir}:${process.env.PATH ?? ""}`,
           IGNIS_REPLY_TARGET: JSON.stringify({ channel: "email", externalId: `email:eval-${c.id}`, email: { messageId: `eval-${c.id}` } }),
+          IGNIS_CURRENT_MESSAGE: JSON.stringify({ conversationId: EVAL_CONVERSATION_ID, seq: kase.history.length }),
         },
       };
 

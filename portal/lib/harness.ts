@@ -85,10 +85,18 @@ export function getLauncher() {
   const launcher = getRawLauncher();
   return {
     async launch(input: AgentInput): Promise<AgentResult> {
-      const result = await launcher.launch(input);
-      // Best-effort and no-op unless this was an API-layer failure.
-      await alertOwnerOnApiFailure(input.agentId, result);
-      return result;
+      try {
+        const result = await launcher.launch(input);
+        // Best-effort and no-op unless this was an API-layer failure.
+        await alertOwnerOnApiFailure(input.agentId, result);
+        return result;
+      } finally {
+        // Whatever the outcome, the run may have written files worth indexing.
+        // Imported lazily: the indexer is optional and loads nothing until used.
+        import("./workspace-index")
+          .then((m) => m.requestIndexSync(input.agentId))
+          .catch(() => {});
+      }
     },
   };
 }

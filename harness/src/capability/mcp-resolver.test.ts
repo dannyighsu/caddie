@@ -164,10 +164,61 @@ describe("resolveCapabilities", () => {
     expect(result.servers["github"]).toBeDefined();
   });
 
+  it("qualifies a mounted capability's disallowed tools with its server name", async () => {
+    mockReadFile.mockResolvedValueOnce(
+      JSON.stringify({
+        name: "local-rag",
+        disallowedTools: ["ingest_file", "delete_file"],
+        server: { command: "node", args: ["rag.js"] },
+      })
+    );
+
+    const result = await resolveCapabilities(["local-rag"], "/caps");
+    expect(result.disallowedTools).toEqual([
+      "mcp__local-rag__ingest_file",
+      "mcp__local-rag__delete_file",
+    ]);
+  });
+
+  it("drops the disallowed tools of a capability that wasn't mounted", async () => {
+    mockReadFile.mockResolvedValueOnce(
+      JSON.stringify({
+        name: "local-rag",
+        disallowedTools: ["ingest_file"],
+        server: { command: "node", args: ["${UNSET_RAG_ENTRY}"] },
+      })
+    );
+
+    const result = await resolveCapabilities(["local-rag"], "/caps");
+    expect(result.servers).toEqual({});
+    expect(result.disallowedTools).toEqual([]);
+  });
+
+  it("resolves caller-provided substitutions before process.env", async () => {
+    process.env.TEST_HOST = "from-env";
+    mockReadFile.mockResolvedValueOnce(
+      JSON.stringify({
+        name: "per-agent",
+        server: {
+          command: "node",
+          args: ["srv.js"],
+          env: { DB_PATH: "${IGNIS_WORKSPACE}/.rag/db", HOST: "${TEST_HOST}" },
+        },
+      })
+    );
+
+    const result = await resolveCapabilities(["per-agent"], "/caps", {
+      IGNIS_WORKSPACE: "/ws/buri",
+    });
+    expect(result.servers["per-agent"].env).toEqual({ DB_PATH: "/ws/buri/.rag/db", HOST: "from-env" });
+    expect(result.skipped).toEqual([]);
+  });
+
   it("returns empty result for empty input", async () => {
     const result = await resolveCapabilities([], "/caps");
     expect(result.servers).toEqual({});
     expect(result.flags).toEqual([]);
+    expect(result.disallowedTools).toEqual([]);
     expect(result.warnings).toEqual([]);
     expect(result.skipped).toEqual([]);
   });

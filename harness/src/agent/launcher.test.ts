@@ -11,6 +11,7 @@ vi.mock("../capability/mcp-resolver.js", () => ({
   resolveCapabilities: vi.fn().mockResolvedValue({
     servers: {},
     flags: [],
+    disallowedTools: [],
     warnings: [],
     skipped: [],
   }),
@@ -287,6 +288,48 @@ describe("createLauncher", () => {
     expect(names).toContain("browser");
   });
 
+  it("gives capability servers the agent's workspace, trust tier and disallowed tools", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({ ...baseAgentConfig, capabilities: ["local-rag"] });
+      }
+      if (String(path).endsWith("persona.md")) return "persona";
+      throw new Error(`Unmocked: ${path}`);
+    });
+    vi.mocked(resolveCapabilities).mockResolvedValueOnce({
+      servers: { "local-rag": { command: "node", args: ["rag.js"], env: { DB_PATH: "/x" } } },
+      flags: [],
+      disallowedTools: ["mcp__local-rag__delete_file"],
+      warnings: [],
+      skipped: [],
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+      workspaceRoot: "/ws",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: { ...ID, trustTier: "guest" },
+      prompt: "go",
+    });
+
+    // Capability JSON can reference the workspace (a per-agent DB path).
+    const provided = vi.mocked(resolveCapabilities).mock.calls.at(-1)![2];
+    expect(provided).toMatchObject({ IGNIS_WORKSPACE: "/ws/test-agent", IGNIS_AGENT_ID: "test-agent" });
+
+    const call = (runtime.execute as any).mock.calls[0][0];
+    expect(call.mcpServers["local-rag"].env).toMatchObject({
+      DB_PATH: "/x",
+      IGNIS_WORKSPACE: "/ws/test-agent",
+      IGNIS_TRUST_TIER: "guest",
+    });
+    expect(call.disallowedTools).toEqual(["mcp__local-rag__delete_file"]);
+  });
+
   it("warns and falls back to base config when the profile name is unknown", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockFs.readFile.mockImplementation(async (path: any) => {
@@ -420,11 +463,13 @@ describe("createLauncher", () => {
 
     // ...LastCalledWith, not ...CalledWith: this module mock accumulates calls
     // across tests, so a plain "was called with" can match an earlier test's.
-    // The third argument is HARNESS_ROOT, supplied by the launcher rather than
-    // read from the environment.
-    expect(resolveCapabilities).toHaveBeenLastCalledWith(["web-search"], "/caps", {
-      HARNESS_ROOT: "/",
-    });
+    // The third argument holds paths the launcher computes rather than reads
+    // from the environment.
+    expect(resolveCapabilities).toHaveBeenLastCalledWith(
+      ["web-search"],
+      "/caps",
+      expect.objectContaining({ HARNESS_ROOT: "/" })
+    );
   });
 
   it("injects the job's state file when a stateKey is provided", async () => {

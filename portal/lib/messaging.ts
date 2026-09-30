@@ -219,7 +219,7 @@ export async function handleInboundMessage(
     // The prompt above was built from the pre-append snapshot
     // (`conversation.messages`) with `text` as the current message, so this
     // does not double-render the inbound turn for this run.
-    await appendMessages(conversation.id, [
+    const currentSeq = await appendMessages(conversation.id, [
       {
         role: "user",
         content: text,
@@ -248,6 +248,11 @@ export async function handleInboundMessage(
         // land in the current thread.
         ...(deliveryMode === "tool" && replyTarget
           ? { IGNIS_REPLY_TARGET: JSON.stringify(replyTarget) }
+          : {}),
+        // The message this run is handling — the one thing a guest run's
+        // `purge_content` may remove. Injected, never agent-supplied.
+        ...(currentSeq !== null
+          ? { IGNIS_CURRENT_MESSAGE: JSON.stringify({ conversationId: conversation.id, seq: currentSeq }) }
           : {}),
       },
     };

@@ -33,3 +33,5 @@ expect:
     why: Nothing to act on, so nothing goes to the vendor.
   - not_called: email_team
     why: Marketing isn't worth the team's attention.
+  - not_called: purge_content
+    why: Marketing gets no reply, but it isn't phishing and isn't purged (suspicious-content skill).

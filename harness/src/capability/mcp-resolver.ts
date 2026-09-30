@@ -17,6 +17,13 @@ import type { MCPServerConfig } from "../runtime/types.js";
 export interface CapabilityDefinition {
   name: string;
   description?: string;
+  /**
+   * Tools this capability's server exposes that a run must never call, by the
+   * server's own tool name (e.g. `delete_file`). Used when a third-party server
+   * bundles write tools alongside the reads we want — the tools are removed
+   * from the run entirely rather than left to instructions.
+   */
+  disallowedTools?: string[];
   /** MCP server config. Omit for flag-only capabilities (e.g., chrome). */
   server?: {
     command: string;
@@ -85,6 +92,11 @@ export interface ResolveResult {
   servers: Record<string, MCPServerConfig>;
   /** Flag-only capabilities (no MCP server, e.g., chrome). */
   flags: string[];
+  /**
+   * Fully qualified tool names (`mcp__<server>__<tool>`) to remove from the run,
+   * from the `disallowedTools` of every capability that was actually mounted.
+   */
+  disallowedTools: string[];
   /** Warnings about missing env vars or failed loads. */
   warnings: string[];
   /**
@@ -112,6 +124,7 @@ export async function resolveCapabilities(
 ): Promise<ResolveResult> {
   const servers: Record<string, MCPServerConfig> = {};
   const flags: string[] = [];
+  const disallowedTools: string[] = [];
   const warnings: string[] = [];
   const skipped: SkippedCapability[] = [];
 
@@ -156,6 +169,9 @@ export async function resolveCapabilities(
       }
 
       servers[def.name] = server;
+      for (const tool of def.disallowedTools ?? []) {
+        disallowedTools.push(`mcp__${def.name}__${tool}`);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const msg = `Failed to load capability "${name}": ${message}`;
@@ -164,5 +180,5 @@ export async function resolveCapabilities(
     }
   }
 
-  return { servers, flags, warnings, skipped };
+  return { servers, flags, disallowedTools, warnings, skipped };
 }

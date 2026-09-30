@@ -42,6 +42,15 @@ export function senderLabel(m: Message): string {
 }
 
 /**
+ * What a purged message renders as, in prompt history and the portal: enough to
+ * show that something was there and why it's gone, none of what it said.
+ */
+export function purgedPlaceholder(m: Message): string {
+  const reason = m.purged?.reason === "other" ? "unsafe content" : m.purged?.reason;
+  return `[removed — suspected ${reason}]`;
+}
+
+/**
  * Render a history window under {@link HISTORY_CHAR_BUDGET}.
  *
  * Walks newest-first so recency wins the budget, then flips the result back
@@ -57,14 +66,14 @@ export function renderHistoryLines(recent: Message[]): string[] {
     const m = recent[i];
     if (budget < MIN_USEFUL_EXCERPT) break;
 
-    let content = m.content;
+    let content = m.purged ? purgedPlaceholder(m) : m.content;
     if (content.length > budget) {
       const dropped = content.length - budget;
       content =
         content.substring(0, budget) +
         `\n... [truncated — ${dropped} more characters in this message]`;
     }
-    budget -= Math.min(m.content.length, budget);
+    budget -= Math.min(content.length, budget);
     lines.push(`[${senderLabel(m)}]: ${content}`);
   }
 

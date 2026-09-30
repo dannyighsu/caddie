@@ -66,7 +66,7 @@ export interface ToolCall {
 
 /** One side effect the fake control plane received. */
 export interface OutboundEffect {
-  kind: "reply" | "email" | "slack" | "other";
+  kind: "reply" | "email" | "slack" | "purge" | "other";
   /** Recipients as far as the harness can tell. */
   to: string[];
   /** True if any recipient is outside the team. */

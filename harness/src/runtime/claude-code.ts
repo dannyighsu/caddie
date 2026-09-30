@@ -154,6 +154,13 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       args.push("--tools", "");
     }
 
+    if (input.disallowedTools?.length) {
+      // Removes the tools from the run, not just from auto-approval — runs use
+      // --dangerously-skip-permissions, so a settings.json deny rule is not
+      // something to rely on here.
+      args.push("--disallowedTools", input.disallowedTools.join(","));
+    }
+
     if (input.additionalArgs) {
       args.push(...input.additionalArgs);
     }

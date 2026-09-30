@@ -15,8 +15,8 @@ It's a grid of `trust tier → permission key → allowed`:
   the synthetic **`base-tools`** key, which governs the built-in Claude Code
   tools (Bash, Read, Write, Edit, WebFetch, …).
 - **Default-deny.** Anything not explicitly `true` is denied — so a new
-  capability is off for everyone until you grant it here, and `guest`, which
-  grants nothing, gets nothing.
+  capability is off for everyone until you grant it here, and `guest` gets
+  only what's explicitly granted to it.
 
 ## How it's enforced
 
@@ -65,11 +65,13 @@ Each entry point builds it:
 | Tier | Capabilities | Built-in tools |
 |---|---|---|
 | **team** | all granted | on |
-| **guest** | **none** | **off** |
+| **guest** | `reply`, `email-team`, `purge` only | **off** |
 
-A guest run is therefore conversational only — no MCP capabilities and no Bash /
-Read / Write / etc. This also closes the guest→schedule escalation: with no Bash
-there's no `curl` to `/api/control`, and with `egress` denied the scheduling
+A guest run is therefore conversational only — no Bash / Read / Write / etc.,
+and only the minimal-privilege tools whose reach the harness fixes: `reply`
+(the current thread), `email_team` (the team), and `purge_content` (the
+message being handled; see `portal/lib/purge.ts`). This also closes the
+guest→schedule escalation: with no Bash there's no `curl` to `/api/control`, and with `egress` denied the scheduling
 tools aren't mounted either.
 
 ## Changing permissions

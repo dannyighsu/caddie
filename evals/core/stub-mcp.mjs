@@ -6,9 +6,13 @@
  * without touching anything. What was called is read back from the session
  * transcript, so this server doesn't log.
  *
+ * `rag` stands in for local-rag (mcp-local-rag) with its read tools only, as
+ * production mounts it: a keyword search over the case's seeded documents,
+ * which the sandbox also writes into the workspace.
+ *
  * Env:
- *   EVAL_STUB_KIND      — "calendar" | "gmail"
- *   EVAL_FIXTURES_FILE  — JSON: { calendar?: Event[], gmail?: Email[] }
+ *   EVAL_STUB_KIND      — "calendar" | "gmail" | "rag"
+ *   EVAL_FIXTURES_FILE  — JSON: { calendar?: Event[], gmail?: Email[], rag?: {path, text}[], workspace }
  */
 
 import { readFileSync } from "fs";
@@ -143,6 +147,48 @@ if (kind === "gmail") {
     { messageId: z.string(), partId: z.string() },
     async () => text("Attachment not available in this environment.")
   );
+}
+
+if (kind === "rag") {
+  const docs = (fixtures.rag ?? []).map((d) => ({
+    filePath: `${fixtures.workspace}/${d.path}`,
+    text: d.text,
+    title: d.text.match(/^title:\s*"?(.+?)"?\s*$/m)?.[1] ?? d.path,
+  }));
+  const words = (s) => (s.toLowerCase().match(/[\p{L}\p{N}@.$-]{3,}/gu) ?? []);
+  server.tool(
+    "query_documents",
+    "Search ingested documents. Your query words are embedded and compared against document chunks, then boosted by exact keyword matches. Results include file path, chunk index, text and relevance score.",
+    {
+      query: z.string(),
+      limit: z.number().optional(),
+      scope: z.union([z.string(), z.array(z.string())]).optional(),
+    },
+    async ({ query, limit }) => {
+      const terms = new Set(words(query));
+      const hits = docs
+        .map((d) => {
+          const hay = new Set(words(d.text));
+          const score = [...terms].filter((t) => hay.has(t)).length;
+          return { filePath: d.filePath, chunkIndex: 0, text: d.text, fileTitle: d.title, score: 1 / (1 + score) };
+        })
+        .filter((h) => h.score < 1)
+        .sort((a, b) => a.score - b.score)
+        .slice(0, limit ?? 10);
+      return text(hits.length ? hits : "No results.");
+    }
+  );
+  server.tool(
+    "read_chunk_neighbors",
+    "Read the chunks before and after a search result, for more context.",
+    { filePath: z.string(), chunkIndex: z.number(), before: z.number().optional(), after: z.number().optional() },
+    async ({ filePath }) => {
+      const d = docs.find((x) => x.filePath === filePath);
+      return text(d ? [{ filePath, chunkIndex: 0, text: d.text, isTarget: true }] : `No document at ${filePath}.`);
+    }
+  );
+  server.tool("list_files", "List ingested files.", {}, async () => text(docs.map((d) => ({ filePath: d.filePath }))));
+  server.tool("status", "Index status.", {}, async () => text({ documentCount: docs.length, chunkCount: docs.length }));
 }
 
 await server.connect(new StdioServerTransport());

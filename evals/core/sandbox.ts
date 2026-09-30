@@ -10,8 +10,10 @@
  *     permissions.json        copy of the real policy (tiers behave as in prod)
  *     .claude/settings.json   real hook settings + WebFetch/WebSearch blocked
  *     scripts/, skills/core/  → real (read-only in practice)
- *     capabilities/*.json     generated: real MCP servers for the messaging tools
- *                             (pointed at the fake portal), stubs for Google
+ *     capabilities/*.json     generated: real MCP servers for the messaging and
+ *                             purge tools (pointed at the fake portal), stubs
+ *                             for Google, and a stub `local-rag` when the case
+ *                             seeds search documents
  *     agents/<agent>/         a COPY of the definition (persona, skills), with
  *                             capabilities trimmed to the ones the sandbox
  *                             provides
@@ -45,6 +47,8 @@ const CAPABILITIES: Record<string, (fixturesFile: string) => object> = {
   "email-team": () => realTool("email-team", "email-team-mcp.mjs"),
   egress: () => realTool("egress", "egress-mcp.mjs"),
   introspect: () => realTool("introspect", "introspect-mcp.mjs"),
+  purge: () => realTool("purge", "purge-mcp.mjs"),
+  "local-rag": (f) => stub("local-rag", "rag", f),
   "google-calendar": (f) => stub("google-calendar", "calendar", f),
   "google-gmail": (f) => stub("google-gmail", "gmail", f),
 };
@@ -74,6 +78,13 @@ export interface Sandbox {
   omitted: string[];
   /** Prepend to PATH: shadows CLIs that reach real services (see SHADOWED_CLIS). */
   binDir: string;
+}
+
+/** A document a case seeds into the workspace and the stub search index. */
+export interface RagDoc {
+  /** Workspace-relative, e.g. `conversations/email/<id>/0003.md`. */
+  path: string;
+  text: string;
 }
 
 export interface SandboxOptions {
@@ -112,19 +123,29 @@ export async function createSandbox(opts: SandboxOptions): Promise<Sandbox> {
   const agentJsonPath = resolve(agentDir, "agent.json");
   const agentJson = JSON.parse(await readFile(agentJsonPath, "utf-8"));
   const declared: string[] = agentJson.capabilities ?? [];
-  agentJson.capabilities = declared.filter((c) => c in CAPABILITIES);
-  const omitted = declared.filter((c) => !(c in CAPABILITIES));
+  // Search is mounted only for cases that seed documents, so every other case
+  // runs as if the index were empty/unconfigured rather than against a stub.
+  const ragDocs = (opts.fixtures?.rag as RagDoc[] | undefined) ?? [];
+  const provided = (c: string) => c in CAPABILITIES && (c !== "local-rag" || ragDocs.length > 0);
+  agentJson.capabilities = declared.filter(provided);
+  const omitted = declared.filter((c) => !provided(c));
   await writeFile(agentJsonPath, JSON.stringify(agentJson, null, 2));
 
+  const workingDirectory = resolve(workspaceRoot, opts.agentId);
   const fixturesFile = resolve(opts.runDir, "fixtures.json");
-  await writeFile(fixturesFile, JSON.stringify(opts.fixtures ?? {}, null, 2));
+  await writeFile(fixturesFile, JSON.stringify({ ...opts.fixtures, workspace: workingDirectory }, null, 2));
+  // Seeded documents exist on disk too, so the agent can open what search points at.
+  for (const doc of ragDocs) {
+    const path = resolve(workingDirectory, doc.path);
+    await mkdir(resolve(path, ".."), { recursive: true });
+    await writeFile(path, doc.text);
+  }
   for (const name of agentJson.capabilities as string[]) {
     await writeFile(resolve(capabilitiesDir, `${name}.json`), JSON.stringify(CAPABILITIES[name](fixturesFile), null, 2));
   }
 
   // Workspace config: the live standing instructions, with real addresses
   // mapped onto the fake team so they agree with the case files.
-  const workingDirectory = resolve(workspaceRoot, opts.agentId);
   const liveConfig = opts.configDir ?? resolve(defaultWorkspaceRoot(), opts.agentId, "config");
   const targetConfig = resolve(workingDirectory, "config");
   await mkdir(targetConfig, { recursive: true });

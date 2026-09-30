@@ -112,6 +112,22 @@ Email arrives once step 3 is done. For the rest, see
 the provider's side. To reach the agent from outside your machine, see
 [Network exposure](#network-exposure).
 
+**6. Workspace search** (optional)
+
+Lets the agent search every conversation it has had and the files in its
+workspace, locally, with no data leaving the machine:
+
+```bash
+make rag-setup        # clones + builds mcp-local-rag beside this repo; prints LOCAL_RAG_ENTRY
+```
+
+Add the printed `LOCAL_RAG_ENTRY=…` line to `portal/.env.local` and restart
+(`make run`). On startup the portal mirrors each conversation message into
+`<workspace>/conversations/` and indexes the workspace into
+`<workspace>/.rag/`, then keeps both in sync. The first run downloads a ~90 MB
+embedding model. Index status shows up in portal health. After an
+embedding-model change or a workspace move, `make rag-rebuild AGENT=buri`.
+
 ### Making it yours
 
 A fresh clone ships the `buri` agent. To adapt it, edit these — all of it is
@@ -308,7 +324,9 @@ Capabilities are MCP server configurations. Each is a JSON file in `harness/capa
 }
 ```
 
-`${ENV_VAR}` references are resolved from `process.env` at runtime. A capability with an unresolved reference is **skipped** — not mounted with a blank value — so a missing credential costs you that capability rather than giving the agent a tool that fails at first use. The run proceeds, and the launcher logs which variable was missing. `HARNESS_ROOT` is supplied by the launcher, not read from the environment.
+`${ENV_VAR}` references are resolved from `process.env` at runtime. A capability with an unresolved reference is **skipped** — not mounted with a blank value — so a missing credential costs you that capability rather than giving the agent a tool that fails at first use. The run proceeds, and the launcher logs which variable was missing. `HARNESS_ROOT`, `IGNIS_AGENT_ID` and `IGNIS_WORKSPACE` (the agent's workspace path, for per-agent state like a search index) are supplied by the launcher, not read from the environment.
+
+A capability can also list `"disallowedTools"`: tools its server exposes that no run may call, by the server's own tool name. They're removed from the run with `--disallowedTools`. Use it when a third-party server bundles writes alongside the reads you want, as `local-rag` does.
 
 ### Flag-only capability
 
@@ -347,6 +365,8 @@ see [PERMISSIONS.md](docs/PERMISSIONS.md).
 | `reply` | — | Reply into the conversation the run is handling. Destination injected by the harness, never chosen by the agent |
 | `email-team` | — | Email team members and only them; recipients resolved from the roster. Granted at guest tier too |
 | `introspect` | — | Read the agent's own run transcripts for self-diagnosis. Read-only, self-scoped |
+| `purge` | — | Remove suspected phishing/prompt injection from history, workspace and search; emails the team. Guest runs can purge only the message being handled |
+| `local-rag` | `LOCAL_RAG_ENTRY` | Search past conversations and workspace files (read-only; the portal indexes) |
 | `egress` | — | Outbound messaging and scheduling via the control API |
 | `browser` | — | Headed Playwright browser; persistent profile keeps logins |
 | `chrome` | — | Flag-only: enables Chrome automation on the runtime |
@@ -420,6 +440,8 @@ Agent workspaces live at `~/.ignis/{agentId}/` by default (override with `WORKSP
 - `jobs/` -- recurring-job procedures, one `<job>.md` each (written by you)
 - `tickets/` -- bug reports the agent files about its own machinery (see `AGENTS.md`)
 - `.claude/` -- symlinked skills and hooks from the agent definition
+- `conversations/` -- one markdown file per conversation message, mirrored from Postgres for search (derived; rebuilt on startup)
+- `.rag/` -- the search index, its embedding-model cache and sync manifest (derived; `make rag-rebuild`)
 - Everything else -- created by the agent during runs (task files, memory, run records, etc.)
 
 Override the workspace location with `WORKSPACE_ROOT`:
