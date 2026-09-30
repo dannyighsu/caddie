@@ -12,7 +12,7 @@ the evidence is still reachable. Your traces are evicted after about a week, and
 the person who would fix it wasn't watching the run.
 
 A ticket is that record: a self-investigated bug report, written to `tickets/`
-in your workspace, that the team picks up later in the development repo.
+in your workspace, that the team picks up later.
 
 A ticket is **not** a to-do, a reminder, or a note to yourself. It is a report
 about the system you run on.
@@ -150,10 +150,9 @@ Tell the team member in one line, with the filename: *"Filed
 so that one went out as plain text."* Don't paste the ticket into the reply, and
 don't apologize at length. One line, then move on.
 
-### Where tickets go, and why
+### Where tickets go
 
-`tickets/` is a link into your agent definition, not scratch space in the
-workspace — so a ticket outlives the run that filed it and shows up in the
-development repo, where it gets fixed. That also means the usual care applies:
-one file per problem, real filenames, nothing you wouldn't want read a month
-from now.
+`tickets/` is a plain directory in your workspace. Create it if it isn't there
+yet. A ticket stays there until the team fixes the problem and deletes it, so
+the usual care applies: one file per problem, real filenames, nothing you
+wouldn't want read a month from now.

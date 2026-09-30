@@ -33,6 +33,7 @@ vi.mock("../resolver/runner.js", () => ({
 // backup must never take down a run), which is what a restored mock gives back.
 vi.mock("./config-journal.js", () => ({
   journalConfig: vi.fn().mockResolvedValue([]),
+  watchJournal: vi.fn().mockResolvedValue(async () => {}),
   detectConfigDrift: vi.fn().mockResolvedValue([]),
   describeConfigDrift: vi.fn().mockReturnValue(""),
 }));
@@ -185,6 +186,25 @@ describe("createLauncher", () => {
     expect(prompt).toContain("Trust tier: team");
     expect(iTime).toBeGreaterThan(iIdentity);
     expect(iUser).toBeGreaterThan(iTime);
+  });
+
+  it("derives the run-record path from an injected clock", async () => {
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, {
+      agentsDir: "/agents",
+      capabilitiesDir: "/caps",
+    });
+
+    await launcher.launch({
+      agentId: "test-agent",
+      identity: ID,
+      prompt: "go",
+      now: new Date("2026-09-22T19:03:00Z"),
+    });
+
+    // A replayed run must not show the real date anywhere in its context.
+    const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    expect(prompt).toContain("Run record path: runs/2026-09/22_tuesday/run-record-2026-09-22T19-03-00.jsonl");
   });
 
   it("skips persona prefix on session resume", async () => {
@@ -847,33 +867,23 @@ describe("skill mounting", () => {
     );
   });
 
-  it("links tickets into the workspace, so a filed ticket outlives the run", async () => {
-    const AGENT_TICKETS = "/agents/test-agent/tickets";
+  it("relinks skills-src that still points at the repo's old path", async () => {
+    const LINK = "/workspace/test-agent/.claude/skills-src";
     mockFs.readdir.mockImplementation(dirs({ [AGENT_SKILLS]: ["feed-scan"] }));
-    mockFs.lstat.mockImplementation(async (p: any) =>
-      String(p) === AGENT_TICKETS
-        ? ({ isSymbolicLink: () => false } as any)
-        : Promise.reject(new Error("ENOENT"))
-    );
+    mockFs.lstat.mockImplementation(async (p: any) => {
+      const path = String(p);
+      if (path === AGENT_SKILLS) return { isSymbolicLink: () => false } as any;
+      if (path === LINK) return { isSymbolicLink: () => true } as any;
+      throw new Error("ENOENT");
+    });
+    mockFs.readlink.mockResolvedValue("/old-repo/agents/test-agent/.claude/skills" as any);
 
     const runtime = mockRuntime();
     await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
 
-    // Writes go through the link into the agent definition, not the scratch
-    // workspace — otherwise a bug report is swept away with the run that filed it.
-    expect(mockFs.symlink).toHaveBeenCalledWith(
-      AGENT_TICKETS, "/workspace/test-agent/tickets"
-    );
-  });
-
-  it("skips the tickets link for an agent that has no tickets directory", async () => {
-    mockFs.readdir.mockImplementation(dirs({ [AGENT_SKILLS]: ["feed-scan"] }));
-
-    const runtime = mockRuntime();
-    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
-
-    const linked = mockFs.symlink.mock.calls.map((c: any) => String(c[1]));
-    expect(linked).not.toContain("/workspace/test-agent/tickets");
+    // A link that exists but points elsewhere is dangling after a repo move.
+    expect(mockFs.unlink).toHaveBeenCalledWith(LINK);
+    expect(mockFs.symlink).toHaveBeenCalledWith(AGENT_SKILLS, LINK);
   });
 });
 

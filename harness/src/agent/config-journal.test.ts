@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { resolve } from "path";
 import {
   journalConfig,
+  watchJournal,
   detectConfigDrift,
   describeConfigDrift,
   JOURNAL_DIRNAME,
@@ -23,8 +24,8 @@ async function writeConfig(relPath: string, content: string): Promise<void> {
 }
 
 /** Snapshots recorded for one config file, oldest first. */
-async function snapshots(relPath: string): Promise<string[]> {
-  const dir = resolve(agentDir, JOURNAL_DIRNAME, relPath, "..");
+async function snapshots(relPath: string, root = "config"): Promise<string[]> {
+  const dir = resolve(agentDir, JOURNAL_DIRNAME, root, relPath, "..");
   return (await readdir(dir).catch(() => []))
     .filter((name) => name.startsWith(`${relPath.split("/").pop()}.`))
     .sort();
@@ -52,7 +53,7 @@ describe("journalConfig", () => {
     expect(written.sort()).toEqual(["config/preferences.md", "config/team/betty.md"]);
     const [snapshot] = await snapshots("team/betty.md");
     const content = await readFile(
-      resolve(agentDir, JOURNAL_DIRNAME, "team", snapshot),
+      resolve(agentDir, JOURNAL_DIRNAME, "config", "team", snapshot),
       "utf-8"
     );
     expect(content).toContain(BULLET);
@@ -75,7 +76,7 @@ describe("journalConfig", () => {
     const versions = await snapshots("team/betty.md");
     expect(versions).toHaveLength(2);
     const oldest = await readFile(
-      resolve(agentDir, JOURNAL_DIRNAME, "team", versions[0]),
+      resolve(agentDir, JOURNAL_DIRNAME, "config", "team", versions[0]),
       "utf-8"
     );
     expect(oldest).toContain(BULLET);
@@ -142,6 +143,49 @@ describe("detectConfigDrift", () => {
   it("is a no-op with no journal yet", async () => {
     await writeConfig("preferences.md", "# Preferences\n");
     expect(await detectConfigDrift(agentDir, workspace)).toEqual([]);
+  });
+});
+
+describe("state/ journaling", () => {
+  async function writeState(relPath: string, content: string): Promise<void> {
+    const path = resolve(workspace, "state", relPath);
+    await mkdir(resolve(path, ".."), { recursive: true });
+    await writeFile(path, content, "utf-8");
+  }
+
+  it("journals state files in their own subtree", async () => {
+    await writeState("news-digest.md", "## Directives\n");
+
+    expect(await journalConfig(agentDir, workspace)).toEqual(["state/news-digest.md"]);
+    expect(await snapshots("news-digest.md", "state")).toHaveLength(1);
+  });
+
+  it("does not drift-check state files: clearing a directive is routine", async () => {
+    await writeState("news-digest.md", "## Directives\n- skip crypto this week\n");
+    await journalConfig(agentDir, workspace);
+    await writeState("news-digest.md", "## Directives\n");
+
+    expect(await detectConfigDrift(agentDir, workspace)).toEqual([]);
+  });
+
+  it("keeps an edit made mid-run even after the file is overwritten", async () => {
+    await writeState("news-digest.md", "## Directives\n");
+    await journalConfig(agentDir, workspace); // run start
+    const stop = await watchJournal(agentDir, workspace);
+
+    // A team member adds a directive while the run is going…
+    await writeState("news-digest.md", "## Directives\n- lead with the Fed\n");
+    await new Promise((r) => setTimeout(r, 1500));
+    // …and the agent regenerates the file from what it read at the start.
+    await writeState("news-digest.md", "## Directives\n");
+    await stop();
+    await journalConfig(agentDir, workspace); // run end
+
+    const dir = resolve(agentDir, JOURNAL_DIRNAME, "state");
+    const contents = await Promise.all(
+      (await snapshots("news-digest.md", "state")).map((f) => readFile(resolve(dir, f), "utf-8"))
+    );
+    expect(contents.some((c) => c.includes("lead with the Fed"))).toBe(true);
   });
 });
 

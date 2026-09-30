@@ -19,51 +19,35 @@ reintroduce repo-relative workspace paths.
 
 Agents file bug reports about **their own machinery** — a tool that fails like a
 defect, a capability that isn't mounted, a run that went wrong for a reason no
-instruction explains. Each is one markdown file in the agent's definition:
+instruction explains. Each is one markdown file in the agent's workspace:
 
 ```
-harness/agents/<agent>/tickets/YYYY-MM-DD-<slug>.md
+~/.ignis/<agent>/tickets/YYYY-MM-DD-<slug>.md
 ```
 
-Read them from the repo — that's the whole point of where they live:
+Check them when you're working on the harness:
 
 ```bash
-ls harness/agents/buri/tickets/
+ls ~/.ignis/buri/tickets/
 ```
 
 ### How it works
 
-`tickets/` is symlinked from the agent definition into the agent's workspace by
-`ensureDefinitionSymlink` in `harness/src/agent/launcher.ts` — the same helper
-behind `jobs/` and `.claude/skills-src`. The agent writes to `tickets/` in its
-workspace and the file lands in the repo working tree.
-
-That indirection is load-bearing. The workspace (`~/.ignis/<agent>/`) is the
-agent's data, outside the repo, so a ticket written there would never reach
-the repo where it gets picked up. `tickets/` is
-also the **first writable** thing linked this way — the others are read-only in
-practice — so don't "tidy" the helper into something that assumes read-only.
-
-Ticket bodies are gitignored; the README is kept (`.gitignore`, next to the
-matching `jobs/` rules). A ticket quotes real runs — session ids, error strings,
-the shape of someone's request — so it belongs to the install, not a clone. It
-stays readable locally, which is where it gets picked up.
+Tickets are plain files in the workspace, with no link or harness step behind
+them. The workspace is outside the repo and never swept, so a ticket persists
+there. It never reaches git: a ticket quotes real runs (session ids, error
+strings, the shape of someone's request), so it belongs to the install, not a
+clone.
 
 ### Changing how tickets work
 
 | What | Where |
 |---|---|
 | When to file, the file format, investigation steps, guardrails | `harness/skills/core/ticketing/SKILL.md` |
-| The workspace link | `ensureDefinitionSymlink` call in `harness/src/agent/launcher.ts` (+ tests in `launcher.test.ts`) |
 | What the agent is told it has | `tickets/` bullet and the Self-diagnosis capability in `harness/agents/<agent>/persona.md` |
-| Committed vs. ignored | `harness/agents/*/tickets/*` rules in `.gitignore` |
 
 Behavior changes belong in the **skill**, not the persona — the persona only
 points at it. Keep the two in sync when you rename or move anything.
-
-**Adding tickets to a new agent:** create `harness/agents/<agent>/tickets/README.md`.
-The symlink helper no-ops when the directory is absent, so without a committed
-file the agent silently gets no `tickets/` at all.
 
 ### Conventions worth preserving
 

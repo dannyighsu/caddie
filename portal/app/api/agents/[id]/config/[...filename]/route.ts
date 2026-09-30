@@ -23,9 +23,9 @@ class BadRequest extends Error {}
  * - core-skill: harness/skills/core/{skillName}/{file} — shared by every agent
  * - config:  <workspaceRoot>/{id}/config/{filename}
  *
- * Skills live in the agent *definition* (not the workspace) because that's the
- * symlink target the runtime mounts at `.claude/skills` — see the launcher's
- * ensureDefinitionSymlink. Writing here is what makes an edit take effect on
+ * Skills live in the agent *definition* (not the workspace) because that's
+ * what the runtime links into `.claude/skills` — see the launcher's
+ * mountSkills. Writing here is what makes an edit take effect on
  * the next run.
  */
 function resolveFilePath(

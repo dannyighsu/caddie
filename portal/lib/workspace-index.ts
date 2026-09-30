@@ -328,7 +328,7 @@ class AgentIndex {
       }
       for (const e of entries) {
         const rel = relDir ? `${relDir}/${e.name}` : e.name;
-        // Never follow links: jobs/, tickets/ and skills point into the repo.
+        // Never follow links: skills and the harness settings point into the repo.
         if (e.isSymbolicLink()) continue;
         if (e.isDirectory()) {
           if (!isExcludedDir(rel)) await walk(rel);

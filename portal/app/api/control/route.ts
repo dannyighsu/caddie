@@ -11,7 +11,7 @@
  *   notify  — Send a message to Slack, Telegram, or email (immediately or scheduled)
  *   run     — Execute an agent (immediately or scheduled)
  *   schedule — Create a recurring job
- *   list_slack_channels — List the workspace's Slack channels (id, name, bot membership)
+ *   list_slack_channels — List the workspace's Slack channels (id, name, whether the bot can post)
  *
  * Supports `scheduledFor` for one-shot deferred execution,
  * or `cron` for recurring jobs.
@@ -27,7 +27,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { sendMessage, replyInThread, recordOutboundSlackThread, isSlackConfigured, listChannels } from "@/lib/slack";
+import { sendMessage, replyInThread, uploadFile, recordOutboundSlackThread, isSlackConfigured, listChannels } from "@/lib/slack";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
 import { sendEmail, replyToEmail, recordEmailReply, isEmailConfigured, htmlToText } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
@@ -76,6 +76,12 @@ interface ControlRequest {
   from?: string;
   slackChannel?: string;
   threadTs?: string;
+  /**
+   * A file to attach to the Slack post (slack channel only), sent as bytes so
+   * the portal never reads a caller-supplied path off disk. `message` becomes
+   * the comment that introduces it.
+   */
+  file?: { filename: string; contentBase64: string; title?: string };
   /**
    * Telegram chat ID (numeric string), or email recipient(s) — the email
    * channel accepts a comma-separated list.
@@ -349,9 +355,8 @@ async function executeTrigger(req: ControlRequest): Promise<Record<string, unkno
  * List the workspace's Slack channels so a caller can resolve a channel by name
  * instead of being handed an ID. Read-only: it touches no conversation state.
  *
- * `isMember` is the field that matters — `notify` posts through
- * `chat.postMessage`, which fails for a channel the bot was never invited to,
- * public or not.
+ * `canPost` is the field that matters, not `isMember`: with `chat:write.public`
+ * the bot can post to a public channel it never joined.
  */
 async function executeListSlackChannels(req: ControlRequest): Promise<Record<string, unknown>> {
   if (!isSlackConfigured()) {
@@ -378,6 +383,9 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
 
   // Handle deferred notification
   if (req.scheduledFor) {
+    if (req.file) {
+      return { success: false, error: "file attachments can't be scheduled; post them immediately" };
+    }
     const runAt = new Date(req.scheduledFor);
     if (isNaN(runAt.getTime())) {
       return { success: false, error: "Invalid scheduledFor timestamp" };
@@ -432,7 +440,14 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
     // so a reply in this thread matches a conversation and — for posts from the
     // agent's own tasks — carries the source-task facts (see recordOutboundSlackThread).
     let threadTs = req.threadTs;
-    if (threadTs) {
+    if (req.file) {
+      const file = {
+        filename: req.file.filename,
+        data: Buffer.from(req.file.contentBase64, "base64"),
+        title: req.file.title,
+      };
+      threadTs = await uploadFile(channelId, file, formatted, threadTs);
+    } else if (threadTs) {
       await replyInThread(channelId, threadTs, formatted);
     } else {
       threadTs = await sendMessage(channelId, formatted);

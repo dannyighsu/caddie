@@ -1,11 +1,11 @@
 id: liveaqua-headcount-question
-title: Venue asks how many people are coming — no filler reply
+title: Venue asks how many people are coming — the team's to answer
 tags:
-  - triage/escalate
+  - triage/drop
   - no-filler
   - multi-turn
 notes: >-
-  The original run sent the venue "Confirming the headcount now — I'll get back to you shortly", which says nothing. The team is on Cc but the question needs an answer from them.
+  The original run sent the venue "Confirming the headcount now — I'll get back to you shortly", which says nothing. The team is on Cc and only they know who's coming, so the question is theirs to answer: Buri stays silent (team decision, 2026-09-29).
 source:
   session: 9ec4b90b
   extracted: 2026-09-25
@@ -161,8 +161,5 @@ expect:
     why: A holding reply with no information is filler.
   - no_external_send: true
     why: Buri doesn't know the headcount; answering needs the team, and a holding reply is filler.
-  - called: email_team
-    where:
-      body:
-        contains_any: ["how many", "headcount", "people", "guests", "attend"]
-    why: Only the team knows who's coming.
+  - not_called: email_team
+    why: Danny and Betty are on the thread and only they know who's coming; relaying the question to them is noise.

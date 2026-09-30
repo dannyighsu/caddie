@@ -10,13 +10,15 @@ export interface SlackChannelSummary {
   id: string;
   name: string;
   isPrivate: boolean;
-  /**
-   * Whether the bot user is in the channel. This is the field that actually
-   * decides whether a post will succeed — a public channel the bot has never
-   * been invited to still fails on `chat.postMessage`.
-   */
+  /** Whether the bot user is in the channel. */
   isMember: boolean;
   isArchived: boolean;
+  /**
+   * Whether `chat.postMessage` will accept a post here. Membership alone
+   * doesn't decide it: a token with `chat:write.public` can post to any public
+   * channel it hasn't joined. Archived channels accept nothing.
+   */
+  canPost: boolean;
   numMembers?: number;
   topic?: string;
   purpose?: string;
@@ -37,8 +39,12 @@ export interface RawSlackChannel {
 /** One `conversations.list` response page. */
 export interface ConversationsListPage {
   channels?: RawSlackChannel[];
-  response_metadata?: { next_cursor?: string };
+  /** `scopes` is the token's granted OAuth scopes, from the x-oauth-scopes header. */
+  response_metadata?: { next_cursor?: string; scopes?: string[] };
 }
+
+/** The scope that lets a bot post to a public channel without joining it. */
+export const PUBLIC_POST_SCOPE = "chat:write.public";
 
 export interface ListChannelsOptions {
   /** Case-insensitive substring match on the channel name. */
@@ -53,16 +59,23 @@ export interface ListChannelsOptions {
 export const MAX_PAGES = 20;
 export const DEFAULT_LIMIT = 200;
 
-export function toChannelSummary(raw: RawSlackChannel): SlackChannelSummary | null {
+export function toChannelSummary(
+  raw: RawSlackChannel,
+  canPostPublic = false,
+): SlackChannelSummary | null {
   // A channel with no id is unusable (nothing to post to) and one with no name
   // is unidentifiable, so both are dropped rather than surfaced half-formed.
   if (!raw.id || !raw.name) return null;
+  const isPrivate = !!raw.is_private;
+  const isMember = !!raw.is_member;
+  const isArchived = !!raw.is_archived;
   return {
     id: raw.id,
     name: raw.name,
-    isPrivate: !!raw.is_private,
-    isMember: !!raw.is_member,
-    isArchived: !!raw.is_archived,
+    isPrivate,
+    isMember,
+    isArchived,
+    canPost: !isArchived && (isMember || (!isPrivate && canPostPublic)),
     ...(typeof raw.num_members === "number" && { numMembers: raw.num_members }),
     ...(raw.topic?.value && { topic: raw.topic.value }),
     ...(raw.purpose?.value && { purpose: raw.purpose.value }),
@@ -71,8 +84,9 @@ export function toChannelSummary(raw: RawSlackChannel): SlackChannelSummary | nu
 
 /**
  * Walk every page of a `conversations.list` cursor, mapping and filtering as we
- * go. Channels the bot belongs to sort first — those are the postable ones — and
- * alphabetically within each group.
+ * go. Postable channels sort first, then alphabetically within each group.
+ * Whether public channels are postable without membership is read from the
+ * scopes Slack reports on the first page.
  *
  * `truncated` is true when at least one matching channel was dropped, either
  * because `limit` filled up or because the cursor ran past MAX_PAGES. Callers
@@ -90,13 +104,17 @@ export async function collectChannels(
   let cursor: string | undefined;
   let truncated = false;
   let pages = 0;
+  let canPostPublic = false;
 
   pageLoop: while (pages < MAX_PAGES) {
     const page = await fetchPage(cursor);
     pages++;
+    if (pages === 1) {
+      canPostPublic = !!page.response_metadata?.scopes?.includes(PUBLIC_POST_SCOPE);
+    }
 
     for (const raw of page.channels ?? []) {
-      const channel = toChannelSummary(raw);
+      const channel = toChannelSummary(raw, canPostPublic);
       if (!channel) continue;
       if (channel.isArchived && !options.includeArchived) continue;
       if (needle && !channel.name.toLowerCase().includes(needle)) continue;
@@ -116,7 +134,7 @@ export async function collectChannels(
   }
 
   channels.sort((a, b) =>
-    a.isMember === b.isMember ? a.name.localeCompare(b.name) : a.isMember ? -1 : 1,
+    a.canPost === b.canPost ? a.name.localeCompare(b.name) : a.canPost ? -1 : 1,
   );
 
   return { channels, truncated };

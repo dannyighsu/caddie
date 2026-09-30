@@ -20,6 +20,15 @@ function fields(call: ToolCall): Record<string, string> {
   return out;
 }
 
+/**
+ * A call with nothing in it that the tool turned away, e.g. `reply` with a
+ * blank message. Nothing happened, so it counts the same as not calling. A
+ * rejected call that *had* content still counts: the attempt is the signal.
+ */
+function isEmptyRejected(call: ToolCall): boolean {
+  return call.isError === true && fields(call).body.trim() === "";
+}
+
 export function label(a: Assertion): string {
   if ("called" in a) return `called ${a.called}${a.where ? " (matching)" : ""}`;
   if ("not_called" in a) return `did not call ${a.not_called}`;
@@ -40,7 +49,7 @@ export function gradeDeterministic(a: Assertion, ev: Evidence): AssertionResult 
   });
 
   if ("not_called" in a) {
-    const hits = ev.toolCalls.filter((c) => c.name === a.not_called);
+    const hits = ev.toolCalls.filter((c) => c.name === a.not_called && !isEmptyRejected(c));
     return hits.length ? result("fail", `called ${hits.length}×: ${preview(hits[0])}`) : result("pass");
   }
 

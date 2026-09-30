@@ -55,10 +55,24 @@ test("toChannelSummary maps the fields the agent needs", () => {
       isPrivate: true,
       isMember: false,
       isArchived: false,
+      canPost: false,
       numMembers: 7,
       topic: "ship it",
     },
   );
+});
+
+test("toChannelSummary: canPost follows membership, chat:write.public, and archival", () => {
+  const canPost = (over: RawSlackChannel, canPostPublic: boolean) =>
+    toChannelSummary(raw(over), canPostPublic)?.canPost;
+
+  assert.equal(canPost({ is_member: true }, false), true);
+  assert.equal(canPost({ is_member: false }, false), false);
+  // chat:write.public reaches public channels the bot never joined...
+  assert.equal(canPost({ is_member: false }, true), true);
+  // ...but not private ones, and nothing reaches an archived channel.
+  assert.equal(canPost({ is_member: false, is_private: true }, true), false);
+  assert.equal(canPost({ is_member: true, is_archived: true }, true), false);
 });
 
 test("toChannelSummary drops channels with no id or no name", () => {
@@ -195,6 +209,20 @@ test("collectChannels sorts postable channels first, then by name", async () => 
     channels.map((c) => c.name),
     ["beta", "zebra", "alpha", "yak"],
   );
+});
+
+test("collectChannels reads chat:write.public from the first page's scopes", async () => {
+  const { fetchPage } = pager([
+    {
+      channels: [raw({ id: "C1", name: "product-metrics", is_member: false })],
+      response_metadata: { scopes: ["chat:write", "chat:write.public"] },
+    },
+  ]);
+
+  const { channels } = await collectChannels(fetchPage);
+
+  assert.equal(channels[0].isMember, false);
+  assert.equal(channels[0].canPost, true);
 });
 
 test("collectChannels tolerates a page with no channels array", async () => {

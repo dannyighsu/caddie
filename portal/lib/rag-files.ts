@@ -35,7 +35,8 @@ export const MAX_INDEXED_FILE_SIZE = 10 * 1024 * 1024;
 /**
  * Top-level workspace directories that are never indexed:
  * - `mounts/`: repo checkouts (repo-mount skill); code, not memory.
- * - `jobs/`, `tickets/`: links into the agent definition in the repo.
+ * - `jobs/`, `tickets/`: job procedures and the agent's own bug reports;
+ *   operating material, not memory.
  */
 const EXCLUDED_TOP_LEVEL = new Set(["mounts", "jobs", "tickets"]);
 

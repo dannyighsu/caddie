@@ -2,9 +2,9 @@
  * Per-trial sandbox: a throwaway harness root and workspace.
  *
  * The launcher derives almost everything from `agentsDir/..` — permissions,
- * hook settings, config journaling, the writable `tickets/` link — so pointing
- * it at the real harness would let an eval run file tickets into the repo or
- * journal fake config into `config-history/`. Instead each trial gets:
+ * hook settings, config journaling — so pointing it at the real harness would
+ * let an eval run journal fake config into `config-history/`. Instead each
+ * trial gets:
  *
  *   <runDir>/harness/
  *     permissions.json        copy of the real policy (tiers behave as in prod)
@@ -14,9 +14,9 @@
  *                             purge tools (pointed at the fake portal), stubs
  *                             for Google, and a stub `local-rag` when the case
  *                             seeds search documents
- *     agents/<agent>/         a COPY of the definition (persona, skills, jobs,
- *                             tickets README), with capabilities trimmed to the
- *                             ones the sandbox provides
+ *     agents/<agent>/         a COPY of the definition (persona, skills), with
+ *                             capabilities trimmed to the ones the sandbox
+ *                             provides
  *   <runDir>/workspace/<agent>/config/   the live config, anonymized
  *
  * Deliberately not provided: notion, browser/chrome, web-search, and the
@@ -116,10 +116,7 @@ export async function createSandbox(opts: SandboxOptions): Promise<Sandbox> {
     recursive: true,
     filter: (src) => {
       const rel = src.slice(realAgentDir.length);
-      if (rel.startsWith("/config-history")) return false;
-      // Keep the tickets README (so the link exists) but not real tickets.
-      if (rel.startsWith("/tickets/") && !rel.endsWith("README.md")) return false;
-      return true;
+      return !rel.startsWith("/config-history");
     },
   });
 

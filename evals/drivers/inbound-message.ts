@@ -167,6 +167,7 @@ export const inboundMessage: Driver = {
         identity: toRunIdentity(identity),
         prompt,
         context: { currentTime: kase.now },
+        now: parseCaseTime(kase.now),
         additionalEnv: {
           PORTAL_URL: portal.url,
           PATH: `${sandbox.binDir}:${process.env.PATH ?? ""}`,
@@ -213,3 +214,14 @@ export const inboundMessage: Driver = {
     }
   },
 };
+
+/**
+ * A case's `now` ("Tuesday, September 22, 2026 at 12:03 PM PDT (America/Los_Angeles,
+ * UTC-07:00)") as a Date, so the launcher's clock-derived values agree with it.
+ */
+function parseCaseTime(now: string): Date {
+  const m = now.match(/^\w+, (\w+ \d+, \d{4}) at (\d+:\d+ [AP]M)\b.*UTC([+-]\d\d):(\d\d)/);
+  const date = m && new Date(`${m[1]} ${m[2]} GMT${m[3]}${m[4]}`);
+  if (!date || isNaN(date.getTime())) throw new Error(`unparseable case time: "${now}"`);
+  return date;
+}

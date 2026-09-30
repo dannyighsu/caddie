@@ -71,6 +71,39 @@ export async function acquireActiveRun(
 }
 
 // =============================================================================
+// Inbound Message Dedup
+// =============================================================================
+
+/**
+ * How long a handled inbound message stays claimed. Long enough to outlive
+ * anything that can make an old message UNREAD again (a person marking the
+ * thread unread, a failed mark-read, a restart); a message older than this that
+ * reappears is treated as new.
+ */
+const INBOUND_CLAIM_TTL_SECONDS = 180 * 24 * 60 * 60;
+
+/**
+ * Atomically claim an inbound Gmail message for dispatch. Returns false if it
+ * was already claimed — by an earlier poll, a previous process, or a concurrent
+ * poller — so it is never handed to the agent twice. Release the claim only if
+ * dispatch fails and the message should be retried.
+ */
+export async function claimInboundMessage(gmailId: string): Promise<boolean> {
+  const res = await getRedis().set(
+    `ignis:inbound:gmail:${gmailId}`,
+    String(Date.now()),
+    "EX",
+    INBOUND_CLAIM_TTL_SECONDS,
+    "NX"
+  );
+  return res === "OK";
+}
+
+export async function releaseInboundMessage(gmailId: string): Promise<void> {
+  await getRedis().del(`ignis:inbound:gmail:${gmailId}`);
+}
+
+// =============================================================================
 // Job Scheduler
 // =============================================================================
 
