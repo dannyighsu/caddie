@@ -131,7 +131,7 @@ function extractHtmlBody(payload) {
 
 /**
  * Every file part of a message: attached files and inline (`cid:`) images.
- * Mirrors extractParts in northstar/lib/gmail/parts.ts — containers and the
+ * Mirrors extractParts in portal/lib/gmail/parts.ts — containers and the
  * unnamed text/plain / text/html bodies are skipped, every other leaf with bytes
  * behind it is a file.
  */
@@ -335,7 +335,7 @@ server.tool(
       };
     }
 
-    const workspace = process.env.NORTHSTAR_WORKSPACE || process.cwd();
+    const workspace = process.env.IGNIS_WORKSPACE || process.cwd();
     const dir = artifactsDir(workspace, msg.data.threadId);
     await mkdir(dir, { recursive: true });
     const filePath = resolve(dir, safeFileName(found.filename, messageId, partId));

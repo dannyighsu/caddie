@@ -27,7 +27,7 @@ shared by Calendar, the Gmail MCP, and the email transport.
 
 ## 2. Environment
 
-In `northstar/.env.local` (already present for Calendar):
+In `portal/.env.local` (already present for Calendar):
 
 ```bash
 GOOGLE_CLIENT_ID=...
@@ -41,7 +41,7 @@ GOOGLE_CLIENT_SECRET=...
 # EMAIL_MAX_IMAGES=5                 # per message, largest first
 ```
 
-Team identity for the auth gate — the roster (see `northstar/.env.example`):
+Team identity for the auth gate — the roster (see `portal/.env.example`):
 
 ```bash
 TEAM_MEMBER_A_NAME=...
@@ -52,7 +52,7 @@ TEAM_MEMBER_A_EMAIL=...        # comma-separated; first is primary
 
 ## How it works
 
-**Inbound** (`northstar/lib/gmail/poller.ts`)
+**Inbound** (`portal/lib/gmail/poller.ts`)
 1. Every `GMAIL_POLL_INTERVAL_MS` the poller lists `label:INBOX label:UNREAD` —
    the mailbox's own UNREAD state is the queue.
 2. Each message is fetched, parsed into a `ReceivedEmail`, and dispatched to the
@@ -67,7 +67,7 @@ TEAM_MEMBER_A_EMAIL=...        # comma-separated; first is primary
 5. Attached and inline images are selected, downloaded, and passed to the agent
    (see **Inbound images** below).
 
-**Outbound** (`northstar/lib/gmail/transport.ts`)
+**Outbound** (`portal/lib/gmail/transport.ts`)
 - `send_email` / `reply` route through the control API → `sendEmail` /
   `replyToEmail`. Replies resolve the thread, reconstruct recipients (reply-all
   rebuilds To+Cc minus self), set `In-Reply-To`/`References`, and send within the
@@ -75,7 +75,7 @@ TEAM_MEMBER_A_EMAIL=...        # comma-separated; first is primary
 
 **Inbound images**
 - Selection is metadata-only and happens at parse time
-  (`northstar/lib/gmail/parts.ts`), so a message that gets skipped never costs a
+  (`portal/lib/gmail/parts.ts`), so a message that gets skipped never costs a
   fetch. Bytes are downloaded only once the message is going to the agent.
 - What survives: viewable raster images (SVG excluded — it's markup, not a
   viewable image) between `EMAIL_MIN_IMAGE_BYTES` and `EMAIL_MAX_IMAGE_BYTES`,
@@ -86,7 +86,7 @@ TEAM_MEMBER_A_EMAIL=...        # comma-separated; first is primary
   arrives inline with a `cid:`, and is exactly what someone means by "see the
   image" — so size, not disposition, does the filtering.
 - Files land in the thread's run-artifacts directory
-  (`workspace/<agent>/runs/<month>/<day>/artifacts/email-<threadId>/`), named
+  (`~/.ignis/<agent>/runs/<month>/<day>/artifacts/email-<threadId>/`), named
   `<messageId>-<sanitized name>` so two messages on one thread can't clobber each
   other. The agent gets each one as a path it reads to view the image — the same
   channel-agnostic `Attachment` path Telegram uses.
@@ -104,7 +104,7 @@ TEAM_MEMBER_A_EMAIL=...        # comma-separated; first is primary
 - `send_email` and `email_team` accept an `html` body in place of `message`.
   The send becomes a `multipart/alternative`: the HTML as given, plus a
   plain-text alternative derived from it by `htmlToText`
-  (`northstar/lib/gmail/html-text.ts`), which keeps link URLs (`text (url)`) and
+  (`portal/lib/gmail/html-text.ts`), which keeps link URLs (`text (url)`) and
   list bullets so text-only clients lose nothing. That same derived text — never
   the markup — is what gets stored as conversation history.
 - Supply `message`, `html`, or both. With both, each is used verbatim; with only

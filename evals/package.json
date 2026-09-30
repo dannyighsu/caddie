@@ -1,5 +1,5 @@
 {
-  "name": "@agints/evals",
+  "name": "@ignis/evals",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agints/harness": "workspace:*",
+    "@ignis/harness": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "yaml": "^2.6.0",
     "zod": "^3.24.0"

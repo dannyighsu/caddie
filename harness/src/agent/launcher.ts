@@ -13,6 +13,7 @@
 import { readFile, mkdir, symlink, lstat, readdir, copyFile, unlink, rm, readlink } from "fs/promises";
 import { resolve, dirname } from "path";
 import type { AgentRuntime } from "../runtime/types.js";
+import { defaultWorkspaceRoot } from "../workspace.js";
 import { resolveCapabilities } from "../capability/mcp-resolver.js";
 import {
   loadPermissions,
@@ -41,7 +42,7 @@ export interface LauncherConfig {
   capabilitiesDir: string;
   /** Directory containing resolver definitions and modules. */
   resolversDir?: string;
-  /** Root directory for agent workspaces. Defaults to <cwd>/workspace. */
+  /** Root directory for agent workspaces. Defaults to `defaultWorkspaceRoot()`. */
   workspaceRoot?: string;
   /**
    * Directory of shared, instance-agnostic skills mounted for every agent.
@@ -335,7 +336,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     agentsDir,
     capabilitiesDir,
     resolversDir,
-    workspaceRoot = resolve(process.cwd(), "workspace"),
+    workspaceRoot = defaultWorkspaceRoot(),
     coreSkillsDir = resolve(agentsDir, "..", "skills", "core"),
   } = config;
 
@@ -574,7 +575,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
             name,
             {
               ...server,
-              env: { ...server.env, NORTHSTAR_AGENT_ID: agent.id, NORTHSTAR_WORKSPACE: workingDirectory },
+              env: { ...server.env, IGNIS_AGENT_ID: agent.id, IGNIS_WORKSPACE: workingDirectory },
             },
           ])
         )

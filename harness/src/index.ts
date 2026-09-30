@@ -1,9 +1,10 @@
 /**
- * @agints/harness — Modular Agent System
+ * @ignis/harness — Modular Agent System
  *
  * Public API:
  *   createLauncher() — create an agent launcher bound to a runtime and directories
  *   createRuntime()  — create an agent runtime from config
+ *   defaultWorkspaceRoot() — where agent workspaces live ($WORKSPACE_ROOT or ~/.ignis)
  *
  * Types:
  *   AgentConfig, AgentInput, AgentResult
@@ -36,6 +37,9 @@ export {
   DEFAULT_MAX_TURNS,
   type LauncherConfig,
 } from "./agent/launcher.js";
+
+// Workspace
+export { defaultWorkspaceRoot } from "./workspace.js";
 
 // Capability
 export { resolveCapabilities, type ResolveResult } from "./capability/mcp-resolver.js";

@@ -1,9 +1,9 @@
 /**
  * Config Journal
  *
- * `workspace/<agent>/config/` holds the only copy of everything the agent has
+ * `<workspace>/<agent>/config/` holds the only copy of everything the agent has
  * been told to remember — shared preferences and each member's standing
- * instructions. It is unversioned, gitignored, and written by both the agent and
+ * instructions. It is unversioned, outside the repo, and written by both the agent and
  * whoever is at the keyboard, with no locking and no change detection. An editor
  * or script saving a stale copy over it wins silently, and the instruction is
  * gone with no error anywhere. That is how a recorded sign-off preference was

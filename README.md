@@ -1,12 +1,12 @@
-# agints
+# Ignis
 
 Agents that run the business. Each agent is a declarative config (JSON + persona prompt + optional skills) that the Agent Harness executes via an underlying runtime (currently Claude Code CLI).
 
 ## Repository Structure
 
 ```
-agints/
-├── harness/              # Agent Harness library (@agints/harness)
+ignis/
+├── harness/              # Agent Harness library (@ignis/harness)
 │   ├── src/              # Runtime, launcher, capability + resolver system
 │   ├── agents/           # Agent definitions (agent.json + persona.md + skills)
 │   ├── skills/core/      # Shared skills, mounted for every agent
@@ -14,8 +14,7 @@ agints/
 │   ├── credentials/      # OAuth tokens (gitignored)
 │   ├── resolvers/        # Pre-run data fetchers (e.g., Google Calendar)
 │   └── scripts/run.ts    # CLI smoke test
-├── northstar/            # Control plane + API server (Next.js)
-└── workspace/            # Agent working directories (gitignored)
+├── portal/               # Control plane + API server (Next.js)
 ```
 
 ## Quick Start
@@ -43,7 +42,7 @@ for from Bash have to be installed here — `make agent-tools` covers them.
 **2. Configure**
 
 ```bash
-cp northstar/.env.example northstar/.env.local
+cp portal/.env.example portal/.env.local
 ```
 
 Fill in the `REQUIRED` block — that's `POSTGRES_URL`, `REDIS_URL`, one team
@@ -109,7 +108,7 @@ Open the portal and talk to the agent from the **Conversations** tab.
 
 Email arrives once step 3 is done. For the rest, see
 [TELEGRAM.md](docs/TELEGRAM.md) and the Slack section in
-[northstar/README.md](northstar/README.md); both are just env vars plus setup on
+[portal/README.md](portal/README.md); both are just env vars plus setup on
 the provider's side. To reach the agent from outside your machine, see
 [Network exposure](#network-exposure).
 
@@ -215,7 +214,7 @@ curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","pr
 curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","cron":"0,30 * * * *","prompt":"/feed-scan"}'
 ```
 
-All profiles share the same workspace at `workspace/buri/`.
+All profiles share the same workspace at `~/.ignis/buri/`.
 
 ### 3. Write persona.md
 
@@ -278,7 +277,7 @@ at session start.
 
 ### 5. Done
 
-The agent auto-appears in the Northstar dashboard.
+The agent auto-appears in the portal dashboard.
 
 ## Adding a Capability
 
@@ -358,7 +357,7 @@ starts, rather than giving the agent a tool.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Northstar (Next.js)                                │
+│  Portal (Next.js)                                   │
 │  ┌──────────┐  ┌───────────┐  ┌──────────────────┐ │
 │  │ Dashboard │  │ Control   │  │ Postgres + Redis │ │
 │  │ (React)   │  │ API       │  │                  │ │
@@ -367,7 +366,7 @@ starts, rather than giving the agent a tool.
 │  Slack Socket Mode    │  Scheduler                   │
 │  (inbound messages)   │  (Redis-backed, cron)        │
 └───────────────────────┼──────────────────────────────┘
-                        │ imports @agints/harness
+                        │ imports @ignis/harness
 ┌───────────────────────┼──────────────────────────────┐
 │  Agent Harness        │                              │
 │                       ▼                              │
@@ -394,7 +393,7 @@ starts, rather than giving the agent a tool.
 - `createRuntime()` -- instantiates an `AgentRuntime`
 - `createLauncher(runtime, config)` -- returns `{ launch }` bound to agent and capability directories
 
-**Northstar** imports the harness as a workspace dependency. The control API (`/api/control`) is the command surface for running agents, sending notifications, and managing schedules. Agents with orchestration logic have dedicated orchestrators that handle Slack posting, scheduling, and multi-step execution. See [docs/BACKEND.md](docs/BACKEND.md) for the API server's client classes and endpoint groups.
+The **portal** imports the harness as a workspace dependency. The control API (`/api/control`) is the command surface for running agents, sending notifications, and managing schedules. Agents with orchestration logic have dedicated orchestrators that handle Slack posting, scheduling, and multi-step execution. See [docs/BACKEND.md](docs/BACKEND.md) for the API server's client classes and endpoint groups.
 
 ### Execution flow
 
@@ -408,7 +407,7 @@ Session IDs enable multi-turn conversations. On resumption, resolvers and person
 
 ## Workspace
 
-Agent workspaces live at `workspace/{agentId}/` in the repo root by default. All profiles of an agent share the same workspace. Each agent gets its own directory containing:
+Agent workspaces live at `~/.ignis/{agentId}/` by default (override with `WORKSPACE_ROOT`) — outside the repo, since a workspace is the agent's data, not app code. All profiles of an agent share the same workspace. Each agent gets its own directory containing:
 
 - `config/` -- persistent config files (editable via the control plane)
 - `.claude/` -- symlinked skills and hooks from the agent definition
@@ -428,7 +427,7 @@ The workspace directory is gitignored.
 make run          # PROD: next build + next start on http://localhost:3000 (use for long-lived sessions)
 make dev          # DEV: next dev with hot reload (active development only)
 make debug        # DEV + memory diagnostics (see below)
-make build        # build harness + northstar
+make build        # build harness + portal
 make install      # install all dependencies
 make agent-tools  # host tools the agent uses (poppler, pypdf venv)
 make smoke        # run a quick smoke test via the harness
@@ -446,8 +445,8 @@ editing.
 Or directly:
 
 ```bash
-cd northstar && pnpm dev                                      # dev server (hot reload)
-cd northstar && pnpm build && pnpm start                      # production server
+cd portal && pnpm dev                                      # dev server (hot reload)
+cd portal && pnpm build && pnpm start                      # production server
 cd harness && pnpm smoke                                      # default: buri agent
 cd harness && pnpm smoke -- --agent buri --prompt "..."       # specify agent and prompt
 ```
@@ -455,11 +454,11 @@ cd harness && pnpm smoke -- --agent buri --prompt "..."       # specify agent an
 ### Debugging memory
 
 `make debug` runs the dev server with Node memory diagnostics from
-`northstar/scripts/mem-logger.cjs`: periodic per-process `memoryUsage()` logging
+`portal/scripts/mem-logger.cjs`: periodic per-process `memoryUsage()` logging
 (tagged `server` / `agent` / `child`), major-GC logging, and heap-snapshot dumps
 (automatic near the heap limit, or on demand via `make debug-snapshot`). Filter
 the noise with `make debug 2>&1 | grep ' server '`. Snapshots land in
-`northstar/` (`*.heapsnapshot`, gitignored) — open them in Chrome DevTools →
+`portal/` (`*.heapsnapshot`, gitignored) — open them in Chrome DevTools →
 Memory.
 
 ## Network exposure
@@ -500,18 +499,18 @@ run `make unexpose`. It requires the `tailscale` CLI and a tailnet with
 [Funnel enabled](https://tailscale.com/kb/1223/funnel); if `tailscale` isn't
 installed, `make run` still starts the server localhost-only (webhooks just won't
 be reachable from the internet). Tune via make variables `FUNNEL_PATHS`,
-`TAILNET_PORT`, `NORTHSTAR_PORT`. Verify the live config with
+`TAILNET_PORT`, `IGNIS_PORT`. Verify the live config with
 `tailscale serve status`.
 
 > To add a public endpoint, append its path to `FUNNEL_PATHS` in the `Makefile` —
 > that list is the entire public attack surface, so keep it minimal. The Next.js
-> middleware (`northstar/middleware.ts`) keeps a coarse host-based allow-list as a
+> middleware (`portal/middleware.ts`) keeps a coarse host-based allow-list as a
 > secondary backstop, but Tailscale is now the primary gate.
 
 ## Configuration reference
 
-Every variable lives in one place: **`northstar/.env.example`**, annotated and
-split into required / defaulted / optional. Copy it to `northstar/.env.local`.
+Every variable lives in one place: **`portal/.env.example`**, annotated and
+split into required / defaulted / optional. Copy it to `portal/.env.local`.
 
 A capability whose variables aren't set is **not mounted** — the run proceeds
 without it and the launcher logs which variable was missing. So a missing

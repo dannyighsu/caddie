@@ -863,14 +863,14 @@ describe("config journal", () => {
 
   it("snapshots config before and after the run", async () => {
     const runtime = mockRuntime();
-    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps", workspaceRoot: "/workspace" });
 
     await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "go" });
 
     // Both ends: the run-start snapshot preserves what was there, the run-end
     // one becomes the baseline the next run's drift check compares against.
     expect(journalConfig).toHaveBeenCalledTimes(2);
-    expect(journalConfig).toHaveBeenCalledWith("/agents/test-agent", expect.stringContaining("workspace/test-agent"));
+    expect(journalConfig).toHaveBeenCalledWith("/agents/test-agent", "/workspace/test-agent");
     // Detection runs before the snapshot, or the loss would be journaled as fact.
     expect(detectConfigDrift).toHaveBeenCalledBefore(vi.mocked(journalConfig));
   });

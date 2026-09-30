@@ -1,7 +1,7 @@
 # Backend
 
-Northstar is a Next.js app serving both the control-plane UI and an HTTP API.
-Business logic lives in `northstar/lib/` (scheduling, notifications, agent
+The portal is a Next.js app serving both the control-plane UI and an HTTP API.
+Business logic lives in `portal/lib/` (scheduling, notifications, agent
 launching, persistence); the `app/api/*` route handlers are thin wrappers over
 it. The scheduler and server-rendered pages call `lib` **directly, in-process** —
 they are not HTTP clients.
@@ -51,7 +51,7 @@ Route handlers stay thin; the work is in `lib/`:
 | Scheduling + job execution | `scheduler.ts`, `redis.ts` |
 | Outbound messaging | `notification-channels.ts`, `slack.ts`, `telegram.ts`, `email.ts` |
 | Inbound channels + identity | `messaging.ts`, `*-handler.ts`, `identity.ts` |
-| Agent runs | `harness.ts` (launches via `@agints/harness`) |
+| Agent runs | `harness.ts` (launches via `@ignis/harness`) |
 | Persistence | `db.ts` (Postgres) |
 
 ## Related docs

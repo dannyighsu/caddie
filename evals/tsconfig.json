@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["bin", "core", "drivers", "scripts", "../northstar/lib/inbound-prompt.ts"]
+  "include": ["bin", "core", "drivers", "scripts", "../portal/lib/inbound-prompt.ts"]
 }

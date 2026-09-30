@@ -3,7 +3,7 @@
 /**
  * Email Egress MCP Server
  *
- * Outbound email for the agent, proxied through the Northstar control API
+ * Outbound email for the agent, proxied through the Ignis control API
  * (`notify` action, `email` channel). Routing sends through the control API —
  * rather than calling the Gmail API directly — means every send is recorded as a
  * local conversation keyed by its Gmail thread id, so when the recipient
@@ -150,10 +150,10 @@ async function handleSendEmail(args) {
   }
 
   // If this run was launched by a task, the harness passes the source-task facts
-  // via NORTHSTAR_THREAD_CONTEXT (inherited from the run env). Forward them so
+  // via IGNIS_THREAD_CONTEXT (inherited from the run env). Forward them so
   // the control API can attach them to the created thread for reply continuity.
   let threadContext;
-  const rawCtx = process.env.NORTHSTAR_THREAD_CONTEXT;
+  const rawCtx = process.env.IGNIS_THREAD_CONTEXT;
   if (rawCtx) {
     try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
   }

@@ -11,12 +11,12 @@ You have a `mounts/` directory in your workspace for temporary access to git rep
 - `mounts/<name>/` — the repo itself (symlink for local, directory for clones)
 - `mounts/.meta/<name>.json` — sidecar with `name`, `kind`, `source`, `mountedAt`, `expiresAt`
 
-**Choose a short, kebab-case `<name>`** — the directory name the user will see when you reference paths. Usually derived from the repo name (e.g. `agints`, `northstar-legacy`).
+**Choose a short, kebab-case `<name>`** — the directory name the user will see when you reference paths. Usually derived from the repo name (e.g. `ignis`, `northstar-legacy`).
 
 ## Mount a local repo (symlink)
 
 When the user points you at a path on their machine. **Exception:** to work on
-the agints repo itself, clone it instead — see **Working on agints itself**.
+the ignis repo itself, clone it instead — see **Working on ignis itself**.
 
 ```bash
 SRC="/abs/path/to/repo"
@@ -96,7 +96,7 @@ Rewrite the sidecar with a new `expiresAt` (re-run the metadata block from the m
 
 ## Contributing changes
 
-`git push` is blocked for the containing agints repo. It **is** allowed inside a
+`git push` is blocked for the containing ignis repo. It **is** allowed inside a
 mount — `cd mounts/<name> && git push` or `git -C mounts/<name> push`.
 
 **Default to a pull request.** Push directly to the default branch only when the
@@ -123,7 +123,7 @@ gh pr create --title "<title>" --body "<what, why, how you verified it>"
 - Never force-push, never push to a branch you didn't create, never merge your
   own PR. Review is the point.
 
-## Working on agints itself
+## Working on ignis itself
 
 This repo is the harness you run on, so two extra rules apply.
 
@@ -134,7 +134,7 @@ instead, even though the source is a local path — that gives you an isolated
 checkout at HEAD:
 
 ```bash
-git clone /path/to/agints mounts/agints
+git clone /path/to/ignis mounts/ignis
 ```
 
 **Never change what governs you.** These files decide what you are allowed to
@@ -156,8 +156,8 @@ If a fix genuinely seems to need one of these, **stop and say so** — in your
 reply, or in the ticket. Proposing it to a person is the whole job; making the
 change yourself is not.
 
-Everything else — `northstar/`, `harness/src/`, docs, tests — is fair game.
-Changes to compiled TypeScript (`harness/src/`, `northstar/`) need a rebuild and
+Everything else — `portal/`, `harness/src/`, docs, tests — is fair game.
+Changes to compiled TypeScript (`harness/src/`, `portal/`) need a rebuild and
 a restart before they take effect, so they cannot break the running install
 mid-PR.
 
@@ -168,6 +168,6 @@ into the checkout — don't assume the clone has it.
 
 ## Notes
 
-- Mounts are under `workspace/buri/mounts/` — the whole workspace is gitignored by agints, so nothing leaks into the agints repo.
-- Nested git repos are fine: git walks up from cwd to find the nearest `.git/`, so git commands run inside a mount operate on that mount, not agints.
+- Mounts are under `mounts/` in your workspace, which lives outside the ignis repo, so nothing leaks into it.
+- Nested git repos are fine: git walks up from cwd to find the nearest `.git/`, so git commands run inside a mount operate on that mount, not ignis.
 - Default TTL is 24h. Use longer only when the user explicitly wants to keep a repo around.

@@ -148,7 +148,7 @@ export async function resolveCapabilities(
         const vars = Array.from(missingVars).join(", ");
         const msg =
           `Capability "${name}" NOT mounted — unset env vars: ${vars}. ` +
-          `Set them (see northstar/.env.example) or drop "${name}" from the agent's capabilities.`;
+          `Set them (see portal/.env.example) or drop "${name}" from the agent's capabilities.`;
         skipped.push({ name, missingVars: Array.from(missingVars) });
         warnings.push(msg);
         console.warn(`[MCP Resolver] ${msg}`);

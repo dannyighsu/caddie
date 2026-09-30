@@ -5,13 +5,13 @@
  * Opens a browser for OAuth consent and saves tokens to credentials/.
  *
  * Prerequisites:
- *   - GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (live in northstar/.env.local)
+ *   - GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (live in portal/.env.local)
  *   - Google Cloud project with Calendar API and Gmail API enabled
  *   - OAuth 2.0 credentials (Desktop app type)
  *
  * Usage:
  *   make google-auth        # from the repo root — loads the creds from
- *                           # northstar/.env.local for you
+ *                           # portal/.env.local for you
  *
  * This script reads the two vars from process.env; it does NOT load any .env
  * file itself, so run it via `make google-auth` (or export the vars first).
@@ -35,7 +35,7 @@ async function main() {
 
   if (!clientId || !clientSecret) {
     console.error("Error: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set.");
-    console.error("Run `make google-auth` from the repo root — it loads them from northstar/.env.local.");
+    console.error("Run `make google-auth` from the repo root — it loads them from portal/.env.local.");
     console.error("(This script does not read any .env file on its own.)");
     process.exit(1);
   }

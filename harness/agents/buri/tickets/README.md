@@ -22,8 +22,8 @@ appears **here**, in the repo working tree, where you can read and grep it:
 ls harness/agents/buri/tickets/
 ```
 
-Without the link, a ticket would land in `workspace/`, which is scratch and
-gitignored — it would be swept away exactly when it mattered.
+Without the link, a ticket would land in the workspace (`~/.ignis/<agent>/`),
+outside the repo — it would never reach the people who fix things.
 
 ## Not committed
 

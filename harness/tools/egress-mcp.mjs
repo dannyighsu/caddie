@@ -4,7 +4,7 @@
  * Egress MCP Server
  *
  * MCP server for outbound messaging — Slack, email, etc.
- * Proxies through the Northstar control API (/api/control).
+ * Proxies through the Ignis control API (/api/control).
  *
  * Env:
  *   PORTAL_URL — Base URL for the portal control API (default: http://localhost:3000)
@@ -17,7 +17,7 @@ import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprot
 const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 // The agent this server is mounted for — injected by the launcher, so schedule
 // tools default to "run me" instead of making the model name itself.
-const AGENT_ID = process.env.NORTHSTAR_AGENT_ID || "buri";
+const AGENT_ID = process.env.IGNIS_AGENT_ID || "buri";
 
 const server = new Server(
   { name: "egress", version: "0.1.0" },
@@ -298,11 +298,11 @@ async function handlePostToSlack(args) {
   const { message, from, channel, threadTs } = args;
 
   // If this run was created by one of the agent's own tasks, its source-task
-  // facts arrive via NORTHSTAR_THREAD_CONTEXT (inherited from the run env, set
+  // facts arrive via IGNIS_THREAD_CONTEXT (inherited from the run env, set
   // only for scheduled/triggered runs). Forward them so a reply in the posted
   // Slack thread can be traced back to the task (mirrors the send_email path).
   let threadContext;
-  const rawCtx = process.env.NORTHSTAR_THREAD_CONTEXT;
+  const rawCtx = process.env.IGNIS_THREAD_CONTEXT;
   if (rawCtx) {
     try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
   }

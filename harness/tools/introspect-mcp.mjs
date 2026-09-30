@@ -11,7 +11,7 @@
  * live outside the workspace (~/.claude/projects/...) and the run ledger lives in
  * Postgres, both off-limits to the agent's own file/DB access per its workspace
  * boundaries. So instead of reading either directly, this proxies through the
- * Northstar server, which already owns both:
+ * Ignis server, which already owns both:
  *   - list_runs → GET /api/runs        (the job_runs ledger — the "list of traces")
  *   - view_run  → GET /api/transcripts/<sessionId>  (one run's actual steps)
  *
@@ -26,7 +26,7 @@
  *
  * Env:
  *   PORTAL_URL          — Base URL for the portal control API (default: http://localhost:3000)
- *   NORTHSTAR_AGENT_ID  — Which agent's traces to read (injected by the launcher)
+ *   IGNIS_AGENT_ID  — Which agent's traces to read (injected by the launcher)
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -34,7 +34,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
-const AGENT_ID = process.env.NORTHSTAR_AGENT_ID || "buri";
+const AGENT_ID = process.env.IGNIS_AGENT_ID || "buri";
 
 const server = new Server(
   { name: "introspect", version: "0.1.0" },
@@ -186,7 +186,7 @@ async function handleListRuns(args) {
     }
   } else {
     return {
-      content: [{ type: "text", text: "Could not reach the run APIs to list runs. Is the Northstar server up?" }],
+      content: [{ type: "text", text: "Could not reach the run APIs to list runs. Is the Ignis server up?" }],
       isError: true,
     };
   }

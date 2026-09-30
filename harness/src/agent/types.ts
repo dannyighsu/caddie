@@ -13,14 +13,14 @@ import type { TriggerContext } from "../trigger/types.js";
  * ../policy/permissions.ts and docs/PERMISSIONS.md. `guest` is default-deny
  * (nothing granted).
  *
- * Resolved by the caller (e.g. northstar's messaging layer) from the inbound
+ * Resolved by the caller (e.g. the portal's messaging layer) from the inbound
  * sender's identity — never from message content.
  */
 export type TrustTier = "team" | "guest";
 
 /**
  * The origin identity of a run. Trust and "who" travel together as one object
- * so a caller can't supply one without the other. The caller (e.g. northstar)
+ * so a caller can't supply one without the other. The caller (e.g. the portal)
  * derives this from a resolved sender identity.
  */
 export interface RunIdentity {

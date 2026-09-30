@@ -1,5 +1,5 @@
 /**
- * A stand-in for the Northstar control API (`POST /api/control`).
+ * A stand-in for the Ignis control API (`POST /api/control`).
  *
  * The real `reply`, `email`, `email-team` and `egress` MCP servers run unchanged
  * in an eval — so the model sees production tool definitions — but their

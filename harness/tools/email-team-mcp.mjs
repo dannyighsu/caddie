@@ -151,7 +151,7 @@ async function handleEmailTeam(args) {
   // Forward source-task facts (if this run came from a task) so the created
   // thread is linked for reply continuity — same as send_email.
   let threadContext;
-  const rawCtx = process.env.NORTHSTAR_THREAD_CONTEXT;
+  const rawCtx = process.env.IGNIS_THREAD_CONTEXT;
   if (rawCtx) {
     try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
   }

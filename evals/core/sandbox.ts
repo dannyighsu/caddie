@@ -25,6 +25,7 @@
 import { chmod, cp, mkdir, readFile, readdir, symlink, writeFile, stat } from "fs/promises";
 import { existsSync } from "fs";
 import { resolve } from "path";
+import { defaultWorkspaceRoot } from "@ignis/harness";
 import { Anonymizer, REPO_ROOT, realAddressAliases } from "./team.ts";
 
 const REAL_HARNESS = resolve(REPO_ROOT, "harness");
@@ -127,7 +128,7 @@ export async function createSandbox(opts: SandboxOptions): Promise<Sandbox> {
   // Workspace config: the live standing instructions, with real addresses
   // mapped onto the fake team so they agree with the case files.
   const workingDirectory = resolve(workspaceRoot, opts.agentId);
-  const liveConfig = opts.configDir ?? resolve(REPO_ROOT, "workspace", opts.agentId, "config");
+  const liveConfig = opts.configDir ?? resolve(defaultWorkspaceRoot(), opts.agentId, "config");
   const targetConfig = resolve(workingDirectory, "config");
   await mkdir(targetConfig, { recursive: true });
   if (existsSync(liveConfig)) {

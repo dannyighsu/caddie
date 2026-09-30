@@ -2,6 +2,19 @@
 This project uses OpenSDD spec-driven development. Before implementing, modifying, or verifying any code governed by an OpenSDD spec, you MUST load and follow the sdd-manager skill/instructions first. Check `opensdd.json` and `.opensdd.deps/` to identify spec-governed code.
 <!-- /OpenSDD Skills -->
 
+## Migrations: hard cutover
+
+This is a personal app with one install, so there are no uptime or
+backward-compatibility requirements. When you rename or move persisted state
+(Redis keys, env vars, file layouts, database schema), stop the server, migrate
+once, and restart. Don't carry dual-read/dual-write paths, fallbacks to old
+names, or compatibility shims. The old names go away completely.
+
+Agent workspaces live outside the repo at `~/.ignis/<agent>/` (override with
+`WORKSPACE_ROOT`; resolved by `defaultWorkspaceRoot()` in
+`harness/src/workspace.ts`). They're the agent's data, not app code. Don't
+reintroduce repo-relative workspace paths.
+
 ## Agent tickets
 
 Agents file bug reports about **their own machinery** — a tool that fails like a
@@ -25,8 +38,9 @@ ls harness/agents/buri/tickets/
 behind `jobs/` and `.claude/skills-src`. The agent writes to `tickets/` in its
 workspace and the file lands in the repo working tree.
 
-That indirection is load-bearing. `workspace/` is scratch and gitignored, so a
-ticket written there would be swept away exactly when it mattered. `tickets/` is
+That indirection is load-bearing. The workspace (`~/.ignis/<agent>/`) is the
+agent's data, outside the repo, so a ticket written there would never reach
+the repo where it gets picked up. `tickets/` is
 also the **first writable** thing linked this way — the others are read-only in
 practice — so don't "tidy" the helper into something that assumes read-only.
 
@@ -79,7 +93,7 @@ pnpm eval email-inbound            # Buri on inbound external email
 ```
 
 Run the relevant suite after changing a persona, skill, standing instruction
-or the inbound prompt path (`northstar/lib/inbound-prompt.ts`, shared with the
+or the inbound prompt path (`portal/lib/inbound-prompt.ts`, shared with the
 eval driver). Cases run on Sonnet by default. That bar is deliberately tighter
 than production's Opus, so don't "fix" a failing case by switching models. When
 a behavior is corrected, add the case that would have caught it.

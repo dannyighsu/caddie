@@ -1,7 +1,7 @@
 /**
  * Driver: an inbound message (email today) handled by a real agent run.
  *
- * Mirrors northstar's inbound path end to end — the same prompt assembly
+ * Mirrors the portal's inbound path end to end — the same prompt assembly
  * (`assembleInboundPrompt`), envelope summary, identity, launcher and one-time
  * reply reminder — with the control plane faked and the agent sandboxed. What
  * isn't reproduced: DB persistence, tracing, and attachment download (a case
@@ -11,7 +11,7 @@
 import { mkdir } from "fs/promises";
 import { resolve } from "path";
 import { z } from "zod";
-import { createLauncher, createRuntime } from "@agints/harness";
+import { createLauncher, createRuntime } from "@ignis/harness";
 import {
   assembleInboundPrompt,
   summarizeEnvelope,
@@ -21,7 +21,7 @@ import {
   mergeUsage,
   type ResolvedIdentity,
   type Message,
-} from "../core/northstar.ts";
+} from "../core/portal.ts";
 import type { Driver, Evidence, LoadedCase, RunOptions, SuiteConfig } from "../core/types.ts";
 import { startFakePortal } from "../core/fake-portal.ts";
 import { createSandbox } from "../core/sandbox.ts";
@@ -157,7 +157,7 @@ export const inboundMessage: Driver = {
         additionalEnv: {
           PORTAL_URL: portal.url,
           PATH: `${sandbox.binDir}:${process.env.PATH ?? ""}`,
-          NORTHSTAR_REPLY_TARGET: JSON.stringify({ channel: "email", externalId: `email:eval-${c.id}`, email: { messageId: `eval-${c.id}` } }),
+          IGNIS_REPLY_TARGET: JSON.stringify({ channel: "email", externalId: `email:eval-${c.id}`, email: { messageId: `eval-${c.id}` } }),
         },
       };
 

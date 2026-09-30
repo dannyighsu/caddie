@@ -6,7 +6,7 @@
  * A single, minimal-privilege tool for responding to the person the agent is
  * currently talking to — in the SAME conversation they contacted it on. The
  * destination is NOT chosen by the agent: the harness injects it via
- * NORTHSTAR_REPLY_TARGET, so a reply can only ever land in the current thread.
+ * IGNIS_REPLY_TARGET, so a reply can only ever land in the current thread.
  * That makes it safe to grant at every trust tier (including guest): it can't
  * reach anyone new, only answer whoever wrote in — exactly what auto-delivery
  * did before, but as an explicit, skippable action.
@@ -14,13 +14,13 @@
  * Contrast with `send_email` (a separate, team-only capability), which
  * starts arbitrary new mail and therefore stays gated to authenticated senders.
  *
- * Delivery is proxied through the Northstar control API (`reply` action) so the
+ * Delivery is proxied through the Ignis control API (`reply` action) so the
  * send is recorded on the local conversation — keeping replayed history a
  * faithful copy of the real, user-visible thread.
  *
  * Env:
  *   PORTAL_URL              — Base URL for the portal control API (default: http://localhost:3000)
- *   NORTHSTAR_REPLY_TARGET  — JSON reply target injected by the harness for this run
+ *   IGNIS_REPLY_TARGET  — JSON reply target injected by the harness for this run
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -76,7 +76,7 @@ async function handleReply(args) {
 
   // The reply target is injected by the harness (not agent-supplied), so a reply
   // can only land in the conversation this run is handling.
-  const rawTarget = process.env.NORTHSTAR_REPLY_TARGET;
+  const rawTarget = process.env.IGNIS_REPLY_TARGET;
   if (!rawTarget) {
     return {
       content: [

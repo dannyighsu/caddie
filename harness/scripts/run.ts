@@ -10,6 +10,7 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { createRuntime } from "../src/runtime/factory.js";
 import { createLauncher } from "../src/agent/launcher.js";
+import { defaultWorkspaceRoot } from "../src/workspace.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(__dirname, "..");
@@ -41,9 +42,8 @@ async function main() {
     agentsDir: resolve(harnessRoot, "agents"),
     capabilitiesDir: resolve(harnessRoot, "capabilities"),
     resolversDir: resolve(harnessRoot, "resolvers"),
-    // Same workspace the server uses (<repo>/workspace), so a smoke run
-    // exercises the real one instead of creating a second one under harness/.
-    workspaceRoot: process.env.WORKSPACE_ROOT ?? resolve(harnessRoot, "..", "workspace"),
+    // Same workspace the server uses, so a smoke run exercises the real one.
+    workspaceRoot: defaultWorkspaceRoot(),
   });
 
   const result = await launcher.launch({

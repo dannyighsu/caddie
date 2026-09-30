@@ -1,26 +1,26 @@
 .PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke google-auth gog-auth expose unexpose
 
 # Network exposure (see the "Network exposure" section in README.md).
-NORTHSTAR_PORT ?= 3000
+IGNIS_PORT ?= 3000
 TAILNET_PORT   ?= 8443
 # Paths reachable from the PUBLIC internet via Tailscale Funnel. Everything else
 # is served to the tailnet + localhost only. Keep this list minimal — it is the
 # entire public attack surface.
 FUNNEL_PATHS := /api/telegram/webhook /api/email/webhook
 
-# Start the Northstar control plane in PRODUCTION mode (next build + next start).
+# Start the Ignis control plane in PRODUCTION mode (next build + next start).
 # Use this for the long-lived process: `next start` has no Turbopack dev
 # compiler, so memory stays flat/bounded. The dev server (`make dev`) leaks
-# compiled-module strings over long uptime — see northstar/scripts/mem-logger.cjs.
-# Override workspace: make run WORKSPACE_ROOT=/path/to/workspace
+# compiled-module strings over long uptime — see portal/scripts/mem-logger.cjs.
+# Workspace defaults to ~/.ignis; override with make run WORKSPACE_ROOT=/path
 #
 # `make run` wraps `make serve` in a tmux session (TMUX_SESSION, default
-# "northstar") so the server outlives the terminal. Detach with C-b d, reattach
-# with `tmux attach -t northstar`. If the session already exists, its run is
+# "ignis") so the server outlives the terminal. Detach with C-b d, reattach
+# with `tmux attach -t ignis`. If the session already exists, its run is
 # stopped (C-c, wait for the port to free) and replaced with a fresh one — so
 # `make run` doubles as "restart". Runs in the foreground when tmux is
 # missing, when already inside tmux, or with `make run TMUX_SESSION=`.
-TMUX_SESSION ?= northstar
+TMUX_SESSION ?= ignis
 run:
 	@if [ -z "$(TMUX_SESSION)" ] || [ -n "$$TMUX" ] || ! command -v tmux >/dev/null 2>&1; then \
 		exec $(MAKE) --no-print-directory serve; \
@@ -29,7 +29,7 @@ run:
 		echo "[run] stopping existing run in tmux session '$(TMUX_SESSION)'…"; \
 		tmux send-keys -t "=$(TMUX_SESSION):" C-c; \
 		for i in 1 2 3 4 5 6 7 8 9 10; do \
-			lsof -ti tcp:$(NORTHSTAR_PORT) -sTCP:LISTEN >/dev/null 2>&1 || break; \
+			lsof -ti tcp:$(IGNIS_PORT) -sTCP:LISTEN >/dev/null 2>&1 || break; \
 			sleep 1; \
 		done; \
 		tmux kill-session -t "=$(TMUX_SESSION)" 2>/dev/null || true; \
@@ -43,13 +43,13 @@ run:
 # The actual production server (what `make run` runs inside tmux).
 serve: build
 	@$(MAKE) --no-print-directory expose
-	cd northstar && WORKSPACE_ROOT=$(or $(WORKSPACE_ROOT),$(CURDIR)/workspace) pnpm start
+	cd portal && pnpm start
 
 # Configure the network surface via Tailscale, enforced at the proxy BEFORE any
 # request reaches Next:
 #   • PUBLIC internet → only FUNNEL_PATHS (ingress webhooks), Funnel on :443
 #   • TAILNET + local → the full control plane, Serve on :$(TAILNET_PORT)
-# localhost:$(NORTHSTAR_PORT) is always reachable directly on this machine.
+# localhost:$(IGNIS_PORT) is always reachable directly on this machine.
 # Idempotent; config persists (Tailscale --bg) until `make unexpose`.
 expose:
 	@if ! command -v tailscale >/dev/null 2>&1; then \
@@ -59,11 +59,11 @@ expose:
 	@echo "[expose] Clearing previous serve/funnel config…"
 	@tailscale serve reset >/dev/null 2>&1 || true
 	@echo "[expose] Tailnet-only (private): full control plane on :$(TAILNET_PORT)"
-	@tailscale serve --bg --https=$(TAILNET_PORT) http://127.0.0.1:$(NORTHSTAR_PORT) >/dev/null \
+	@tailscale serve --bg --https=$(TAILNET_PORT) http://127.0.0.1:$(IGNIS_PORT) >/dev/null \
 		|| echo "[expose] WARN: serve setup failed."
 	@for p in $(FUNNEL_PATHS); do \
 		echo "[expose] Public (Funnel :443): $$p"; \
-		tailscale funnel --bg --yes --https=443 --set-path=$$p http://127.0.0.1:$(NORTHSTAR_PORT)$$p >/dev/null \
+		tailscale funnel --bg --yes --https=443 --set-path=$$p http://127.0.0.1:$(IGNIS_PORT)$$p >/dev/null \
 			|| echo "[expose] WARN: funnel failed for $$p — is Funnel enabled for this node? https://tailscale.com/kb/1223/funnel"; \
 	done
 	@echo "[expose] Public surface = $(FUNNEL_PATHS); everything else is tailnet-only."
@@ -76,46 +76,45 @@ unexpose:
 		echo "[unexpose] tailscale not found; nothing to clear."; \
 	fi
 
-# Start the Northstar control plane with the Next dev server (hot reload).
+# Start the Ignis control plane with the Next dev server (hot reload).
 # For active development only — do NOT leave running for hours; the Turbopack
 # dev compiler accumulates memory over uptime (use `make run` for long sessions).
 dev: build-harness
-	cd northstar && WORKSPACE_ROOT=$(or $(WORKSPACE_ROOT),$(CURDIR)/workspace) pnpm dev
+	cd portal && pnpm dev
 
 # Run the dev server with memory diagnostics (local only, no Funnel).
 # Layers Node memory diagnostics on top of `make dev`:
 #   --require .../mem-logger.cjs      periodic process.memoryUsage() + major-GC logging (per pid)
 #   --heapsnapshot-near-heap-limit=2  dump up to 2 .heapsnapshot files as it nears OOM
 #   --heapsnapshot-signal=SIGUSR2     dump a snapshot on demand: kill -USR2 <pid>
-# Snapshots land in northstar/ — open them in Chrome DevTools -> Memory, sort by
+# Snapshots land in portal/ — open them in Chrome DevTools -> Memory, sort by
 # retained size. Tune logging cadence with DEBUG_MEM_INTERVAL_MS (ms).
 debug: build-harness
-	cd northstar && \
-		WORKSPACE_ROOT=$(or $(WORKSPACE_ROOT),$(CURDIR)/workspace) \
-		NODE_OPTIONS="--require $(CURDIR)/northstar/scripts/mem-logger.cjs --heapsnapshot-near-heap-limit=2 --heapsnapshot-signal=SIGUSR2" \
+	cd portal && \
+		NODE_OPTIONS="--require $(CURDIR)/portal/scripts/mem-logger.cjs --heapsnapshot-near-heap-limit=2 --heapsnapshot-signal=SIGUSR2" \
 		pnpm dev
 
 # Dump an on-demand heap snapshot of the running next-server worker (requires
 # `make debug` running). Take one early and one after generating load, then diff
 # them in Chrome DevTools -> Memory (Comparison view, sort by Size Delta).
-# Snapshot files (Heap.*.heapsnapshot) are written into northstar/.
+# Snapshot files (Heap.*.heapsnapshot) are written into portal/.
 debug-snapshot:
 	@pid=$$(pgrep -f "next-server" | head -1); \
 	if [ -z "$$pid" ]; then \
 		echo "No next-server process found — is \`make debug\` running?"; \
 		exit 1; \
 	fi; \
-	echo "Sending SIGUSR2 to next-server (pid $$pid) — snapshot -> northstar/"; \
+	echo "Sending SIGUSR2 to next-server (pid $$pid) — snapshot -> portal/"; \
 	kill -USR2 $$pid
 
-# Build the harness package (produces harness/dist, which northstar imports as
-# @agints/harness). Needed by both `make dev` and `make run`.
+# Build the harness package (produces harness/dist, which the portal imports as
+# @ignis/harness). Needed by both `make dev` and `make run`.
 build-harness:
 	cd harness && pnpm build
 
-# Full production build: harness + northstar (next build). Needed by `make run`.
+# Full production build: harness + portal (next build). Needed by `make run`.
 build: build-harness
-	cd northstar && pnpm build
+	cd portal && pnpm build
 
 # Install all dependencies
 install:
@@ -144,12 +143,12 @@ agent-tools:
 smoke:
 	cd harness && pnpm smoke
 
-# One-time Google Calendar OAuth setup (pulls env from northstar/.env.local)
+# One-time Google Calendar OAuth setup (pulls env from portal/.env.local)
 google-auth:
-	cd harness && env $$(grep -E '^GOOGLE_CLIENT' ../northstar/.env.local | xargs) npx tsx scripts/google-auth.ts
+	cd harness && env $$(grep -E '^GOOGLE_CLIENT' ../portal/.env.local | xargs) npx tsx scripts/google-auth.ts
 
 # One-time Google Sheets/Docs/Slides auth for the gog CLI (the agent's
-# google-workspace skill). Reuses the OAuth client in northstar/.env.local; gog
+# google-workspace skill). Reuses the OAuth client in portal/.env.local; gog
 # keeps the token in the OS keyring. Scopes: Sheets, Docs, Slides + Drive
 # limited to files gog creates or opens. Uses the manual flow with the client's
 # registered redirect URI (localhost:3456, shared with google-auth) so no extra
@@ -159,8 +158,8 @@ gog-auth:
 	@test -n "$(ACCOUNT)" || { echo "usage: make gog-auth ACCOUNT=<the agent's Google account>"; exit 1; }
 	@command -v gog >/dev/null || { echo "gog not found: brew install openclaw/tap/gogcli"; exit 1; }
 	@creds=$$(mktemp); trap 'rm -f "$$creds"' EXIT; \
-	id=$$(grep -E '^GOOGLE_CLIENT_ID=' northstar/.env.local | cut -d= -f2- | tr -d "\"'"); \
-	secret=$$(grep -E '^GOOGLE_CLIENT_SECRET=' northstar/.env.local | cut -d= -f2- | tr -d "\"'"); \
+	id=$$(grep -E '^GOOGLE_CLIENT_ID=' portal/.env.local | cut -d= -f2- | tr -d "\"'"); \
+	secret=$$(grep -E '^GOOGLE_CLIENT_SECRET=' portal/.env.local | cut -d= -f2- | tr -d "\"'"); \
 	printf '{"installed":{"client_id":"%s","client_secret":"%s","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://localhost"]}}' "$$id" "$$secret" > "$$creds"; \
 	gog auth credentials set "$$creds" && \
 	echo "After approving, the browser lands on a localhost:3456 page that won't load; paste that full URL here." && \

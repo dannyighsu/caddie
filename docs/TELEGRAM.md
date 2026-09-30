@@ -12,7 +12,7 @@ Optionally, tune the bot:
 - `/setprivacy` → **Disable** if you want the bot to read all group messages (needed to detect @mentions in groups). With privacy enabled, the bot only receives commands and direct replies.
 - `/setdescription`, `/setuserpic`, etc.
 
-## 2. Add to `northstar/.env.local`
+## 2. Add to `portal/.env.local`
 
 ```bash
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234...    # from BotFather
@@ -22,7 +22,7 @@ TELEGRAM_WEBHOOK_SECRET=some-random-string  # optional, but recommended in produ
 
 ## 3. Register the webhook
 
-Telegram is webhook-based — you tell their servers where to POST updates. Make sure Northstar is reachable publicly (via Tailscale Funnel, ngrok, etc.), then register:
+Telegram is webhook-based — you tell their servers where to POST updates. Make sure Ignis is reachable publicly (via Tailscale Funnel, ngrok, etc.), then register:
 
 ```bash
 curl -F "url=https://your-domain.com/api/telegram/webhook" \

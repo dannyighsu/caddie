@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """PreToolUse hook that blocks `git push` when it would target the containing
-agints repo rather than a mounted repo under workspace/*/mounts/.
+ignis repo rather than a mounted repo under <workspace>/mounts/.
 
 Invoked by harness/.claude/settings.json. Reads the hook payload from stdin
 (JSON with tool_name and tool_input.command) and emits a deny decision when
-the command would push the agints repo. All other git commands are allowed.
+the command would push the ignis repo. All other git commands are allowed.
 """
 
 import json
@@ -13,7 +13,7 @@ import sys
 
 DENY_MSG = (
     "`git push` is blocked unless scoped into a mounted repo under "
-    "workspace/*/mounts/. The containing agints repo is managed by the "
+    "mounts/ in your workspace. The ignis repo is managed by the "
     "harness — do not push it. To push a mounted repo, prefix with "
     "`cd mounts/<name> &&` or use `git -C mounts/<name> push`."
 )

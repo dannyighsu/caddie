@@ -29,7 +29,7 @@ The exit code is non-zero if any case fails.
 - **Trials.** A case passes only if **every** trial passes. Use `--trials 3`
   before trusting a persona or skill change.
 - **Standing instructions.** Cases are graded against the **current** config in
-  `workspace/<agent>/config/`, anonymized. When a standing instruction changes,
+  `~/.ignis/<agent>/config/`, anonymized. When a standing instruction changes,
   the expectations that depend on it change too. Each such assertion's `why`
   names its instruction.
 
@@ -38,7 +38,7 @@ The exit code is non-zero if any case fails.
 ```
 case.yaml ──▶ driver ──▶ sandbox (temp harness root + workspace) ──▶ claude -p
                 │                                                      │
-                │   prompt built by northstar's own assembleInboundPrompt
+                │   prompt built by the portal's own assembleInboundPrompt
                 ▼                                                      ▼
           fake control API  ◀── real reply / email / email-team MCP servers
           (records sends,        (unchanged, PORTAL_URL points at the fake)
@@ -59,7 +59,7 @@ case.yaml ──▶ driver ──▶ sandbox (temp harness root + workspace) ─
     The loader rejects a case that expects anything else, because it would be
     grading the fake, not the agent.
 - **Same code path as production.** The prompt is built by
-  `northstar/lib/inbound-prompt.ts`, the one production uses, together with the
+  `portal/lib/inbound-prompt.ts`, the one production uses, together with the
   real envelope summary and identity helpers. The one-time "you didn't reply"
   reminder is replayed as well.
 - **Fake team.** Every run uses the Danny/Betty roster at `@team.example` and
@@ -70,7 +70,7 @@ case.yaml ──▶ driver ──▶ sandbox (temp harness root + workspace) ─
 A case is one YAML file in `suites/<suite>/cases/`. To start from a real run:
 
 ```bash
-pnpm --filter @agints/evals extract-case <sessionId> <case-id> --agent-address <agent's real inbox>
+pnpm --filter @ignis/evals extract-case <sessionId> <case-id> --agent-address <agent's real inbox>
 ```
 
 This pulls the envelope, history, current time and inbound message out of the

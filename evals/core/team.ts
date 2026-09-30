@@ -65,11 +65,11 @@ function readEnvFile(path: string): Record<string, string> {
 
 /**
  * Real → fake address map for the install's own people, read from the live
- * roster (northstar/.env.local, overridable by process.env). Returns an empty
+ * roster (portal/.env.local, overridable by process.env). Returns an empty
  * map on a clone without one, which is fine: there's no real config to scrub.
  */
 export function realAddressAliases(extraAgentAddresses: string[] = []): Map<string, string> {
-  const env = { ...readEnvFile(resolve(REPO_ROOT, "northstar", ".env.local")) };
+  const env = { ...readEnvFile(resolve(REPO_ROOT, "portal", ".env.local")) };
   for (const [k, v] of Object.entries(process.env)) {
     if (k.startsWith("TEAM_MEMBER_") && v && !v.endsWith(".example")) env[k] = v;
   }

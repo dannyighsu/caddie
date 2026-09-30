@@ -10,8 +10,8 @@ config-history/preferences.md.2026-09-21T09-04-55.117Z
 
 ## Why this exists
 
-`workspace/<agent>/config/` holds the **only** copy of everything the agent has
-been told to remember. It is unversioned, gitignored, and written by both the
+`~/.ignis/<agent>/config/` holds the **only** copy of everything the agent has
+been told to remember. It is unversioned, outside the repo, and written by both the
 agent and whoever is at the keyboard, with no locking. An editor or script
 saving a stale copy over it wins silently — which is how a standing instruction
 about how the agent signs its mail was lost on 2026-09-19, minutes after the
