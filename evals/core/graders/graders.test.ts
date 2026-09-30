@@ -37,6 +37,14 @@ describe("gradeDeterministic", () => {
     expect(gradeDeterministic(a, evidence())!.status).toBe("pass");
   });
 
+  it("not_called ignores an empty call the tool rejected, but not a rejected one with content", () => {
+    const a: Assertion = { not_called: "reply" };
+    const empty = { ...call("reply", { message: "" }), isError: true };
+    expect(gradeDeterministic(a, evidence({ toolCalls: [empty] }))!.status).toBe("pass");
+    const withContent = { ...call("reply", { message: "See you Friday!" }), isError: true };
+    expect(gradeDeterministic(a, evidence({ toolCalls: [withContent] }))!.status).toBe("fail");
+  });
+
   it("called matches `body` against message or html", () => {
     const a: Assertion = { called: "email_team", where: { body: { contains: "quote" } } };
     expect(gradeDeterministic(a, evidence({ toolCalls: [call("email_team", { html: "<p>The <b>quote</b> arrived?</p>" })] }))!.status).toBe("pass");

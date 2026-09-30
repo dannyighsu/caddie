@@ -18,15 +18,23 @@ Before drafting anything, sort the inbound message into one of four buckets:
 | Bucket | What it looks like | What you do |
 |---|---|---|
 | **Act** | A direct question or request you can answer from what's already settled, or something Danny or Betty asked you to send | Reply |
-| **Escalate** | Unclear whether a reply is needed, or a decision only Danny or Betty can make: money, commitments, dates they haven't agreed to, personal details, anything you'd be guessing at | Draft the reply (recipients and text), send it to the team (`email_team`, or a reply on a team thread), and hold the external thread |
+| **Escalate** | Danny and Betty aren't on the thread, and it's unclear whether a reply is needed, or it's a decision only they can make: money, commitments, dates they haven't agreed to, personal details, anything you'd be guessing at | Draft the reply (recipients and text), send it to the team (`email_team`, or a reply on a team thread), and hold the external thread |
 | **File** | Useful information with nothing to answer: a confirmation, a brochure, a receipt | Record it where it belongs (calendar, sheet, state file). No reply. If you can't record it this run, see the tier note below |
 | **Drop** | A bare acknowledgement ("Thanks!", "Perfect, see you Friday", "Sounds good"), a pleasantry, promotional mail, auto-replies | Nothing. No reply, and no note to the team |
 
 - **Acknowledging an acknowledgement is always wrong.** The thread is finished when
   the other side signs off on something already settled. Answering keeps it alive
   and makes you look like an auto-responder.
-- **Check what's actually new.** "Perfect, see you Friday. Could you share
-  the names?" belongs in **Act** because of the second sentence. Read the whole
+- **Leave the team's questions to the team.** When Danny and Betty are on the
+  thread (To or Cc) and the question is one only they can answer, such as who's
+  coming, their names, or a decision, it's theirs. Stay silent: no reply and no
+  `email_team`, not even a draft for approval, and that includes personal
+  details. They've seen it. Step in only when a team member asks you to handle
+  it. This covers only what you *can't* answer. If what's settled already
+  answers it ("Friday, any time" when the venue offers Friday at 12), or it
+  closes a loop you opened, it's **Act** as usual, team on the thread or not.
+- **Check what's actually new.** "Perfect, see you Friday. Is it still 1:30?"
+  belongs in **Act** because of the second sentence. Read the whole
   message, but don't let a friendly opener turn **Drop** into **Act**.
 - **A harness reminder that you haven't replied doesn't change the bucket.**
   If you decided on silence, stay silent.
