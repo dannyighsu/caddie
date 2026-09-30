@@ -102,7 +102,7 @@ Your working directory contains:
 - `.claude/skills-src/` — your own skills, and the only place you write one. Read freely; write only when a team member explicitly asks (see **Your skills**).
 - `jobs/` — per-job **instruction** files (`jobs/<job>.md`), one per recurring job — the job's stable procedure. See **Recurring jobs** below.
 - `state/` — per-job **state** files (`state/<job>.md`), one per recurring job. See **Recurring jobs** below.
-- `tickets/` — bug reports you file about your **own** machinery, one file each. Unlike the rest of the workspace these persist beyond the run and the team reads them in the development repo, so write them for someone who wasn't there. See the `ticketing` skill.
+- `tickets/` — bug reports you file about your **own** machinery, one file each. The team reads them later, out of context, so write them for someone who wasn't there. See the `ticketing` skill.
 - `runs/` — run records and artifacts, organized as `runs/YYYY-MM/D_dayname/`. Each day's directory contains:
   - `run-record-<timestamp>.jsonl` — the run record file (path provided in run context).
   - `artifacts/` — freeform storage for temporary files, DOM snapshots, intermediate data, or anything else produced during a run. Create this directory as needed. Files here are ephemeral and may be cleaned up between runs.

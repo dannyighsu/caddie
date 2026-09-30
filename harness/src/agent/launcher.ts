@@ -88,44 +88,16 @@ async function loadPersona(
 }
 
 /**
- * Symlink a directory from the agent definition into the workspace at the same
- * relative path, so the running agent sees the agent's stable definitions
- * natively. Used for `.claude/skills/` (native skill discovery), `jobs/`
- * (recurring-job procedures injected as "Job instructions"), and `tickets/`
- * (the agent's own bug reports — see the `ticketing` core skill). A no-op if
- * the agent has no such directory or the workspace already links it — so an edit
- * to the agent definition propagates without a workspace rebuild.
- *
- * Most of what's linked this way is read-only in practice; `tickets/` is not,
- * and that's the point. Writing through the link lands in the agent definition
- * rather than the workspace, so a ticket outlives the run that filed it —
- * the workspace is scratch, and a bug report swept away with it is worthless.
+ * Whether `link` is already a symlink to `target`. A symlink pointing anywhere
+ * else — typically the repo's old path after it moved — is removed so the
+ * caller recreates it; stopping at "it's a symlink" would leave it dangling.
  */
-async function ensureDefinitionSymlink(
-  agentDir: string,
-  workingDirectory: string,
-  relPath: string
-): Promise<void> {
-  const agentPath = resolve(agentDir, relPath);
-  const workspacePath = resolve(workingDirectory, relPath);
-
-  // Nothing to link if the agent definition doesn't have it.
-  try {
-    await lstat(agentPath);
-  } catch {
-    return;
-  }
-
-  // Already linked — leave it.
-  try {
-    const stat = await lstat(workspacePath);
-    if (stat.isSymbolicLink()) return;
-  } catch {
-    // Doesn't exist yet — create it below.
-  }
-
-  await mkdir(dirname(workspacePath), { recursive: true });
-  await symlink(agentPath, workspacePath);
+async function reuseOrClearLink(link: string, target: string): Promise<boolean> {
+  const stat = await lstat(link).catch(() => null);
+  if (!stat?.isSymbolicLink()) return false;
+  if ((await readlink(link)) === target) return true;
+  await unlink(link);
+  return false;
 }
 
 /**
@@ -144,12 +116,7 @@ async function ensureHarnessClaudeConfig(
     return; // No harness settings
   }
 
-  try {
-    const stat = await lstat(workspaceSettingsFile);
-    if (stat.isSymbolicLink()) return; // Already symlinked
-  } catch {
-    // Doesn't exist yet
-  }
+  if (await reuseOrClearLink(workspaceSettingsFile, harnessSettingsFile)) return;
 
   await mkdir(resolve(workingDirectory, ".claude"), { recursive: true });
   await symlink(harnessSettingsFile, workspaceSettingsFile);
@@ -321,9 +288,8 @@ async function ensureSkillsSrcLink(
   } catch {
     return; // agent has no skills directory of its own yet
   }
-  const current = await lstat(link).catch(() => null);
-  if (current?.isSymbolicLink()) return;
-  if (current) await rm(link, { recursive: true, force: true });
+  if (await reuseOrClearLink(link, source)) return;
+  if (await lstat(link).catch(() => null)) await rm(link, { recursive: true, force: true });
   await mkdir(dirname(link), { recursive: true });
   await symlink(source, link);
 }
@@ -396,11 +362,9 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     }
 
     // 4. Mount skills (core + agent, or just what the profile grants), then
-    //    link job definitions, tickets, and hooks into the workspace.
+    //    link hooks into the workspace.
     await mountSkills(agentDir, coreSkillsDir, workingDirectory, profile?.skills);
     await ensureSkillsSrcLink(agentDir, workingDirectory);
-    await ensureDefinitionSymlink(agentDir, workingDirectory, "jobs");
-    await ensureDefinitionSymlink(agentDir, workingDirectory, "tickets");
     const harnessRoot = resolve(agentsDir, "..");
     await ensureHarnessClaudeConfig(harnessRoot, workingDirectory);
 

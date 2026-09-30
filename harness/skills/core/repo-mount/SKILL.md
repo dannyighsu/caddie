@@ -102,7 +102,7 @@ whatever branch and uncommitted state it happens to be in.
 
 **Never change what governs you.** These files decide what you are allowed to
 do, and most of them are read live rather than compiled — `permissions.json`,
-`persona.md`, `agent.json`, `jobs/` and `config/` are re-read on every run,
+`persona.md`, `agent.json` and `config/` are re-read on every run,
 skills take effect on the next one, and `.claude/settings.json` and `scripts/`
 take effect on the very next tool call, inside the run that changed them. So a
 change here is not a proposal for a human to review later; it is already in
@@ -124,10 +124,8 @@ Changes to compiled TypeScript (`harness/src/`, `portal/`) need a rebuild and
 a restart before they take effect, so they cannot break the running install
 mid-PR.
 
-**Tickets don't travel.** Ticket bodies are gitignored, so a fresh clone's
-`harness/agents/<agent>/tickets/` holds only its README. Read the ticket from
-your own `tickets/` (the live one in your workspace) and carry what you need
-into the checkout — don't assume the clone has it.
+**Tickets aren't in the repo.** They live only in your workspace's `tickets/`.
+Read the ticket from there and carry what you need into the checkout.
 
 ## Notes
 

@@ -114,18 +114,6 @@ Secrets.swift
 .aider*
 .DS_Store
 .workspace
-# Recurring job definitions are per-instance: a job names real places, people,
-# and criteria for one household, so it belongs to that install and not the
-# repo. The README is kept so a fresh clone still explains what goes here.
-harness/agents/*/jobs/*
-!harness/agents/*/jobs/README.md
-# Tickets the agent files about its own machinery. Each one quotes a real run —
-# session ids, error strings, the shape of a team member's request — so it
-# belongs to the install and not the repo. They stay in the working tree, which
-# is where they get picked up; they just don't travel with a clone. The README
-# is kept so a fresh clone still explains the directory.
-harness/agents/*/tickets/*
-!harness/agents/*/tickets/README.md
 # Snapshots of the agent's durable memory, written by the harness on every run.
 # They are copies of one install's config — standing instructions, member
 # profiles — so they belong to the install and not the repo, same as the config

@@ -122,9 +122,16 @@ also editable in the portal's **Config** tab:
 | Voice, boundaries, how it represents you | `harness/agents/buri/persona.md` |
 | Shared standing instructions | `harness/agents/buri/config/preferences.md` |
 | Per-person profiles | `harness/agents/buri/config/team/<member>.md` |
-| Recurring job procedures | `harness/agents/buri/jobs/` (gitignored — see its README) |
+| Recurring job procedures | `~/.ignis/buri/jobs/<job>.md` (workspace — see below) |
 
 Changes take effect on the agent's next run. Nothing to rebuild or restart.
+
+Job procedures live in the workspace, not the repo: a job names real places,
+people and match criteria for one install. On a scheduled run the launcher
+injects `jobs/<job>.md` as **"Job instructions"**; the agent keeps the job's
+carried state and one-off directives in `state/<job>.md` beside it. Writing the
+file doesn't schedule anything — cadence is Redis state, set through the control
+API (`action: "schedule"`) or by asking the agent (`manage-schedules` skill).
 
 ## Creating an Agent
 
@@ -410,6 +417,8 @@ Session IDs enable multi-turn conversations. On resumption, resolvers and person
 Agent workspaces live at `~/.ignis/{agentId}/` by default (override with `WORKSPACE_ROOT`) — outside the repo, since a workspace is the agent's data, not app code. All profiles of an agent share the same workspace. Each agent gets its own directory containing:
 
 - `config/` -- persistent config files (editable via the control plane)
+- `jobs/` -- recurring-job procedures, one `<job>.md` each (written by you)
+- `tickets/` -- bug reports the agent files about its own machinery (see `AGENTS.md`)
 - `.claude/` -- symlinked skills and hooks from the agent definition
 - Everything else -- created by the agent during runs (task files, memory, run records, etc.)
 
