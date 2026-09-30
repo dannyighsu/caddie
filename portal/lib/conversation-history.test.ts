@@ -66,3 +66,16 @@ test("renderHistoryLines labels each turn by speaker", () => {
   assert.match(lines[0], /^\[Assistant\]: /);
   assert.match(lines[1], /^\[User\]: /);
 });
+
+test("renderHistoryLines shows a purged message as a placeholder, never its text", () => {
+  const purged: Message = {
+    role: "user",
+    content: "",
+    timestamp: new Date().toISOString(),
+    sender: { kind: "guest" },
+    purged: { at: new Date().toISOString(), reason: "phishing", by: "agent" },
+  };
+  const lines = renderHistoryLines([msg("assistant", "sent the brochure"), purged, msg("assistant", "noted")]);
+  assert.equal(lines.length, 3);
+  assert.equal(lines[1], "[Guest]: [removed — suspected phishing]");
+});

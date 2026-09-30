@@ -28,6 +28,22 @@ export interface Message {
   sender?:
     | { kind: "authenticated"; userId: string }
     | { kind: "guest" };
+  /**
+   * Set when the message was purged as suspected phishing or prompt injection.
+   * `content` is then empty — the original text is kept nowhere — and the
+   * message keeps its place in the array so every later message's position
+   * (and so its mirror file, `<seq>.md`) stays put. See lib/purge.ts.
+   */
+  purged?: MessagePurge;
+}
+
+export type PurgeReason = "phishing" | "prompt-injection" | "other";
+
+export interface MessagePurge {
+  at: string;
+  reason: PurgeReason;
+  /** `agent` when the agent purged it through `purge_content`. */
+  by: string;
 }
 
 export interface Conversation {
@@ -214,6 +230,26 @@ CREATE INDEX IF NOT EXISTS idx_job_runs_status ON job_runs(status, created_at DE
 CREATE INDEX IF NOT EXISTS idx_job_runs_agent ON job_runs(agent_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_job_runs_trace ON job_runs(trace_id) WHERE trace_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_job_runs_created ON job_runs(created_at DESC);
+
+-- Audit trail for purge_content. Deliberately never holds the purged text —
+-- only where it was, why, and a hash to recognize it by. See lib/purge.ts.
+CREATE TABLE IF NOT EXISTS purges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id TEXT NOT NULL,
+  -- 'message' | 'file'
+  kind TEXT NOT NULL,
+  conversation_id UUID,
+  seq INTEGER,
+  -- Workspace-relative path: the mirror file for a message, the file itself otherwise.
+  path TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  note TEXT,
+  content_sha256 TEXT,
+  trust_tier TEXT NOT NULL,
+  trace_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_purges_agent ON purges(agent_id, created_at DESC);
 `;
 
 let schemaEnsured = false;
@@ -292,18 +328,132 @@ export async function listConversations(
   return result.rows.map(rowToConversation);
 }
 
+/**
+ * Append messages to a conversation. Returns the array position (`seq`) of the
+ * first appended message, or null if the conversation doesn't exist.
+ *
+ * Each appended message is then mirrored to its own file in the agent's
+ * workspace for search (lib/conversation-mirror.ts). That happens after the
+ * write commits and never fails or delays the caller.
+ */
 export async function appendMessages(
   conversationId: string,
   newMessages: Message[]
-): Promise<void> {
+): Promise<number | null> {
   await ensureSchema();
   // Append to the JSONB array and update timestamp
-  await getPool().query(
+  const result = await getPool().query(
     `UPDATE conversations
      SET messages = messages || $1::jsonb,
          updated_at = now()
-     WHERE id = $2`,
+     WHERE id = $2
+     RETURNING agent_id, jsonb_array_length(messages) AS len`,
     [JSON.stringify(newMessages), conversationId]
+  );
+  if (result.rows.length === 0) return null;
+  const agentId = result.rows[0].agent_id as string;
+  const startSeq = Number(result.rows[0].len) - newMessages.length;
+
+  // Imported lazily: the mirror reads conversations back through this module.
+  import("./conversation-mirror")
+    .then((m) => m.mirrorAppended(agentId, conversationId, startSeq, newMessages.length))
+    .catch((err) => console.error(`[DB] Conversation mirror failed for ${conversationId}:`, err));
+
+  return startSeq;
+}
+
+/** Every conversation belonging to an agent, oldest first (mirror backfill). */
+export async function listAgentConversations(agentId: string): Promise<Conversation[]> {
+  await ensureSchema();
+  const result = await getPool().query(
+    `SELECT * FROM conversations WHERE agent_id = $1 ORDER BY created_at ASC`,
+    [agentId]
+  );
+  return result.rows.map(rowToConversation);
+}
+
+export type TombstoneResult =
+  | { status: "purged"; original: Message; conversation: Conversation }
+  | { status: "already-purged"; conversation: Conversation }
+  | { status: "not-found" };
+
+/**
+ * Replace one message's content with a tombstone, in place. The original text
+ * is returned to the caller (for hashing) and exists nowhere afterwards.
+ * Row-locked, so a concurrent append can't shift the position underneath it.
+ */
+export async function tombstoneMessage(
+  conversationId: string,
+  seq: number,
+  purge: MessagePurge
+): Promise<TombstoneResult> {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const found = await client.query(`SELECT * FROM conversations WHERE id = $1 FOR UPDATE`, [
+      conversationId,
+    ]);
+    if (found.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { status: "not-found" };
+    }
+    const conversation = rowToConversation(found.rows[0]);
+    const original = conversation.messages[seq];
+    if (!original) {
+      await client.query("ROLLBACK");
+      return { status: "not-found" };
+    }
+    if (original.purged) {
+      await client.query("ROLLBACK");
+      return { status: "already-purged", conversation };
+    }
+    const tombstone: Message = { ...original, content: "", purged: purge };
+    await client.query(
+      `UPDATE conversations SET messages = jsonb_set(messages, $1::text[], $2::jsonb) WHERE id = $3`,
+      [[String(seq)], JSON.stringify(tombstone), conversationId]
+    );
+    await client.query("COMMIT");
+    conversation.messages[seq] = tombstone;
+    return { status: "purged", original, conversation };
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export interface PurgeRecord {
+  agentId: string;
+  kind: "message" | "file";
+  conversationId?: string;
+  seq?: number;
+  path: string;
+  reason: PurgeReason;
+  note?: string;
+  contentSha256?: string;
+  trustTier: string;
+  traceId?: string;
+}
+
+export async function recordPurge(r: PurgeRecord): Promise<void> {
+  await ensureSchema();
+  await getPool().query(
+    `INSERT INTO purges (agent_id, kind, conversation_id, seq, path, reason, note, content_sha256, trust_tier, trace_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      r.agentId,
+      r.kind,
+      r.conversationId ?? null,
+      r.seq ?? null,
+      r.path,
+      r.reason,
+      r.note ?? null,
+      r.contentSha256 ?? null,
+      r.trustTier,
+      r.traceId ?? null,
+    ]
   );
 }
 

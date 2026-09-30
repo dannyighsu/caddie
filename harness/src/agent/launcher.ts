@@ -563,19 +563,29 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     }
 
     const resolved = trustFiltered.kept.length > 0
-      ? await resolveCapabilities(trustFiltered.kept, capabilitiesDir, { HARNESS_ROOT: harnessRoot })
+      ? await resolveCapabilities(trustFiltered.kept, capabilitiesDir, {
+          HARNESS_ROOT: harnessRoot,
+          IGNIS_AGENT_ID: agent.id,
+          IGNIS_WORKSPACE: workingDirectory,
+        })
       : undefined;
 
     // Tell every capability server which agent it is serving, so tools can
-    // default to it instead of asking the model to name its own agent id — and
-    // where that agent's workspace is, for tools that hand it files.
+    // default to it instead of asking the model to name its own agent id —
+    // where that agent's workspace is, for tools that hand it files — and the
+    // run's trust tier, for tools that narrow what they do on a guest run.
     const mcpServers = resolved && Object.keys(resolved.servers).length > 0
       ? Object.fromEntries(
           Object.entries(resolved.servers).map(([name, server]) => [
             name,
             {
               ...server,
-              env: { ...server.env, IGNIS_AGENT_ID: agent.id, IGNIS_WORKSPACE: workingDirectory },
+              env: {
+                ...server.env,
+                IGNIS_AGENT_ID: agent.id,
+                IGNIS_WORKSPACE: workingDirectory,
+                IGNIS_TRUST_TIER: trustTier,
+              },
             },
           ])
         )
@@ -618,6 +628,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
         mcpServers,
         enableChrome,
         disableBuiltinTools: !baseToolsAllowed,
+        disallowedTools: resolved?.disallowedTools,
         harnessRoot,
         additionalEnv: input.additionalEnv,
       });

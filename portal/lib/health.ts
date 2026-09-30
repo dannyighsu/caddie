@@ -8,6 +8,8 @@
 import { spawn } from "child_process";
 import { resolve } from "path";
 import { readdir, readFile, access } from "fs/promises";
+import { defaultAgentId, workspaceRoot } from "./harness";
+import { indexStatus } from "./workspace-index";
 
 interface CapabilityDef {
   name: string;
@@ -21,16 +23,25 @@ interface CapabilityDef {
 
 export interface HealthCheckResult {
   name: string;
-  type: "mcp" | "flag";
+  type: "mcp" | "flag" | "index";
   status: "ok" | "error" | "skipped";
   message?: string;
 }
 
 const ENV_VAR_PATTERN = /\$\{([^}]+)\}/g;
 
-function resolveEnvVars(value: string): string {
+/**
+ * Per-agent values the launcher substitutes at run time. Health checks use the
+ * default agent's, so a capability like local-rag starts against a real
+ * workspace instead of an empty path.
+ */
+let runtimeVars: Record<string, string> = {};
+
+function resolveEnvVars(value: string, missing?: Set<string>): string {
   return value.replace(ENV_VAR_PATTERN, (_, varName) => {
-    return process.env[varName] ?? "";
+    const v = runtimeVars[varName] ?? process.env[varName];
+    if (v === undefined) missing?.add(varName);
+    return v ?? "";
   });
 }
 
@@ -42,6 +53,16 @@ function resolveEnvVars(value: string): string {
 async function checkMcpServer(def: CapabilityDef): Promise<HealthCheckResult> {
   if (!def.server) {
     return { name: def.name, type: "flag", status: "ok", message: "Flag-only" };
+  }
+
+  // Mirror the launcher: a capability with unset variables isn't mounted, so
+  // don't start it with blanks either (it may treat "" as a path).
+  const missing = new Set<string>();
+  for (const v of [def.server.command, ...def.server.args, ...Object.values(def.server.env ?? {})]) {
+    resolveEnvVars(v, missing);
+  }
+  if (missing.size > 0) {
+    return { name: def.name, type: "mcp", status: "skipped", message: `Not configured — unset: ${[...missing].join(", ")}` };
   }
 
   const command = resolveEnvVars(def.server.command);
@@ -127,6 +148,14 @@ export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
   process.env.HARNESS_ROOT = harnessRoot;
   const results: HealthCheckResult[] = [];
 
+  let agentId: string | null = null;
+  try {
+    agentId = await defaultAgentId();
+    runtimeVars = { IGNIS_AGENT_ID: agentId, IGNIS_WORKSPACE: resolve(workspaceRoot, agentId) };
+  } catch {
+    runtimeVars = {};
+  }
+
   try {
     const entries = await readdir(capabilitiesDir);
     for (const entry of entries) {
@@ -152,5 +181,23 @@ export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
     console.warn("[Health] Could not read capabilities directory");
   }
 
+  if (agentId) results.push(indexHealth(agentId));
+
   return results;
+}
+
+/** The workspace search index for an agent: whether it's on, current, and healthy. */
+function indexHealth(agentId: string): HealthCheckResult {
+  const s = indexStatus(agentId);
+  const name = `workspace-index:${agentId}`;
+  if (!s.enabled) {
+    return { name, type: "index", status: "skipped", message: "LOCAL_RAG_ENTRY not set — see make rag-setup" };
+  }
+  if (s.rebuildRequired) {
+    return { name, type: "index", status: "error", message: `Rebuild required (make rag-rebuild AGENT=${agentId}): ${s.rebuildRequired}` };
+  }
+  if (s.lastError) return { name, type: "index", status: "error", message: s.lastError };
+  const synced = s.lastSync ? `last sync ${s.lastSync}` : s.syncing ? "first sync in progress" : "not synced yet";
+  const failing = s.failures ? `, ${s.failures} file(s) failing` : "";
+  return { name, type: "index", status: "ok", message: `${s.indexedFiles} files indexed, ${synced}${failing}` };
 }

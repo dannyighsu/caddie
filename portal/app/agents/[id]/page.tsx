@@ -15,6 +15,8 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  /** Set when the agent purged it as suspected phishing / prompt injection (content is empty). */
+  purged?: { reason: string };
 }
 
 interface Conversation {
@@ -230,7 +232,13 @@ function ConversationsView({ agentId }: { agentId: string }) {
                     : "bg-surface border border-line text-ink shadow-sm"
                 }`}
               >
-                <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
+                {msg.purged ? (
+                  <p className="italic opacity-70">
+                    [removed — suspected {msg.purged.reason === "other" ? "unsafe content" : msg.purged.reason}]
+                  </p>
+                ) : (
+                  <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
+                )}
                 <p className="text-xs opacity-60 mt-2">
                   {new Date(msg.timestamp).toLocaleTimeString()}
                 </p>

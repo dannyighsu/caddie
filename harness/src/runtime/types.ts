@@ -33,6 +33,11 @@ export interface AgentRuntimeInput {
    * unaffected. Driven by the `base-tools` permission for the run's trust tier.
    */
   disableBuiltinTools?: boolean;
+  /**
+   * Fully qualified tool names (e.g. `mcp__local-rag__delete_file`) removed from
+   * this run entirely. Comes from capabilities' `disallowedTools`.
+   */
+  disallowedTools?: string[];
   /** Absolute path to the harness root directory (for hook scripts). */
   harnessRoot?: string;
   /** Runtime-specific additional arguments (escape hatch). */

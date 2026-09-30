@@ -86,6 +86,13 @@ export async function startFakePortal(replyAudience: string[]): Promise<FakePort
         return reply({ success: true, ts: `${n}.000` });
       }
 
+      if (body.action === "purge") {
+        // The real portal also emails the team; that notice is the tool's own,
+        // not something the agent sent, so it isn't recorded as an effect.
+        effects.push({ kind: "purge", to: [], external: false, body: text(body.note), raw: body });
+        return reply({ success: true, purged: body.current ? "the current message" : text(body.path) });
+      }
+
       effects.push({ kind: "other", to: [], external: false, body: "", raw: body });
       return reply({ success: true });
     });

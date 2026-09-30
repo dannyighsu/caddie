@@ -10,7 +10,9 @@
     "google-calendar": true,
     "google-gmail": true,
     "introspect": true,
+    "local-rag": true,
     "notion": true,
+    "purge": true,
     "reply": true,
     "web-search": true,
     "base-tools": true
@@ -25,7 +27,9 @@
     "google-calendar": false,
     "google-gmail": false,
     "introspect": false,
+    "local-rag": false,
     "notion": false,
+    "purge": true,
     "reply": true,
     "web-search": false,
     "base-tools": false

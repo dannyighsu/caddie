@@ -40,6 +40,9 @@ import { currentTimePST } from "@/lib/helpers";
 import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, deleteJob, getJob, upsertJob } from "@/lib/redis";
 import { executeJob, isJobActive } from "@/lib/scheduler";
 import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
+import { purgeContent } from "@/lib/purge";
+import type { PurgeReason } from "@/lib/db";
+import { rebuildIndex, ragEnabled } from "@/lib/workspace-index";
 
 interface ControlRequest {
   action:
@@ -49,7 +52,9 @@ interface ControlRequest {
     | "schedule"
     | "update_schedule"
     | "trigger"
-    | "list_slack_channels";
+    | "list_slack_channels"
+    | "purge"
+    | "rag_rebuild";
 
   // --- reply fields ---
   /**
@@ -142,6 +147,18 @@ interface ControlRequest {
   includeArchived?: boolean;
   /** Cap on channels returned after filtering. */
   limit?: number;
+
+  // --- purge fields (see lib/purge.ts) ---
+  // `agentId` and `trustTier` (above) are the run's, injected by the harness.
+  /** The inbound message the run is handling, injected by the harness. */
+  currentMessage?: { conversationId: string; seq: number };
+  /** Purge the message being handled. */
+  current?: boolean;
+  /** Workspace path to purge: a `conversations/` message file or any other file. */
+  path?: string;
+  reason?: PurgeReason;
+  note?: string;
+  traceId?: string;
 }
 
 // --- Action execution ---
@@ -162,6 +179,10 @@ async function executeAction(req: ControlRequest, portalOwner: UserId): Promise<
       return executeTrigger(req);
     case "list_slack_channels":
       return executeListSlackChannels(req);
+    case "purge":
+      return executePurge(req);
+    case "rag_rebuild":
+      return executeRagRebuild(req);
     default:
       return { success: false, error: `Unknown action: ${req.action}` };
   }
@@ -227,6 +248,39 @@ async function executeReply(req: ControlRequest): Promise<Record<string, unknown
     default:
       return { success: false, error: `reply not supported for channel: ${target.channel}` };
   }
+}
+
+/**
+ * Purge suspected phishing / prompt-injection content (the `purge_content`
+ * tool). The run's agent, trust tier and current message come from the
+ * harness-injected tool env, so a guest run can only ever purge the message
+ * it's handling — enforced in lib/purge.ts.
+ */
+async function executePurge(req: ControlRequest): Promise<Record<string, unknown>> {
+  if (!req.agentId || !req.reason) {
+    return { success: false, error: "purge requires `agentId` and `reason`" };
+  }
+  return purgeContent({
+    agentId: req.agentId,
+    trustTier: req.trustTier ?? "guest",
+    currentMessage: req.currentMessage,
+    current: req.current,
+    path: req.path,
+    reason: req.reason,
+    note: req.note,
+    traceId: req.traceId,
+  });
+}
+
+/**
+ * Drop and rebuild an agent's search index (`make rag-rebuild`). Runs in this
+ * process, behind the indexer's own queue, so it never races a sync.
+ */
+async function executeRagRebuild(req: ControlRequest): Promise<Record<string, unknown>> {
+  if (!req.agentId) return { success: false, error: "rag_rebuild requires `agentId`" };
+  if (!ragEnabled()) return { success: false, error: "LOCAL_RAG_ENTRY is not set (see `make rag-setup`)" };
+  await rebuildIndex(req.agentId);
+  return { success: true };
 }
 
 /**
@@ -606,7 +660,7 @@ export async function POST(request: NextRequest) {
 
   if (!req.action) {
     return NextResponse.json(
-      { success: false, error: "action is required (notify | reply | run | schedule | update_schedule | trigger | list_slack_channels)" },
+      { success: false, error: "action is required (notify | reply | run | schedule | update_schedule | trigger | list_slack_channels | purge | rag_rebuild)" },
       { status: 400 }
     );
   }
