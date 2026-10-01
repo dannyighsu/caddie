@@ -9,7 +9,7 @@
  *   SLACK_APP_TOKEN  — for Socket Mode connection (xapp-...)
  */
 
-import { WebClient } from "@slack/web-api";
+import { WebClient, type KnownBlock } from "@slack/web-api";
 import { SocketModeClient } from "@slack/socket-mode";
 import type { ResolvedIdentity, UserId } from "./identity";
 import {
@@ -19,6 +19,7 @@ import {
   type Message,
 } from "./db";
 import type { ThreadContext } from "./thread-context";
+import type { SlackBlock } from "./slack-blocks";
 import {
   collectChannels,
   type ConversationsListPage,
@@ -44,23 +45,35 @@ function getWebClient(): WebClient {
   return webClient;
 }
 
+/**
+ * Post a message to a channel. With `blocks`, `text` becomes the notification /
+ * fallback text Slack shows where blocks can't render (push notifications,
+ * notification previews, older clients) — which is what Slack's API expects.
+ */
 export async function sendMessage(
   channel: string,
-  text: string
+  text: string,
+  options?: { blocks?: SlackBlock[] }
 ): Promise<string | undefined> {
-  const result = await getWebClient().chat.postMessage({ channel, text });
+  const result = await getWebClient().chat.postMessage({
+    channel,
+    text,
+    ...(options?.blocks && { blocks: options.blocks as unknown as KnownBlock[] }),
+  });
   return result.ts;
 }
 
 export async function replyInThread(
   channel: string,
   threadTs: string,
-  text: string
+  text: string,
+  options?: { blocks?: SlackBlock[] }
 ): Promise<void> {
   await getWebClient().chat.postMessage({
     channel,
     text,
     thread_ts: threadTs,
+    ...(options?.blocks && { blocks: options.blocks as unknown as KnownBlock[] }),
   });
 }
 

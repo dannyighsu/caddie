@@ -28,6 +28,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, replyInThread, uploadFile, recordOutboundSlackThread, isSlackConfigured, listChannels } from "@/lib/slack";
+import { normalizeBlocks, withAttribution } from "@/lib/slack-blocks";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
 import { sendEmail, replyToEmail, recordEmailReply, isEmailConfigured, htmlToText } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
@@ -82,6 +83,14 @@ interface ControlRequest {
    * the comment that introduces it.
    */
   file?: { filename: string; contentBase64: string; title?: string };
+  /**
+   * Block Kit layout for a Slack post (slack channel only) — an array of blocks,
+   * or the JSON string / `{"blocks": [...]}` wrapper a job script produces.
+   * `message` stays required and becomes the notification fallback text, as
+   * Slack's API expects. Not supported with `file` (a file share carries only a
+   * plain comment) or with `scheduledFor` (the job payload carries text only).
+   */
+  blocks?: unknown;
   /**
    * Telegram chat ID (numeric string), or email recipient(s) — the email
    * channel accepts a comma-separated list.
@@ -386,6 +395,9 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
     if (req.file) {
       return { success: false, error: "file attachments can't be scheduled; post them immediately" };
     }
+    if (req.blocks) {
+      return { success: false, error: "Block Kit blocks can't be scheduled; post them immediately" };
+    }
     const runAt = new Date(req.scheduledFor);
     if (isNaN(runAt.getTime())) {
       return { success: false, error: "Invalid scheduledFor timestamp" };
@@ -431,9 +443,23 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
       return { success: false, error: "No Slack channel specified and no default configured" };
     }
 
+    const { blocks, error: blocksError } = normalizeBlocks(req.blocks);
+    if (blocksError) {
+      return { success: false, error: blocksError };
+    }
+    if (blocks && req.file) {
+      return {
+        success: false,
+        error: "blocks can't be combined with a file: a file share carries only plain comment text",
+      };
+    }
+
     const formatted = req.from
       ? `*[${req.from}]* ${message}`
       : message;
+    // With blocks, `formatted` is only the fallback text, so the attribution has
+    // to be rendered into the layout too or it disappears from the post itself.
+    const layout = blocks ? withAttribution(blocks, req.from) : undefined;
 
     // Resolve the thread root: the parent thread_ts when replying into an
     // existing thread, otherwise the new top-level message's own ts. Register it
@@ -448,9 +474,9 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
       };
       threadTs = await uploadFile(channelId, file, formatted, threadTs);
     } else if (threadTs) {
-      await replyInThread(channelId, threadTs, formatted);
+      await replyInThread(channelId, threadTs, formatted, { blocks: layout });
     } else {
-      threadTs = await sendMessage(channelId, formatted);
+      threadTs = await sendMessage(channelId, formatted, { blocks: layout });
     }
     if (threadTs) {
       await recordOutboundSlackThread(channelId, threadTs, formatted, req.threadContext);
