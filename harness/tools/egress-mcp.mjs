@@ -43,6 +43,9 @@ const tools = [
       "Calling this with your final summary will cause duplicate messages. " +
       "Legitimate uses: posting a long-running task progress update, alerting a different Slack channel about an event, or proactively raising an issue in Slack while the user is interacting via another channel. " +
       "Messages support Slack mrkdwn formatting (*bold*, _italic_, `code`, >quotes, <url|text> links). " +
+      "For a rich layout (header, fields, a divider, context lines, a monospace table in a section), pass `blocks`: an array of Block Kit blocks. " +
+      "`message` is still required and becomes the notification fallback text Slack shows in push notifications and anywhere blocks can't render, so write it as a readable plain-text version of the same content. " +
+      "Blocks can't be combined with filePath. " +
       "To share a file (a PDF report, a CSV, an image), pass filePath: the file is uploaded into the channel and `message` becomes the text that introduces it. " +
       "Readers can't reach your workspace, so attach the file rather than linking to its path. " +
       "Sharing a file in a public channel the bot isn't in makes it join that channel first.",
@@ -76,6 +79,12 @@ const tools = [
         fileTitle: {
           type: "string",
           description: "Display title for the attached file. Defaults to its filename.",
+        },
+        blocks: {
+          type: "array",
+          items: { type: "object" },
+          description:
+            "Block Kit blocks for a rich layout, e.g. [{\"type\":\"header\",\"text\":{\"type\":\"plain_text\",\"text\":\"Usage\"}}]. Max 50; each entry needs a \"type\". A JSON string of the array is also accepted. Omit for a plain mrkdwn post.",
         },
       },
       required: ["message"],
@@ -340,7 +349,7 @@ async function readWorkspaceFile(filePath) {
 }
 
 async function handlePostToSlack(args) {
-  const { message, from, channel, threadTs, filePath, fileTitle } = args;
+  const { message, from, channel, threadTs, filePath, fileTitle, blocks } = args;
 
   let file;
   if (filePath) {
@@ -370,6 +379,7 @@ async function handlePostToSlack(args) {
     ...(channel && { slackChannel: channel }),
     ...(threadTs && { threadTs }),
     ...(file && { file }),
+    ...(blocks !== undefined && { blocks }),
     ...(threadContext && { threadContext }),
   };
 
@@ -392,7 +402,11 @@ async function handlePostToSlack(args) {
     content: [
       {
         type: "text",
-        text: file ? `Posted to Slack with ${file.filename} attached.` : "Message posted to Slack.",
+        text: file
+          ? `Posted to Slack with ${file.filename} attached.`
+          : blocks
+            ? "Block Kit message posted to Slack."
+            : "Message posted to Slack.",
       },
     ],
   };
