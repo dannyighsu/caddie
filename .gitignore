@@ -123,6 +123,9 @@ harness/agent/config-history/*
 # Who this install's agent is and whom it serves. PERSONA.example.md is the
 # committed template.
 harness/agent/PERSONA.md
+# The agent's own skills, which it also authors at a team member's request.
+# Shared ones live in harness/skills/core/.
+harness/agent/.claude/skills/
 workspace/
 
 # Eval runs: per-run sandboxes and results (transcripts quote real prompts).

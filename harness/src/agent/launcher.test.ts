@@ -875,6 +875,14 @@ describe("skill mounting", () => {
     );
   });
 
+  it("creates the agent's skills directory on a fresh install, so skills-src has a target", async () => {
+    const runtime = mockRuntime();
+    await launcher(runtime).launch({ identity: ID, prompt: "go" });
+
+    expect(mockFs.mkdir).toHaveBeenCalledWith(AGENT_SKILLS, { recursive: true });
+    expect(mockFs.symlink).toHaveBeenCalledWith(AGENT_SKILLS, "/workspace/.claude/skills-src");
+  });
+
   it("relinks skills-src that still points at the repo's old path", async () => {
     const LINK = "/workspace/.claude/skills-src";
     mockFs.readdir.mockImplementation(dirs({ [AGENT_SKILLS]: ["feed-scan"] }));

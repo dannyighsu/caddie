@@ -281,11 +281,8 @@ async function ensureSkillsSrcLink(
 ): Promise<void> {
   const source = resolve(agentDir, ".claude", "skills");
   const link = resolve(workingDirectory, ".claude", "skills-src");
-  try {
-    await lstat(source);
-  } catch {
-    return; // agent has no skills directory of its own yet
-  }
+  // Untracked, so a fresh install starts without one; the link needs a target.
+  await mkdir(source, { recursive: true });
   if (await reuseOrClearLink(link, source)) return;
   if (await lstat(link).catch(() => null)) await rm(link, { recursive: true, force: true });
   await mkdir(dirname(link), { recursive: true });

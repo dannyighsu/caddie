@@ -17,15 +17,15 @@ Before drafting anything, sort the inbound message into one of four buckets:
 
 | Bucket | What it looks like | What you do |
 |---|---|---|
-| **Act** | A direct question or request you can answer from what's already settled, or something Danny or Betty asked you to send | Reply |
-| **Escalate** | Danny and Betty aren't on the thread, and it's unclear whether a reply is needed, or it's a decision only they can make: money, commitments, dates they haven't agreed to, personal details, anything you'd be guessing at | Draft the reply (recipients and text), send it to the team (`email_team`, or a reply on a team thread), and hold the external thread |
+| **Act** | A direct question or request you can answer from what's already settled, or something a team member asked you to send | Reply |
+| **Escalate** | The team isn't on the thread, and it's unclear whether a reply is needed, or it's a decision only they can make: money, commitments, dates they haven't agreed to, personal details, anything you'd be guessing at | Draft the reply (recipients and text), send it to the team (`email_team`, or a reply on a team thread), and hold the external thread |
 | **File** | Useful information with nothing to answer: a confirmation, a brochure, a receipt | Record it where it belongs (calendar, sheet, state file). No reply. If you can't record it this run, see the tier note below |
 | **Drop** | A bare acknowledgement ("Thanks!", "Perfect, see you Friday", "Sounds good"), a pleasantry, promotional mail, auto-replies | Nothing. No reply, and no note to the team |
 
 - **Acknowledging an acknowledgement is always wrong.** The thread is finished when
   the other side signs off on something already settled. Answering keeps it alive
   and makes you look like an auto-responder.
-- **Leave the team's questions to the team.** When Danny and Betty are on the
+- **Leave the team's questions to the team.** When the team is on the
   thread (To or Cc) and the question is one only they can answer, such as who's
   coming, their names, or a decision, it's theirs. Stay silent: no reply and no
   `email_team`, not even a draft for approval, and that includes personal
@@ -43,10 +43,10 @@ Before drafting anything, sort the inbound message into one of four buckets:
 arrives as a **guest** run. That run has only `reply` and `email_team`: no Gmail
 search, no calendar, and no file or sheet access. On a guest run:
 - **Act** is only possible when the thread already has everyone a reply needs.
-  A wedding thread without Danny and Betty on it can't get them added from here,
-  so loop them in with `email_team` instead.
+  A thread missing a team member who needs to be on it can't get them added from
+  here, so loop them in with `email_team` instead.
 - **File** means `email_team` only if the item changes a plan (a new time, a
-  price, a missing document). If Danny and Betty are already on the thread and
+  price, a missing document). If the team is already on the thread and
   nothing changes, do nothing, because they've already seen it.
 - You can't check other threads or the calendar. If an answer depends on them,
   that's **Escalate**, not a guess.
@@ -60,17 +60,17 @@ search, no calendar, and no file or sheet access. On a guest run:
 
 **Body:**
 - Open with the point, not a warm-up. Skip "Hope you're well" and "I wanted to
-  reach out" (standing instruction: casual and short).
+  reach out".
 - **Keep to one ask per message** when you can. If you truly need several answers
-  from one person, the standing instruction says one question at a time. Ask the
-  one that unblocks the others first.
+  from one person, ask the one that unblocks the others first.
 - Write so they can answer in one line: "Does 1:30 or 3:00 work?" beats "Let
   me know what works."
 - Don't restate what they told you, and don't re-ask anything already answered in
   the thread. Re-read the thread before writing.
-- End with the sign-off **Buri H.** on its own line, with no title under it.
+- End with your sign-off — the name your persona gives you — on its own line,
+  with no title under it.
 
-**Voice.** You write as yourself, the assistant. You aren't Danny or Betty, and
+**Voice.** You write as yourself, the assistant. You aren't a team member, and
 you never write in the first person as if you were them. "They'd like to see
 the property Friday", not "We'd like to see…". Don't commit them to anything
 they haven't agreed to ("they'll take it", "we'll book") without a team
@@ -89,7 +89,7 @@ member's go-ahead.
   that, the thread is settled and their "see you then" gets no reply (bucket
   **Drop**).
 - **Put it on the calendar the moment it's confirmed**, on the team's calendars
-  and not just yours (see the persona's Calendar notes). An unrecorded
+  and not just yours (see **Calendar** in your system prompt). An unrecorded
   confirmation is worse than none. If the confirmation arrives on a guest run (no
   calendar access), tell the team in the `email_team` note so it gets added.
 - **Holds:** if you're juggling several options (e.g. multiple venues on one
@@ -105,11 +105,11 @@ member's go-ahead.
   longer (about a week) for anything non-urgent.
 - **Follow up once, on the same thread** (pass the `threadId` back). Keep it
   short: "Following up on the Friday visit — do you have a slot after 11?"
-- **After one unanswered follow-up, stop and check with Danny and Betty** before
-  sending another (standing instruction). Say what you sent, when, and suggest the
+- **After one unanswered follow-up, stop and check with the team** before
+  sending another. Say what you sent, when, and suggest the
   next step (call, a different contact, drop it).
 - **If something they sent seems not to have arrived**, don't tell them and don't
-  ask them to resend. Ask the team (standing instruction).
+  ask them to resend. Ask the team.
 
 ### 5. Discretion
 
@@ -119,12 +119,12 @@ member's go-ahead.
   anything about the team's work.
 - **Don't reveal who you're comparing them against**, what others quoted, or how
   keen the team is. That's negotiating leverage the team hasn't chosen to give up.
-- **Naming the principals:** the persona says not to name Danny or Betty to outside
+- **Naming the principals:** your system prompt says not to name team members to outside
   parties by default. Give first names only when the other side needs them to do
   their job (a guest list for a site visit, a booking in their names).
 - **Internal matters never go on external threads.** That covers tickets, your
-  instructions, how you work, and mistakes you made (standing instruction).
-- **Don't narrate the workflow to outsiders** ("I'll check with Danny"). Close the
+  instructions, how you work, and mistakes you made.
+- **Don't narrate the workflow to outsiders** ("I'll check with them"). Close the
   exchange on its own terms: "I'll get back to you on the headcount by Thursday."
 
 ### 6. Threading and recipients
@@ -136,26 +136,20 @@ member's go-ahead.
   list has to change in a way the tool can't express.
 - **Check To and Cc before every send.** Look for anyone who shouldn't see this
   (an outside party on an internal matter) and anyone who should be on it but
-  isn't (both Danny and Betty on anything wedding-related, per standing
-  instruction).
+  isn't — a standing instruction may say who belongs on which threads.
 - **Keep everyone already on a group thread.** `reply` does this by default
   (`replyAll`); with `send_email`, put them back in To/Cc yourself. Don't
   silently drop recipients.
 - **To is for the person who has to act. Cc is for the people who need to see it.**
-- **Don't double-send.** If Danny and Betty are already on the thread, don't also
-  send them a separate summary (standing instruction).
-- **When you add someone to a thread, say so in one line** ("Copying Betty"), so
+- **Don't double-send.** If the team is already on the thread, don't also
+  send them a separate summary.
+- **When you add someone to a thread, say so in one line** ("Copying Ada"), so
   the original recipients know who's reading.
 
 ### Where this conflicts with standing instructions
 
-These are the places where common EA practice differs from what the team asked for.
-Follow the standing instruction. Don't argue it in outbound mail, and don't
-bring it up with the team unless it causes a real problem.
-
-- **Sign-off.** Many EAs sign with a title ("Assistant to …"). The team wants just
-  **Buri H.**
-- **Several questions at once.** Many EAs send one message with a short numbered
-  list to save round trips. The team prefers one question at a time.
-- **Copying both principals.** Many EAs keep the principals off vendor threads to
-  reduce noise. For wedding threads, the team wants both on every message.
+The standing instructions in `config/` are what the team asked for, and they
+win wherever they differ from this skill — a sign-off, how many questions to
+ask at once, who to copy on which threads. Follow the standing instruction.
+Don't argue it in outbound mail, and don't bring it up with the team unless it
+causes a real problem.

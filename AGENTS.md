@@ -22,7 +22,10 @@ paths.
 Its system prompt is `harness/agent/PERSONA.md` followed by
 `harness/agent/SYSTEM.md`. `SYSTEM.md` is committed and shared by every
 install, so it names no person, place or household; who the agent is and whom
-it serves goes in `PERSONA.md`, which is untracked. Setting up an install is
+it serves goes in `PERSONA.md`, which is untracked. The same split holds for
+skills: `harness/skills/core/` is shared and names nobody, and the agent's own
+skills in `harness/agent/.claude/skills/` are untracked. The seeds in
+`harness/agent/config/` are generic templates. Setting up an install is
 [docs/SETUP.md](docs/SETUP.md).
 
 ## Agent tickets

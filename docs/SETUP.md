@@ -6,8 +6,9 @@ sign-in, an admin console — say so.
 
 An install is one machine running one agent. Everything that makes it *this*
 agent rather than another lives outside git: `portal/.env.local`,
-`harness/agent/PERSONA.md`, `harness/credentials/`, and the workspace at
-`~/.ignis/`. Two installs share the repo and nothing else.
+`harness/agent/PERSONA.md`, `harness/credentials/`, the workspace at
+`~/.ignis/`, and `harness/agent/.claude/skills/`. Two installs share the repo
+and nothing else.
 
 The steps assume macOS with [Homebrew](https://brew.sh). Each one is
 idempotent.
@@ -90,6 +91,11 @@ anyone.
 serves, how it sounds. It comes first in the system prompt, ahead of
 `harness/agent/SYSTEM.md`, which says how the agent works and is shared by every
 install. A run refuses to start without a persona.
+
+A new install starts with the shared core skills, a blank
+`config/preferences.md` and no team profiles. Its own skills
+(`harness/agent/.claude/skills/`) start empty; the agent writes them there when
+a team member asks, and the directory is not tracked.
 
 ## 4. Google (Calendar and Gmail)
 

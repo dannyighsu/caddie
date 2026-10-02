@@ -41,14 +41,18 @@ make run              # portal on http://localhost:3000, inside tmux
 | Shared standing instructions | `~/.ignis/config/preferences.md` | no — workspace |
 | Per-person profiles | `~/.ignis/config/team/<member>.md` | no — workspace |
 | Recurring job procedures | `~/.ignis/jobs/<job>.md` | no — workspace |
+| Skills only this install uses | `harness/agent/.claude/skills/<skill>/` | no |
+| Skills every install shares | `harness/skills/core/<skill>/` | yes |
 
 All of these are also editable in the portal's **Config** tab. Changes take
 effect on the agent's next run, with nothing to rebuild or restart.
 
 A rule every install should follow belongs in `SYSTEM.md`; anything naming a
 particular person, place or household belongs in `PERSONA.md` or the
-workspace. `harness/agent/config/` holds seed files, copied into the workspace
-only when the workspace doesn't have them yet.
+workspace. The same goes for skills: a procedure any install could use is a core
+skill, and one tied to this install's accounts, people or jobs is the agent's
+own. `harness/agent/config/` holds generic seed files, copied into the
+workspace only when the workspace doesn't have them yet.
 
 Job procedures live in the workspace, not the repo: a job names real places,
 people and match criteria for one install. On a scheduled run the launcher
@@ -65,8 +69,8 @@ harness/agent/
 ├── SYSTEM.md             # committed: how the agent works
 ├── PERSONA.md            # per install, untracked: who it is
 ├── PERSONA.example.md    # the template for PERSONA.md
-├── config/               # seed files for the workspace's config/
-└── .claude/skills/       # the agent's own skills
+├── config/               # generic seed files for the workspace's config/
+└── .claude/skills/       # per install, untracked: the agent's own skills
     └── <skill-name>/
         └── SKILL.md
 ```
@@ -157,12 +161,15 @@ harness/skills/core/manage-schedules/SKILL.md      # shared by every install
 harness/agent/.claude/skills/feed-scan/SKILL.md    # the agent's own
 ```
 
-**Core skills** (`harness/skills/core/`) are instance-agnostic mechanism —
-scheduling, skill authoring, repo mounting. A second install inherits them
-through `git pull`.
+**Core skills** (`harness/skills/core/`) are shared by every install —
+mechanism like scheduling, skill authoring and repo mounting, and procedures any
+install could use, like email correspondence. A second install inherits them
+through `git pull`, so they name no person, account or household.
 
-**Agent skills** live with the agent. On a name collision the agent's wins, so
-an install can override a core skill locally.
+**Agent skills** (`harness/agent/.claude/skills/`) belong to this install and
+are not tracked: they are where the agent writes the skills a team member asks
+for, and they name this install's accounts and jobs. On a name collision the
+agent's wins, so an install can override a core skill locally.
 
 At launch both sources are mounted into the workspace as `.claude/skills/` — a
 directory of per-skill symlinks, rebuilt each run. The agent invokes them via

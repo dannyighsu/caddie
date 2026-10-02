@@ -1,16 +1,10 @@
 # Team preferences
 
-Shared context for the team (Danny and Betty). Each member's profile and
-member-specific standing instructions live in `config/team/<member>.md`.
-
-## Routing
-Reply to whoever initiated the conversation; if unspecified, assume Danny.
+Shared context for the team. Each member's profile and member-specific
+standing instructions live in `config/team/<member>.md`.
 
 ## Communication style
-Appreciates detail and conciseness in responses. Tone approachable but to the point.
-
-## Timezone
-America/Los_Angeles
+<!-- How the team likes to be written to — e.g., "short and direct" -->
 
 ## Check-In
 ### Frequency
@@ -23,10 +17,10 @@ America/Los_Angeles
 <!-- e.g., "keep it brief unless something is urgent", "always start with calendar summary" -->
 
 ## Standing instructions (team-wide)
-<!-- Durable directions that apply to BOTH members. Member-specific ones go in
+<!-- Durable directions that apply to EVERY member. Member-specific ones go in
      config/team/<member>.md. One per bullet, tagged with provenance:
      (Who, YYYY-MM-DD). Add or update only when a team member explicitly
-     asks; see the persona's "Preferences and memory" section. -->
+     asks; see "Preferences and memory" in your system prompt. -->
 
 ## Notes
 <!-- Anything else relevant -->

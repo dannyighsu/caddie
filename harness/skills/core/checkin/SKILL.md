@@ -30,7 +30,7 @@ Provide a concise check-in summary covering:
 
 ### Step 4: Post to Slack
 
-Post the check-in summary to Slack using the `post_to_slack` tool with `from` set to `"Buri"`.
+Post the check-in summary to Slack using the `post_to_slack` tool with `from` set to your name.
 
 ### Step 5: Schedule next check-in
 
