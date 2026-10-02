@@ -38,6 +38,21 @@ claude        # then /login; the account you sign in with is billed for every ru
 curl -fsSL https://bun.sh/install | bash
 ```
 
+**Google Chrome** is what the `browser` capability drives. Its MCP server,
+Playwright MCP, comes with `pnpm install`, but it opens the installed Chrome
+rather than a bundled browser, so without Chrome the agent has no browser.
+
+```bash
+brew install --cask google-chrome
+```
+
+The browser is headed: it opens a real window. So the macOS user running Ignis
+has to stay logged in to the desktop. With the lid closed and the machine kept
+awake (step 7), the window still opens. Its profile lives in
+`harness/.browser-profile/` and keeps logins between runs. It starts empty on
+a new machine, so the first time the agent needs a site behind a login, a
+person signs in through that window.
+
 The agent runs directly on this machine, not in a container, so any
 command-line tool it reaches for from Bash has to be installed here.
 
