@@ -1,11 +1,10 @@
 name: email-inbound
 description: >
-  Inbound external email handled by Buri: whether to reply at all, what to
+  Inbound external email handled by the agent: whether to reply at all, what to
   escalate, what never to send. Cases are real threads from the SMA wedding-venue
   search (Sept 2026), anonymized, graded against the CURRENT standing
   instructions — so since 2026-09-25 every external send needs team approval.
 driver: inbound-message
-agent: buri
 defaults:
   channel: email
   sender: guest

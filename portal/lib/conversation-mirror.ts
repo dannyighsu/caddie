@@ -1,6 +1,6 @@
 /**
  * Conversation mirror: one markdown file per conversation message, in the
- * agent's workspace, for the local search index.
+ * workspace, for the local search index.
  *
  *   <workspace>/conversations/<channel>/<conversation-id>/<seq>.md
  *
@@ -15,15 +15,11 @@
 
 import { mkdir, readdir, rename, rm, stat, writeFile } from "fs/promises";
 import { dirname, resolve } from "path";
-import { defaultWorkspaceRoot } from "@ignis/harness";
+import { workspaceDir } from "@ignis/harness";
 import { senderLabel } from "./conversation-history";
-import { getConversation, listAgentConversations, type Conversation } from "./db";
+import { getConversation, listAllConversations, type Conversation } from "./db";
 import { CONVERSATIONS_DIR, messageRelPath, renderMessageFile } from "./rag-files";
 import { MIRROR_SYNC_DEBOUNCE_MS, requestIndexSync } from "./workspace-index";
-
-export function agentWorkspace(agentId: string): string {
-  return resolve(defaultWorkspaceRoot(), agentId);
-}
 
 async function writeAtomic(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -44,28 +40,26 @@ async function writeMessage(workspace: string, conv: Conversation, seq: number):
  * after its write commits), then nudge the indexer.
  */
 export async function mirrorAppended(
-  agentId: string,
   conversationId: string,
   startSeq: number,
   count: number
 ): Promise<void> {
   const conv = await getConversation(conversationId);
   if (!conv) return;
-  const workspace = agentWorkspace(agentId);
+  const workspace = workspaceDir();
   for (let seq = startSeq; seq < startSeq + count; seq++) {
     await writeMessage(workspace, conv, seq);
   }
-  requestIndexSync(agentId, MIRROR_SYNC_DEBOUNCE_MS);
+  requestIndexSync(MIRROR_SYNC_DEBOUNCE_MS);
 }
 
 /** Delete one message's mirror file (purge). Returns its workspace-relative path. */
 export async function removeMirroredMessage(
-  agentId: string,
   conv: Pick<Conversation, "id" | "external_id">,
   seq: number
 ): Promise<string> {
   const rel = messageRelPath(conv, seq);
-  await rm(resolve(agentWorkspace(agentId), rel), { force: true });
+  await rm(resolve(workspaceDir(), rel), { force: true });
   return rel;
 }
 
@@ -100,9 +94,9 @@ async function listFiles(workspace: string, relDir: string): Promise<string[]> {
  * deletes every file whose message is purged or gone (including leftovers
  * from a crashed atomic write). Runs at startup, before the first index sync.
  */
-export async function backfillMirror(agentId: string): Promise<void> {
-  const workspace = agentWorkspace(agentId);
-  const conversations = await listAgentConversations(agentId);
+export async function backfillMirror(): Promise<void> {
+  const workspace = workspaceDir();
+  const conversations = await listAllConversations();
   const expected = new Set<string>();
   let written = 0;
 
@@ -116,7 +110,7 @@ export async function backfillMirror(agentId: string): Promise<void> {
           await writeMessage(workspace, conv, seq);
           written++;
         } catch (err) {
-          console.error(`[Mirror:${agentId}] failed to write ${rel}:`, err);
+          console.error(`[Mirror] failed to write ${rel}:`, err);
         }
       }
     }
@@ -130,6 +124,6 @@ export async function backfillMirror(agentId: string): Promise<void> {
   }
 
   if (written || removed) {
-    console.log(`[Mirror:${agentId}] backfill: ${written} written, ${removed} removed (${conversations.length} conversations)`);
+    console.log(`[Mirror] backfill: ${written} written, ${removed} removed (${conversations.length} conversations)`);
   }
 }

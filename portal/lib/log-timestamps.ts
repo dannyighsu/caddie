@@ -2,7 +2,7 @@
  * Console Timestamping
  *
  * Prefixes every process log line with a readable local timestamp (seconds
- * granularity, no milliseconds) so Buri's logs are chronologically legible.
+ * granularity, no milliseconds) so the portal's logs are chronologically legible.
  * Installed once at server startup (see instrumentation.ts) — it wraps the
  * `console` methods in place, so all in-process logging (the portal + the
  * harness it imports) is covered without touching individual call sites.

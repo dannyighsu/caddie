@@ -29,7 +29,7 @@ The exit code is non-zero if any case fails.
 - **Trials.** A case passes only if **every** trial passes. Use `--trials 3`
   before trusting a persona or skill change.
 - **Standing instructions.** Cases are graded against the **current** config in
-  `~/.ignis/<agent>/config/`, anonymized. When a standing instruction changes,
+  `~/.ignis/config/`, anonymized. When a standing instruction changes,
   the expectations that depend on it change too. Each such assertion's `why`
   names its instruction.
 

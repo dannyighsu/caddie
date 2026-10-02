@@ -118,8 +118,11 @@ Secrets.swift
 # They are copies of one install's config — standing instructions, member
 # profiles — so they belong to the install and not the repo, same as the config
 # they back up. The README is kept so a fresh clone still explains the directory.
-harness/agents/*/config-history/*
-!harness/agents/*/config-history/README.md
+harness/agent/config-history/*
+!harness/agent/config-history/README.md
+# Who this install's agent is and whom it serves. PERSONA.example.md is the
+# committed template.
+harness/agent/PERSONA.md
 workspace/
 
 # Eval runs: per-run sandboxes and results (transcripts quote real prompts).

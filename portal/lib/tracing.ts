@@ -70,13 +70,13 @@ async function langfuseApi(
  */
 export async function createTrace(
   traceId: string,
-  agentId: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  name = "agent-run"
 ): Promise<void> {
   await langfuseApi("/traces", {
     id: traceId,
-    name: `${agentId}-run`,
-    metadata: { agentId, ...metadata },
+    name,
+    metadata,
   });
 }
 

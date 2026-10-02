@@ -1,19 +1,8 @@
-import { getAgent } from "@/lib/harness";
 import { runPortalAgent } from "@/lib/portal-run";
 import { NextRequest, NextResponse } from "next/server";
 import { parsePortalOwner } from "@/lib/identity";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  const agent = await getAgent(id);
-
-  if (!agent) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
-  }
-
+export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const { prompt, conversationId, context } = body as {
     prompt?: string;
@@ -31,7 +20,6 @@ export async function POST(
 
   try {
     const result = await runPortalAgent({
-      agentId: id,
       prompt,
       portalOwner,
       context,

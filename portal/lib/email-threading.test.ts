@@ -128,8 +128,8 @@ test("normal: reply on a known thread whose parent we sent/saw uses stripped bod
   const r = selectInboundBody(
     base({
       threadKnownLocally: true,
-      inReplyTo: "buri-reply@x.com",
-      knownMessageIds: new Set(["msg1@x.com", "buri-reply@x.com"]),
+      inReplyTo: "agent-reply@x.com",
+      knownMessageIds: new Set(["msg1@x.com", "agent-reply@x.com"]),
     }),
   );
   assert.equal(r.reason, "normal");
@@ -141,8 +141,8 @@ test("forward: always includes history and wins over every other signal", () => 
     base({
       isForward: true,
       threadKnownLocally: true,
-      inReplyTo: "buri-reply@x.com",
-      knownMessageIds: new Set(["buri-reply@x.com"]),
+      inReplyTo: "agent-reply@x.com",
+      knownMessageIds: new Set(["agent-reply@x.com"]),
     }),
   );
   assert.equal(r.reason, "forward");
@@ -196,13 +196,13 @@ test("fallback: normal wanted but extracted blank falls back to full", () => {
 // --- The user's motivating scenarios, end to end ---
 
 test("scenario Branch A: side conversation looped back on the same thread → gap", () => {
-  // A→Buri (msg1) is all Buri saw. B↔A happened off Buri's inbox. A replies to
-  // B's last message and re-adds Buri: In-Reply-To points at an id Buri never saw.
+  // A→agent (msg1) is all the agent saw. B↔A happened off the agent's inbox. A replies to
+  // B's last message and re-adds the agent: In-Reply-To points at an id it never saw.
   const r = selectInboundBody(
     base({
       threadKnownLocally: true,
       inReplyTo: "b-private@mail.com",
-      knownMessageIds: new Set(["msg1-a-to-buri@mail.com"]),
+      knownMessageIds: new Set(["msg1-a-to-agent@mail.com"]),
       isForward: false,
     }),
   );
@@ -210,15 +210,15 @@ test("scenario Branch A: side conversation looped back on the same thread → ga
   assert.equal(r.body, FULL, "must surface the quoted side-conversation history");
 });
 
-test("scenario Branch A guard: an ongoing reply where Buri did reply → normal", () => {
+test("scenario Branch A guard: an ongoing reply where the agent did reply → normal", () => {
   const r = selectInboundBody(
     base({
       threadKnownLocally: true,
-      inReplyTo: "buri-reply-2@mail.com",
-      knownMessageIds: new Set(["msg1@mail.com", "buri-reply-2@mail.com"]),
+      inReplyTo: "agent-reply-2@mail.com",
+      knownMessageIds: new Set(["msg1@mail.com", "agent-reply-2@mail.com"]),
     }),
   );
-  assert.equal(r.reason, "normal", "a direct reply to Buri must not re-quote");
+  assert.equal(r.reason, "normal", "a direct reply to the agent must not re-quote");
 });
 
 test("scenario Branch B: forwarded loop-back that lands as a new thread → history preserved", () => {
@@ -233,12 +233,12 @@ test("scenario Branch B: forwarded loop-back that lands as a new thread → hist
 
 // --- summarizeEnvelope ---
 
-const SELF = "buri@agentmail.to";
+const SELF = "agent@agentmail.to";
 
 test("summarizeEnvelope: direct 1:1 recipient", () => {
   const s = summarizeEnvelope({
     from: "danny@example.com",
-    to: ["buri@agentmail.to"],
+    to: ["agent@agentmail.to"],
     cc: [],
     subject: "quick q",
     self: SELF,
@@ -252,14 +252,14 @@ test("summarizeEnvelope: cc'd on a group thread is flagged as copied, not addres
   const s = summarizeEnvelope({
     from: "danny@example.com",
     to: ["alice@example.com", "bob@example.com"],
-    cc: ["Buri <buri@agentmail.to>"],
+    cc: ["Agent <agent@agentmail.to>"],
     subject: "planning",
     self: SELF,
   });
   assert.match(s, /group thread with 3 recipients/);
   assert.match(s, /only a Cc recipient/);
   assert.match(s, /Other participants: alice@example.com, bob@example.com/);
-  assert.match(s, /Cc: Buri <buri@agentmail.to>/);
+  assert.match(s, /Cc: Agent <agent@agentmail.to>/);
 });
 
 test("summarizeEnvelope: not in To or Cc (bcc / list)", () => {
@@ -276,13 +276,13 @@ test("summarizeEnvelope: not in To or Cc (bcc / list)", () => {
 test("summarizeEnvelope: address matching is case-insensitive and bracket-tolerant", () => {
   const s = summarizeEnvelope({
     from: "d@x.com",
-    to: ['"Buri" <BURI@AgentMail.To>'],
+    to: ['"Agent" <AGENT@AgentMail.To>'],
     cc: [],
     subject: "s",
     self: SELF,
   });
   assert.match(s, /direct \(To\) recipient/);
-  // Buri itself is not listed as an "other participant".
+  // The agent itself is not listed as an "other participant".
   assert.doesNotMatch(s, /Other participants/);
 });
 
@@ -319,7 +319,7 @@ test("stress: selectInboundBody upholds its invariants across 20k random inputs"
     if (roll < 0.25) return "   \n\t "; // whitespace-only
     return `body-${Math.floor(rand() * 1000)}`;
   };
-  const idPool = ["a@x", "b@x", "c@x", "buri@x", "side@x"];
+  const idPool = ["a@x", "b@x", "c@x", "agent@x", "side@x"];
 
   for (let n = 0; n < 20_000; n++) {
     const isForward = rand() < 0.3;

@@ -66,11 +66,11 @@ test("rejects entries that aren't blocks, pointing at the index", () => {
 // --- withAttribution ---
 
 test("attribution is prepended as a context block", () => {
-  const out = withAttribution([header], "Buri");
+  const out = withAttribution([header], "Ignis");
   assert.equal(out.length, 2);
   assert.deepEqual(out[0], {
     type: "context",
-    elements: [{ type: "mrkdwn", text: "*[Buri]*" }],
+    elements: [{ type: "mrkdwn", text: "*[Ignis]*" }],
   });
   assert.deepEqual(out[1], header);
 });
@@ -83,5 +83,5 @@ test("no attribution leaves the layout untouched", () => {
 
 test("a full payload is posted as-is rather than failing on the block limit", () => {
   const full = Array.from({ length: MAX_BLOCKS }, () => header);
-  assert.equal(withAttribution(full, "Buri").length, MAX_BLOCKS);
+  assert.equal(withAttribution(full, "Ignis").length, MAX_BLOCKS);
 });

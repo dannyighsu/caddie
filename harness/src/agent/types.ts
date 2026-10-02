@@ -1,8 +1,10 @@
 /**
  * Agent Types
  *
- * An agent = an identity with a persona (system prompt), capabilities (MCP servers),
- * resolvers (pre-run data fetching), and optionally skills (Claude Code native SKILL.md).
+ * One install runs one agent: a system prompt (SYSTEM.md, committed) and a
+ * persona (PERSONA.md, per install), capabilities (MCP servers), resolvers
+ * (pre-run data fetching), and optionally skills (Claude Code native SKILL.md).
+ * Variation between runs is a profile, never a second agent.
  */
 
 import type { TriggerContext } from "../trigger/types.js";
@@ -36,12 +38,6 @@ export interface RunIdentity {
  * Static agent configuration, loaded from agent.json.
  */
 export interface AgentConfig {
-  /** Unique agent identifier. */
-  id: string;
-  /** Human-readable name. */
-  name: string;
-  /** Path to persona markdown file (relative to agent dir), or inline string. */
-  persona: string;
   /** Capability names — references to JSON files in the capabilities directory. */
   capabilities: string[];
   /** Resolver names — pre-run data fetchers that inject context variables. */
@@ -91,8 +87,6 @@ export interface AgentProfile {
  * Input to launch an agent execution.
  */
 export interface AgentInput {
-  /** Which agent to run. */
-  agentId: string;
   /** Which named profile to run as. Omit for the agent's base configuration. */
   profile?: string;
   /**

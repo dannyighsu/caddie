@@ -49,4 +49,4 @@ from memory.
 - **`conversations/` is a read-only mirror** of the conversation history the
   harness keeps. Never write, edit or delete files there, because the harness
   overwrites them. Durable facts go in `config/` as before (see **Preferences
-  and memory** in your persona).
+  and memory** in your system prompt).

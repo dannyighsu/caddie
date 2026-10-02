@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 
 interface TranscriptStep {
   role: "assistant" | "user" | "system";
@@ -12,15 +12,13 @@ interface TranscriptStep {
 
 export default function TranscriptPage() {
   const params = useParams<{ sessionId: string }>();
-  const searchParams = useSearchParams();
-  const agentId = searchParams.get("agentId") ?? "buri";
 
   const [steps, setSteps] = useState<TranscriptStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/transcripts/${params.sessionId}?agentId=${agentId}`)
+    fetch(`/api/transcripts/${params.sessionId}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) setError(data.error);
@@ -28,7 +26,7 @@ export default function TranscriptPage() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [params.sessionId, agentId]);
+  }, [params.sessionId]);
 
   if (loading) return <p className="text-ink-faint">Loading transcript...</p>;
   if (error) return <p className="text-bad">Error: {error}</p>;
@@ -56,7 +54,7 @@ export default function TranscriptPage() {
             Transcript
           </h1>
           <p className="text-xs text-ink-faint mt-1">
-            Session: {params.sessionId.substring(0, 12)}... | Agent: {agentId}
+            Session: {params.sessionId.substring(0, 12)}...
           </p>
         </div>
         <span className="text-xs text-ink-faint">{steps.length} steps</span>

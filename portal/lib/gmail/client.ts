@@ -3,7 +3,7 @@
  *
  * Mirrors the proven auth pattern in harness/mcp-servers/google-gmail.mjs: build
  * an OAuth2 client from GOOGLE_CLIENT_ID/SECRET (already in portal/.env.local)
- * and load the SAME shared token file that Buri's Calendar + Gmail MCP already
+ * and load the SAME shared token file that the agent's Calendar + Gmail MCP already
  * use. That token is already authorized against the Gmail account we're
  * migrating to, so there is no new account/consent here — only the scope must be
  * gmail.modify (re-run `make google-auth`).

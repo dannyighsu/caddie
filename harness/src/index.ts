@@ -4,7 +4,7 @@
  * Public API:
  *   createLauncher() — create an agent launcher bound to a runtime and directories
  *   createRuntime()  — create an agent runtime from config
- *   defaultWorkspaceRoot() — where agent workspaces live ($WORKSPACE_ROOT or ~/.ignis)
+ *   workspaceDir() — the agent's working directory ($WORKSPACE_DIR or ~/.ignis)
  *
  * Types:
  *   AgentConfig, AgentInput, AgentResult
@@ -35,11 +35,13 @@ export {
   createLauncher,
   resolveProfileCapabilities,
   DEFAULT_MAX_TURNS,
+  PERSONA_FILE,
+  SYSTEM_FILE,
   type LauncherConfig,
 } from "./agent/launcher.js";
 
 // Workspace
-export { defaultWorkspaceRoot } from "./workspace.js";
+export { workspaceDir } from "./workspace.js";
 
 // Capability
 export { resolveCapabilities, type ResolveResult } from "./capability/mcp-resolver.js";

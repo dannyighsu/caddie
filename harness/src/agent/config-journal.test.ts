@@ -198,7 +198,7 @@ describe("describeConfigDrift", () => {
     const note = describeConfigDrift([
       {
         relPath: "config/team/betty.md",
-        snapshotPath: "/agents/buri/config-history/team/betty.md.stamp",
+        snapshotPath: "/agent/config-history/team/betty.md.stamp",
         deleted: false,
         removedLines: [BULLET],
       },

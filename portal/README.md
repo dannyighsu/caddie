@@ -1,11 +1,11 @@
-# Buri Agent Portal
+# Ignis Portal
 
-Control plane for the Buri agent system. Built with Next.js.
+Control plane for the install's agent. Built with Next.js.
 
 ## Roles
 
 - **Control API** (`/api/control`) -- triggers agent executions, sends outbound notifications, manages scheduling
-- **Control Plane UI** -- dashboard for agents, conversations, config editing, settings
+- **Control Plane UI** -- dashboard for the agent, conversations, config editing, settings
 
 See [BACKEND.md](../docs/BACKEND.md) for the API server's client classes and endpoint groups.
 
@@ -31,7 +31,7 @@ Open `http://localhost:3000`. The agent page shows conversations, config editing
 
 ### Slack
 
-Connects via Socket Mode (outbound WebSocket -- no public URL or tunnel needed). New threads start a conversation with the base agent; replies in the same thread continue it with session resumption.
+Connects via Socket Mode (outbound WebSocket -- no public URL or tunnel needed). New threads start a conversation on the default profile; replies in the same thread continue it with session resumption.
 
 Setup: Enable Socket Mode in your Slack app settings, generate an App-Level Token (`xapp-...`), subscribe to `message.im` and `app_mention` events. Connection starts automatically when the server boots.
 
@@ -40,27 +40,27 @@ Setup: Enable Socket Mode in your Slack app settings, generate an App-Level Toke
 The control-plane command surface for agent executions, notifications, and scheduling. Called by the portal UI and by the agent's own tools/skills — **not** by external senders (inbound channel traffic arrives at the `/api/*/webhook` routes instead). See [BACKEND.md](../docs/BACKEND.md) for the client classes.
 
 ```bash
-# Run an agent (default profile)
-curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri"}'
+# Run the agent (default profile)
+curl -X POST localhost:3000/api/control -d '{"action":"run"}'
 
-# Run with a specific profile
-curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","prompt":"Draft a summary"}'
+# Run with a prompt
+curl -X POST localhost:3000/api/control -d '{"action":"run","prompt":"Draft a summary"}'
 
 # Send to Slack
 curl -X POST localhost:3000/api/control -d '{
   "action": "notify", "channel": "slack",
-  "message": "Nightly digest ready", "from": "buri"
+  "message": "Nightly digest ready", "from": "Ignis"
 }'
 
 # Schedule for later (works with both notify and run)
 curl -X POST localhost:3000/api/control -d '{
-  "action": "run", "agentId": "buri", "profile": "extended",
+  "action": "run", "profile": "extended",
   "scheduledFor": "2026-03-28T09:00:00Z"
 }'
 
 # Create a recurring schedule
 curl -X POST localhost:3000/api/control -d '{
-  "action": "schedule", "agentId": "buri",
+  "action": "schedule",
   "cron": "0,30 * * * *", "description": "Feed scan every 30 min"
 }'
 
@@ -76,13 +76,12 @@ curl localhost:3000/api/control
 | `from` | notify | Sender attribution, shown as `*[name]* message` |
 | `slackChannel` | notify | Explicit channel ID (falls back to default in Settings) |
 | `threadTs` | notify | Reply in existing Slack thread |
-| `agentId` | run, schedule | Which agent to execute |
 | `profile` | run, schedule | Agent profile to activate |
 | `prompt` | run, schedule | Prompt for the agent |
 | `context` | run | Template variables as key-value map |
 | `scheduledFor` | run, notify | ISO timestamp to defer execution |
 | `cron` | schedule | Cron expression for recurring jobs |
-| `jobId` | schedule | Job ID (for deletion when sent without `cron`/`agentId`) |
+| `jobId` | schedule | Job ID (for deletion when sent without `cron`) |
 | `description` | run, schedule | Human-readable label for scheduled jobs |
 
 ## Data Storage
@@ -96,6 +95,8 @@ curl localhost:3000/api/control
 |----------|----------|-------------|
 | `POSTGRES_URL` | yes | Postgres connection string |
 | `REDIS_URL` | yes | Redis connection string |
+| `WORKSPACE_DIR` | no | The agent's working directory. Defaults to `~/.ignis` |
+| `AGENT_NAME` | no | What the portal and alerts call the agent. Defaults to `Ignis` |
 | `SLACK_BOT_TOKEN` | for Slack | Bot token for sending messages (xoxb-...) |
 | `SLACK_APP_TOKEN` | for Slack | App-level token for Socket Mode (xapp-...) |
 | `LANGFUSE_SECRET_KEY` | for tracing | Langfuse secret key |

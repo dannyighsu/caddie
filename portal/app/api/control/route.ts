@@ -9,7 +9,7 @@
  *
  * Actions:
  *   notify  — Send a message to Slack, Telegram, or email (immediately or scheduled)
- *   run     — Execute an agent (immediately or scheduled)
+ *   run     — Execute the agent (immediately or scheduled)
  *   schedule — Create a recurring job
  *   list_slack_channels — List the workspace's Slack channels (id, name, whether the bot can post)
  *
@@ -19,10 +19,10 @@
  * Examples:
  *   curl -X POST localhost:3000/api/control -d '{"action":"notify","channel":"slack","message":"done"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"notify","channel":"telegram","to":"123456789","message":"done"}'
- *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri"}'
- *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"extended"}'
- *   curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","scheduledFor":"2026-03-28T09:00:00Z"}'
- *   curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","cron":"0,30 * * * *","description":"Feed scan every 30 min"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"run"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"run","profile":"extended"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"run","scheduledFor":"2026-03-28T09:00:00Z"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"schedule","cron":"0,30 * * * *","description":"Feed scan every 30 min"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"list_slack_channels","nameFilter":"eng"}'
  */
 
@@ -122,7 +122,6 @@ interface ControlRequest {
   threadContext?: ThreadContext;
 
   // --- run fields ---
-  agentId?: string;
   profile?: string;
   prompt?: string;
   context?: Record<string, string>;
@@ -164,7 +163,7 @@ interface ControlRequest {
   limit?: number;
 
   // --- purge fields (see lib/purge.ts) ---
-  // `agentId` and `trustTier` (above) are the run's, injected by the harness.
+  // `trustTier` (above) is the run's, injected by the harness.
   /** The inbound message the run is handling, injected by the harness. */
   currentMessage?: { conversationId: string; seq: number };
   /** Purge the message being handled. */
@@ -197,7 +196,7 @@ async function executeAction(req: ControlRequest, portalOwner: UserId): Promise<
     case "purge":
       return executePurge(req);
     case "rag_rebuild":
-      return executeRagRebuild(req);
+      return executeRagRebuild();
     default:
       return { success: false, error: `Unknown action: ${req.action}` };
   }
@@ -267,16 +266,15 @@ async function executeReply(req: ControlRequest): Promise<Record<string, unknown
 
 /**
  * Purge suspected phishing / prompt-injection content (the `purge_content`
- * tool). The run's agent, trust tier and current message come from the
+ * tool). The run's trust tier and current message come from the
  * harness-injected tool env, so a guest run can only ever purge the message
  * it's handling — enforced in lib/purge.ts.
  */
 async function executePurge(req: ControlRequest): Promise<Record<string, unknown>> {
-  if (!req.agentId || !req.reason) {
-    return { success: false, error: "purge requires `agentId` and `reason`" };
+  if (!req.reason) {
+    return { success: false, error: "purge requires `reason`" };
   }
   return purgeContent({
-    agentId: req.agentId,
     trustTier: req.trustTier ?? "guest",
     currentMessage: req.currentMessage,
     current: req.current,
@@ -288,13 +286,12 @@ async function executePurge(req: ControlRequest): Promise<Record<string, unknown
 }
 
 /**
- * Drop and rebuild an agent's search index (`make rag-rebuild`). Runs in this
+ * Drop and rebuild the workspace search index (`make rag-rebuild`). Runs in this
  * process, behind the indexer's own queue, so it never races a sync.
  */
-async function executeRagRebuild(req: ControlRequest): Promise<Record<string, unknown>> {
-  if (!req.agentId) return { success: false, error: "rag_rebuild requires `agentId`" };
+async function executeRagRebuild(): Promise<Record<string, unknown>> {
   if (!ragEnabled()) return { success: false, error: "LOCAL_RAG_ENTRY is not set (see `make rag-setup`)" };
-  await rebuildIndex(req.agentId);
+  await rebuildIndex();
   return { success: true };
 }
 
@@ -306,7 +303,7 @@ async function executeRagRebuild(req: ControlRequest): Promise<Record<string, un
  * is an EXTRA fire), while one-shot jobs are consumed (deleted) after running
  * so they don't also fire at their scheduled time.
  *
- * If a run for the same agent is already in progress, the job is not run and
+ * If a run for the same profile is already in progress, the job is not run and
  * the caller is told to retry later.
  */
 async function executeTrigger(req: ControlRequest): Promise<Record<string, unknown>> {
@@ -320,9 +317,9 @@ async function executeTrigger(req: ControlRequest): Promise<Record<string, unkno
   }
 
   // Immediate "already running" feedback so we don't fire (or consume a
-  // one-shot) while a run for the same agent is in flight.
+  // one-shot) while a run for the same profile is in flight.
   if (await isJobActive(job)) {
-    return { success: false, skipped: true, error: "A run is already in progress for this agent" };
+    return { success: false, skipped: true, error: "A run is already in progress for this profile" };
   }
 
   // One-shot jobs are consumed (deleted) once they run, so they don't also fire
@@ -551,17 +548,13 @@ async function executeNotify(req: ControlRequest): Promise<Record<string, unknow
 }
 
 async function executeRun(req: ControlRequest, portalOwner: UserId): Promise<Record<string, unknown>> {
-  if (!req.agentId) {
-    return { success: false, error: "agentId is required" };
-  }
-
   // Handle deferred one-shot execution
   if (req.scheduledFor) {
     const runAt = new Date(req.scheduledFor);
     if (isNaN(runAt.getTime())) {
       return { success: false, error: "Invalid scheduledFor timestamp" };
     }
-    const job = await scheduleOneShot(req.agentId, runAt, {
+    const job = await scheduleOneShot(runAt, {
       profile: req.profile,
       params: { prompt: req.prompt, ...req.context },
       description: req.description,
@@ -573,14 +566,13 @@ async function executeRun(req: ControlRequest, portalOwner: UserId): Promise<Rec
   }
 
   const traceId = createTraceId();
-  await createTrace(traceId, req.agentId, {
+  await createTrace(traceId, {
     trigger: "control",
     profile: req.profile,
   });
 
   const launcher = getLauncher();
   const result = await launcher.launch({
-    agentId: req.agentId,
     profile: req.profile,
     // An immediate run through the control API is owner-initiated from the
     // portal (the endpoint is network-gated to localhost/tailnet), so it runs
@@ -608,22 +600,19 @@ async function executeRun(req: ControlRequest, portalOwner: UserId): Promise<Rec
 
 async function executeSchedule(req: ControlRequest): Promise<Record<string, unknown>> {
   // Delete a job
-  if (req.jobId && !req.cron && !req.agentId) {
+  if (req.jobId && !req.cron) {
     await deleteJob(req.jobId);
     return { success: true, deleted: req.jobId };
   }
 
   // Create a recurring job
-  if (!req.agentId) {
-    return { success: false, error: "agentId is required" };
-  }
   if (!req.cron) {
     return { success: false, error: "cron expression is required for schedule action" };
   }
 
-  const jobId = req.jobId ?? `recurring:${req.agentId}:${req.profile ?? "default"}:${req.cron!.replace(/\s+/g, "_")}`;
+  const jobId = req.jobId ?? `recurring:${req.profile ?? "default"}:${req.cron.replace(/\s+/g, "_")}`;
   try {
-    const job = await scheduleRecurring(jobId, req.agentId, req.cron, {
+    const job = await scheduleRecurring(jobId, req.cron, {
       profile: req.profile,
       params: { prompt: req.prompt, ...req.context },
       description: req.description,

@@ -116,10 +116,8 @@ export async function releaseInboundMessage(gmailId: string): Promise<void> {
 export interface ScheduledJob {
   /** Unique job identifier. */
   id: string;
-  /** Job action type: "run" (default) launches an agent, "notify" sends a notification. */
+  /** Job action type: "run" (default) launches the agent, "notify" sends a notification. */
   action?: "run" | "notify";
-  /** Agent to run (required for "run" jobs). */
-  agentId: string;
   /** Profile to use (optional). */
   profile?: string;
   /** Cron expression for recurring jobs (e.g., "0 9 * * 2" = Tuesdays 9AM). Omit for one-shot. */
@@ -194,7 +192,6 @@ export async function upsertJob(job: ScheduledJob): Promise<void> {
  * Schedule a one-shot run at a specific time.
  */
 export async function scheduleOneShot(
-  agentId: string,
   runAt: Date,
   options?: {
     profile?: string;
@@ -206,8 +203,7 @@ export async function scheduleOneShot(
   }
 ): Promise<ScheduledJob> {
   const job: ScheduledJob = {
-    id: `oneshot:${agentId}:${runAt.getTime()}`,
-    agentId,
+    id: `oneshot:run:${runAt.getTime()}`,
     profile: options?.profile,
     nextRun: runAt.getTime(),
     enabled: true,
@@ -237,7 +233,6 @@ export async function scheduleNotification(
   const job: ScheduledJob = {
     id: `oneshot:notify:${runAt.getTime()}`,
     action: "notify",
-    agentId: "system",
     nextRun: runAt.getTime(),
     enabled: true,
     params: {
@@ -257,7 +252,6 @@ export async function scheduleNotification(
  */
 export async function scheduleRecurring(
   id: string,
-  agentId: string,
   cronExpr: string,
   options?: {
     profile?: string;
@@ -271,7 +265,6 @@ export async function scheduleRecurring(
   const nextRun = await computeNextRun(cronExpr);
   const job: ScheduledJob = {
     id,
-    agentId,
     profile: options?.profile,
     cron: cronExpr,
     nextRun,

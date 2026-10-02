@@ -1,24 +1,24 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { homedir } from "os";
 import { resolve } from "path";
-import { defaultWorkspaceRoot } from "./workspace.js";
+import { workspaceDir } from "./workspace.js";
 
-describe("defaultWorkspaceRoot", () => {
-  const saved = process.env.WORKSPACE_ROOT;
+describe("workspaceDir", () => {
+  const saved = process.env.WORKSPACE_DIR;
   afterEach(() => {
-    if (saved === undefined) delete process.env.WORKSPACE_ROOT;
-    else process.env.WORKSPACE_ROOT = saved;
+    if (saved === undefined) delete process.env.WORKSPACE_DIR;
+    else process.env.WORKSPACE_DIR = saved;
   });
 
   it("defaults to ~/.ignis, outside the repo", () => {
-    delete process.env.WORKSPACE_ROOT;
-    expect(defaultWorkspaceRoot()).toBe(resolve(homedir(), ".ignis"));
+    delete process.env.WORKSPACE_DIR;
+    expect(workspaceDir()).toBe(resolve(homedir(), ".ignis"));
   });
 
-  it("honors WORKSPACE_ROOT, expanding a leading ~", () => {
-    process.env.WORKSPACE_ROOT = "~/elsewhere";
-    expect(defaultWorkspaceRoot()).toBe(resolve(homedir(), "elsewhere"));
-    process.env.WORKSPACE_ROOT = "/srv/agents";
-    expect(defaultWorkspaceRoot()).toBe("/srv/agents");
+  it("honors WORKSPACE_DIR, expanding a leading ~", () => {
+    process.env.WORKSPACE_DIR = "~/elsewhere";
+    expect(workspaceDir()).toBe(resolve(homedir(), "elsewhere"));
+    process.env.WORKSPACE_DIR = "/srv/ignis";
+    expect(workspaceDir()).toBe("/srv/ignis");
   });
 });

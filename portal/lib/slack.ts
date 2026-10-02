@@ -26,7 +26,6 @@ import {
   type ListChannelsOptions,
   type SlackChannelSummary,
 } from "./slack-channels";
-import { defaultAgentId } from "./harness";
 import { teamLookup } from "@ignis/harness";
 
 
@@ -196,7 +195,7 @@ export type { SlackChannelSummary } from "./slack-channels";
  * Register (or append to) the local conversation for an outbound Slack message,
  * keyed by the message's thread root, so a reply in that thread matches an
  * existing conversation. The reply handler then starts with history (the posted
- * message as an assistant turn) and — when the post came from one of Buri's own
+ * message as an assistant turn) and — when the post came from one of the agent's own
  * tasks — the source-task facts (`thread_context`) it needs to act on the reply
  * (e.g. stop a recurring job). This is the Slack counterpart to email's
  * outbound-thread recording; without it a reply lands in a blank session with no
@@ -223,7 +222,6 @@ export async function recordOutboundSlackThread(
       ? existing.id
       : (
           await createConversation(
-            await defaultAgentId(),
             body.slice(0, 80),
             externalId,
             undefined,

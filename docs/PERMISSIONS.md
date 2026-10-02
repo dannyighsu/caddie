@@ -49,7 +49,7 @@ Each entry point builds it:
 
 - **Channels** (`messaging.ts`) — from the resolved sender: verified team
   member → `team`; unverified → `guest`.
-- **Portal** (`/api/agents/[id]/run`, `/api/control` immediate run) — always
+- **Portal** (`/api/agent/run`, `/api/control` immediate run) — always
   `team`, attributed to the team member picked in the header's *Acting
   as* selector (persisted in the `portal_owner` cookie; both options are
   team-trust, so it's attribution only). The portal is gated to
@@ -57,7 +57,7 @@ Each entry point builds it:
 - **Scheduled / triggered runs** (`scheduler.ts`) — `team` (the team's
   own automations), sender "Automated run".
 
-`senderIdentity` and `originChannel` are rendered into the persona
+`senderIdentity` and `originChannel` are rendered into the system prompt
 (`{{senderIdentity}}`, `{{originChannel}}`); `trustTier` drives this policy.
 
 ## Current defaults

@@ -1,7 +1,7 @@
 /**
  * Per-trial sandbox: a throwaway harness root and workspace.
  *
- * The launcher derives almost everything from `agentsDir/..` — permissions,
+ * The launcher derives almost everything from `agentDir/..` — permissions,
  * hook settings, config journaling — so pointing it at the real harness would
  * let an eval run journal fake config into `config-history/`. Instead each
  * trial gets:
@@ -14,10 +14,10 @@
  *                             purge tools (pointed at the fake portal), stubs
  *                             for Google, and a stub `local-rag` when the case
  *                             seeds search documents
- *     agents/<agent>/         a COPY of the definition (persona, skills), with
+ *     agent/                  a COPY of the definition (persona, skills), with
  *                             capabilities trimmed to the ones the sandbox
  *                             provides
- *   <runDir>/workspace/<agent>/config/   the live config, anonymized
+ *   <runDir>/workspace/config/   the live config, anonymized
  *
  * Deliberately not provided: notion, browser/chrome, web-search, and the
  * `.agent-venv` tools — they reach real services with real credentials. CLIs
@@ -27,7 +27,7 @@
 import { chmod, cp, mkdir, readFile, readdir, symlink, writeFile, stat } from "fs/promises";
 import { existsSync } from "fs";
 import { resolve } from "path";
-import { defaultWorkspaceRoot } from "@ignis/harness";
+import { workspaceDir } from "@ignis/harness";
 import { Anonymizer, REPO_ROOT, realAddressAliases } from "./team.ts";
 
 const REAL_HARNESS = resolve(REPO_ROOT, "harness");
@@ -69,11 +69,10 @@ function stub(name: string, kind: string, fixturesFile: string) {
 }
 
 export interface Sandbox {
-  agentsDir: string;
+  agentDir: string;
   capabilitiesDir: string;
-  workspaceRoot: string;
   /** The agent's working directory inside the sandbox. */
-  workingDirectory: string;
+  workspace: string;
   /** Capabilities the agent declared but the sandbox doesn't provide. */
   omitted: string[];
   /** Prepend to PATH: shadows CLIs that reach real services (see SHADOWED_CLIS). */
@@ -89,7 +88,6 @@ export interface RagDoc {
 
 export interface SandboxOptions {
   runDir: string;
-  agentId: string;
   fixtures?: Record<string, unknown>;
   /** Source of `config/`; defaults to the live workspace. */
   configDir?: string;
@@ -97,9 +95,9 @@ export interface SandboxOptions {
 
 export async function createSandbox(opts: SandboxOptions): Promise<Sandbox> {
   const root = resolve(opts.runDir, "harness");
-  const agentsDir = resolve(root, "agents");
+  const agentDir = resolve(root, "agent");
   const capabilitiesDir = resolve(root, "capabilities");
-  const workspaceRoot = resolve(opts.runDir, "workspace");
+  const workspace = resolve(opts.runDir, "workspace");
   await mkdir(capabilitiesDir, { recursive: true });
   await mkdir(resolve(root, ".claude"), { recursive: true });
 
@@ -110,8 +108,7 @@ export async function createSandbox(opts: SandboxOptions): Promise<Sandbox> {
   await symlink(resolve(REAL_HARNESS, "skills", "core"), resolve(root, "skills", "core"));
 
   // Agent definition — copied, so nothing the run writes lands in the repo.
-  const realAgentDir = resolve(REAL_HARNESS, "agents", opts.agentId);
-  const agentDir = resolve(agentsDir, opts.agentId);
+  const realAgentDir = resolve(REAL_HARNESS, "agent");
   await cp(realAgentDir, agentDir, {
     recursive: true,
     filter: (src) => {
@@ -131,12 +128,11 @@ export async function createSandbox(opts: SandboxOptions): Promise<Sandbox> {
   const omitted = declared.filter((c) => !provided(c));
   await writeFile(agentJsonPath, JSON.stringify(agentJson, null, 2));
 
-  const workingDirectory = resolve(workspaceRoot, opts.agentId);
   const fixturesFile = resolve(opts.runDir, "fixtures.json");
-  await writeFile(fixturesFile, JSON.stringify({ ...opts.fixtures, workspace: workingDirectory }, null, 2));
+  await writeFile(fixturesFile, JSON.stringify({ ...opts.fixtures, workspace }, null, 2));
   // Seeded documents exist on disk too, so the agent can open what search points at.
   for (const doc of ragDocs) {
-    const path = resolve(workingDirectory, doc.path);
+    const path = resolve(workspace, doc.path);
     await mkdir(resolve(path, ".."), { recursive: true });
     await writeFile(path, doc.text);
   }
@@ -146,8 +142,8 @@ export async function createSandbox(opts: SandboxOptions): Promise<Sandbox> {
 
   // Workspace config: the live standing instructions, with real addresses
   // mapped onto the fake team so they agree with the case files.
-  const liveConfig = opts.configDir ?? resolve(defaultWorkspaceRoot(), opts.agentId, "config");
-  const targetConfig = resolve(workingDirectory, "config");
+  const liveConfig = opts.configDir ?? resolve(workspaceDir(), "config");
+  const targetConfig = resolve(workspace, "config");
   await mkdir(targetConfig, { recursive: true });
   if (existsSync(liveConfig)) {
     await copyAnonymized(liveConfig, targetConfig, new Anonymizer(realAddressAliases()));
@@ -161,7 +157,7 @@ export async function createSandbox(opts: SandboxOptions): Promise<Sandbox> {
     await chmod(shim, 0o755);
   }
 
-  return { agentsDir, capabilitiesDir, workspaceRoot, workingDirectory, omitted, binDir };
+  return { agentDir, capabilitiesDir, workspace, omitted, binDir };
 }
 
 /** Built-in tools that reach the live internet; off in every eval run. */

@@ -63,7 +63,6 @@ export interface JobRun {
   id: string;
   replay_of: string | null;
   source: RunSource;
-  agent_id: string;
   profile: string | null;
   label: string | null;
   status: RunStatus;
@@ -101,7 +100,6 @@ export function sumUsageTokens(usage: unknown): number | null {
 // --- Write path ---
 
 export interface BeginRunOpts {
-  agentId: string;
   profile?: string | null;
   /** One-liner shown in the Runs list. */
   label?: string;
@@ -126,13 +124,12 @@ export async function beginRun(
   const leaseMs = opts.leaseMs ?? DEFAULT_LEASE_MS;
   await getPool().query(
     `INSERT INTO job_runs
-       (id, replay_of, source, agent_id, profile, label, status, envelope, trace_id, lease_expires_at)
-     VALUES ($1, $2, $3, $4, $5, $6, 'running', $7, $8, now() + ($9 || ' milliseconds')::interval)`,
+       (id, replay_of, source, profile, label, status, envelope, trace_id, lease_expires_at)
+     VALUES ($1, $2, $3, $4, $5, 'running', $6, $7, now() + ($8 || ' milliseconds')::interval)`,
     [
       id,
       opts.replayOf ?? null,
       envelope.source,
-      opts.agentId,
       opts.profile ?? null,
       opts.label ?? null,
       JSON.stringify(envelope),
@@ -183,7 +180,6 @@ export async function finishRun(
  */
 export async function finishFromResult(
   id: string,
-  agentId: string,
   result: { success: boolean; error?: string; sessionId?: string; usage?: unknown }
 ): Promise<void> {
   const tokens = sumUsageTokens(result.usage);
@@ -191,7 +187,7 @@ export async function finishFromResult(
     await finishRun(id, { status: "succeeded", sessionId: result.sessionId, tokens });
     return;
   }
-  const classified = await classifyRunFailure(agentId, result);
+  const classified = await classifyRunFailure(result);
   await finishRun(id, {
     status: "failed",
     failureClass: classified?.failureClass ?? "agent",
@@ -282,7 +278,7 @@ export async function evictOldRuns(
 export type RunStatusFilter = "all" | "failed" | "active";
 
 export async function listRuns(
-  filter: { status?: RunStatusFilter; agentId?: string; limit?: number } = {}
+  filter: { status?: RunStatusFilter; limit?: number } = {}
 ): Promise<JobRun[]> {
   await ensureSchema();
   const where: string[] = [];
@@ -290,11 +286,6 @@ export async function listRuns(
 
   if (filter.status === "failed") where.push(`status = 'failed'`);
   else if (filter.status === "active") where.push(`status = 'running'`);
-
-  if (filter.agentId) {
-    params.push(filter.agentId);
-    where.push(`agent_id = $${params.length}`);
-  }
 
   params.push(filter.limit ?? 50);
   const sql = `SELECT * FROM job_runs
@@ -409,7 +400,6 @@ function rowToJobRun(row: Record<string, unknown>): JobRun {
     id: row.id as string,
     replay_of: (row.replay_of as string | null) ?? null,
     source: row.source as RunSource,
-    agent_id: row.agent_id as string,
     profile: (row.profile as string | null) ?? null,
     label: (row.label as string | null) ?? null,
     status: row.status as RunStatus,

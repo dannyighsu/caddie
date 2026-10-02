@@ -10,10 +10,20 @@ backward-compatibility requirements. When you rename or move persisted state
 once, and restart. Don't carry dual-read/dual-write paths, fallbacks to old
 names, or compatibility shims. The old names go away completely.
 
-Agent workspaces live outside the repo at `~/.ignis/<agent>/` (override with
-`WORKSPACE_ROOT`; resolved by `defaultWorkspaceRoot()` in
-`harness/src/workspace.ts`). They're the agent's data, not app code. Don't
-reintroduce repo-relative workspace paths.
+An install runs exactly one agent, defined in `harness/agent/`; variation
+between runs is a profile in its `agent.json`, never a second agent. Don't
+reintroduce an agent id.
+
+The agent's workspace lives outside the repo at `~/.ignis/` (override with
+`WORKSPACE_DIR`; resolved by `workspaceDir()` in `harness/src/workspace.ts`).
+It's the agent's data, not app code. Don't reintroduce repo-relative workspace
+paths.
+
+Its system prompt is `harness/agent/PERSONA.md` followed by
+`harness/agent/SYSTEM.md`. `SYSTEM.md` is committed and shared by every
+install, so it names no person, place or household; who the agent is and whom
+it serves goes in `PERSONA.md`, which is untracked. Setting up an install is
+[docs/SETUP.md](docs/SETUP.md).
 
 ## Agent tickets
 
@@ -22,13 +32,13 @@ defect, a capability that isn't mounted, a run that went wrong for a reason no
 instruction explains. Each is one markdown file in the agent's workspace:
 
 ```
-~/.ignis/<agent>/tickets/YYYY-MM-DD-<slug>.md
+~/.ignis/tickets/YYYY-MM-DD-<slug>.md
 ```
 
 Check them when you're working on the harness:
 
 ```bash
-ls ~/.ignis/buri/tickets/
+ls ~/.ignis/tickets/
 ```
 
 ### How it works
@@ -44,7 +54,7 @@ clone.
 | What | Where |
 |---|---|
 | When to file, the file format, investigation steps, guardrails | `harness/skills/core/ticketing/SKILL.md` |
-| What the agent is told it has | `tickets/` bullet and the Self-diagnosis capability in `harness/agents/<agent>/persona.md` |
+| What the agent is told it has | `tickets/` bullet and the Self-diagnosis capability in `harness/agent/SYSTEM.md` |
 
 Behavior changes belong in the **skill**, not the persona — the persona only
 points at it. Keep the two in sync when you rename or move anything.
@@ -73,10 +83,10 @@ a recurring job goes in `state/<job>.md`.
 faked. See `evals/README.md`.
 
 ```bash
-pnpm eval email-inbound            # Buri on inbound external email
+pnpm eval email-inbound            # the agent on inbound external email
 ```
 
-Run the relevant suite after changing a persona, skill, standing instruction
+Run the relevant suite after changing the system prompt or persona, a skill, standing instruction
 or the inbound prompt path (`portal/lib/inbound-prompt.ts`, shared with the
 eval driver). Cases run on Sonnet by default. That bar is deliberately tighter
 than production's Opus, so don't "fix" a failing case by switching models. When

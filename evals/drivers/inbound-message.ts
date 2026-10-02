@@ -144,7 +144,7 @@ export const inboundMessage: Driver = {
     const portal = await startFakePortal([...new Set(audience)]);
 
     try {
-      const sandbox = await createSandbox({ runDir: opts.runDir, agentId: suite.agent, fixtures: kase.fixtures });
+      const sandbox = await createSandbox({ runDir: opts.runDir, fixtures: kase.fixtures });
       const identity = identityFor(kase.sender, envelope.from);
       const prompt = assembleInboundPrompt({
         messages: toMessages(kase.history),
@@ -157,13 +157,12 @@ export const inboundMessage: Driver = {
       const launcher = createLauncher(
         createRuntime({ options: { model: opts.model, effort: opts.effort } }),
         {
-          agentsDir: sandbox.agentsDir,
+          agentDir: sandbox.agentDir,
           capabilitiesDir: sandbox.capabilitiesDir,
-          workspaceRoot: sandbox.workspaceRoot,
+          workspace: sandbox.workspace,
         }
       );
       const launchInput = {
-        agentId: suite.agent,
         identity: toRunIdentity(identity),
         prompt,
         context: { currentTime: kase.now },

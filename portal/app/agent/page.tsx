@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
 
 interface Agent {
-  id: string;
   name: string;
   capabilities: string[];
   /** Always resolved by the API — the agent's own value or the runtime default. */
@@ -21,7 +19,6 @@ interface Message {
 
 interface Conversation {
   id: string;
-  agent_id: string;
   session_id: string | null;
   title: string | null;
   messages: Message[];
@@ -38,17 +35,14 @@ interface ConfigFile {
 type Tab = "main" | "config";
 
 export default function AgentPage() {
-  const params = useParams<{ id: string }>();
-  const agentId = params.id;
-
   const [agent, setAgent] = useState<Agent | null>(null);
   const [tab, setTab] = useState<Tab>("main");
 
   useEffect(() => {
-    fetch(`/api/agents/${agentId}`)
+    fetch("/api/agent")
       .then((r) => r.json())
       .then(setAgent);
-  }, [agentId]);
+  }, []);
 
   if (!agent) {
     return <p className="text-ink-faint">Loading...</p>;
@@ -88,9 +82,9 @@ export default function AgentPage() {
 
       <div className="flex-1 min-h-0">
         {tab === "main" ? (
-          <ConversationsView agentId={agentId} />
+          <ConversationsView />
         ) : (
-          <ConfigView agentId={agentId} />
+          <ConfigView />
         )}
       </div>
     </div>
@@ -101,7 +95,7 @@ export default function AgentPage() {
 // Conversations View
 // =============================================================================
 
-function ConversationsView({ agentId }: { agentId: string }) {
+function ConversationsView() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] =
     useState<Conversation | null>(null);
@@ -111,14 +105,14 @@ function ConversationsView({ agentId }: { agentId: string }) {
 
   useEffect(() => {
     refreshConversations();
-  }, [agentId]);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeConversation?.messages]);
 
   function refreshConversations() {
-    fetch(`/api/conversations?agentId=${agentId}`)
+    fetch("/api/conversations")
       .then((r) => r.json())
       .then(setConversations);
   }
@@ -149,7 +143,7 @@ function ConversationsView({ agentId }: { agentId: string }) {
     setPrompt("");
 
     try {
-      const res = await fetch(`/api/agents/${agentId}/run`, {
+      const res = await fetch("/api/agent/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -291,7 +285,7 @@ function ConversationsView({ agentId }: { agentId: string }) {
 // Config View
 // =============================================================================
 
-function ConfigView({ agentId }: { agentId: string }) {
+function ConfigView() {
   const [files, setFiles] = useState<ConfigFile[]>([]);
   const [activeFile, setActiveFile] = useState<ConfigFile | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -302,10 +296,10 @@ function ConfigView({ agentId }: { agentId: string }) {
 
   useEffect(() => {
     refreshFiles();
-  }, [agentId]);
+  }, []);
 
   function refreshFiles() {
-    fetch(`/api/agents/${agentId}/config`)
+    fetch("/api/agent/config")
       .then((r) => r.json())
       .then((data: ConfigFile[]) => {
         setFiles(data);
@@ -328,7 +322,7 @@ function ConfigView({ agentId }: { agentId: string }) {
     if (!activeFile) return;
     setSaving(true);
     try {
-      await fetch(`/api/agents/${agentId}/config/${activeFile.name}`, {
+      await fetch(`/api/agent/config/${activeFile.name}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: editContent, category: activeFile.category }),
@@ -342,7 +336,7 @@ function ConfigView({ agentId }: { agentId: string }) {
   async function handleCreate() {
     const name = newFileName.trim();
     if (!name) return;
-    await fetch(`/api/agents/${agentId}/config/${name}`, {
+    await fetch(`/api/agent/config/${name}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: "", category: "config" }),
@@ -372,7 +366,7 @@ function ConfigView({ agentId }: { agentId: string }) {
     const scaffold = `---\nname: ${slug}\ndescription: TODO — one line on what this skill does and when to use it.\n---\n\n## ${slug}\n\nTODO: the procedure.\n`;
 
     const res = await fetch(
-      `/api/agents/${agentId}/config/skills/${slug}/SKILL.md`,
+      `/api/agent/config/skills/${slug}/SKILL.md`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -406,7 +400,7 @@ function ConfigView({ agentId }: { agentId: string }) {
       }
     }
     await fetch(
-      `/api/agents/${agentId}/config/${file.name}?category=${file.category}`,
+      `/api/agent/config/${file.name}?category=${file.category}`,
       { method: "DELETE" }
     );
     if (activeFile?.name === file.name) {
@@ -503,7 +497,7 @@ function ConfigView({ agentId }: { agentId: string }) {
                 Shared skills
               </h2>
               <p className="text-xs text-ink-faint px-3 pb-1 leading-snug">
-                Used by every agent. Editing one changes it everywhere.
+                Part of the harness rather than this agent's own.
               </p>
               {coreSkillFiles.map((f) => (
                 <FileEntry key={f.name} file={f} />

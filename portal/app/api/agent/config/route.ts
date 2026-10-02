@@ -1,7 +1,8 @@
 import { readdir, readFile, mkdir } from "fs/promises";
 import { resolve } from "path";
 import { NextResponse } from "next/server";
-import { workspaceRoot, agentsDir, coreSkillsDir } from "@/lib/harness";
+import { PERSONA_FILE, SYSTEM_FILE } from "@ignis/harness";
+import { workspace, agentDir, coreSkillsDir } from "@/lib/harness";
 
 interface AgentFile {
   name: string;
@@ -9,24 +10,22 @@ interface AgentFile {
   category: "persona" | "skill" | "core-skill" | "config";
 }
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+export async function GET() {
   const files: AgentFile[] = [];
 
-  // 1. Persona
-  const personaPath = resolve(agentsDir, id, "persona.md");
-  try {
-    const content = await readFile(personaPath, "utf-8");
-    files.push({ name: "persona.md", content, category: "persona" });
-  } catch {
-    // No persona file
+  // 1. Persona (per install, may not exist yet) and the shared system prompt.
+  for (const name of [PERSONA_FILE, SYSTEM_FILE]) {
+    let content = "";
+    try {
+      content = await readFile(resolve(agentDir, name), "utf-8");
+    } catch {
+      if (name !== PERSONA_FILE) continue;
+    }
+    files.push({ name, content, category: "persona" });
   }
 
   // 2. Skills — each skill dir has a SKILL.md
-  const skillsDir = resolve(agentsDir, id, ".claude", "skills");
+  const skillsDir = resolve(agentDir, ".claude", "skills");
   try {
     const skillEntries = await readdir(skillsDir, { withFileTypes: true });
     for (const entry of skillEntries) {
@@ -47,8 +46,8 @@ export async function GET(
     // No skills directory
   }
 
-  // 2b. Core skills — shared by every agent, so an edit here lands for all of
-  // them. Listed separately from the agent's own so that's visible in the UI.
+  // 2b. Core skills — part of the harness rather than this agent's definition.
+  // Listed separately from the agent's own so that's visible in the UI.
   try {
     const coreEntries = await readdir(coreSkillsDir, { withFileTypes: true });
     for (const entry of coreEntries) {
@@ -72,7 +71,7 @@ export async function GET(
   }
 
   // 3. Config files (from workspace)
-  const configDir = resolve(workspaceRoot, id, "config");
+  const configDir = resolve(workspace, "config");
   try {
     await mkdir(configDir, { recursive: true });
     const entries = await readdir(configDir, { withFileTypes: true });

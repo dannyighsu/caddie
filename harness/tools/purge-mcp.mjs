@@ -18,7 +18,6 @@
  *
  * Env:
  *   PORTAL_URL             — Base URL for the portal control API (default: http://localhost:3000)
- *   IGNIS_AGENT_ID         — The agent (injected by the launcher)
  *   IGNIS_TRUST_TIER       — The run's trust tier (injected by the launcher)
  *   IGNIS_CURRENT_MESSAGE  — JSON {conversationId, seq} of the inbound message, if any
  *   IGNIS_TRACE_ID         — Trace id, recorded with the purge
@@ -29,7 +28,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
-const AGENT_ID = process.env.IGNIS_AGENT_ID || "buri";
 const TRUST_TIER = process.env.IGNIS_TRUST_TIER || "guest";
 const isTeam = TRUST_TIER === "team";
 
@@ -105,7 +103,6 @@ async function handlePurge(args) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       action: "purge",
-      agentId: AGENT_ID,
       trustTier: TRUST_TIER,
       currentMessage: currentMessage(),
       current: !!current,

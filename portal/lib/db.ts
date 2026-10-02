@@ -48,7 +48,6 @@ export interface MessagePurge {
 
 export interface Conversation {
   id: string;
-  agent_id: string;
   profile: string | null;
   session_id: string | null;
   title: string | null;
@@ -97,7 +96,6 @@ export function getPool(): pg.Pool {
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_id TEXT NOT NULL,
   session_id TEXT,
   title TEXT,
   external_id TEXT,
@@ -107,16 +105,6 @@ CREATE TABLE IF NOT EXISTS conversations (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
--- Migrations must run before index creation (column may still be named workflow_id)
-DO $$ BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'conversations' AND column_name = 'workflow_id'
-  ) THEN
-    ALTER TABLE conversations RENAME COLUMN workflow_id TO agent_id;
-  END IF;
-END $$;
 
 DO $$ BEGIN
   IF NOT EXISTS (
@@ -154,8 +142,8 @@ DO $$ BEGIN
   END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_conversations_agent
-  ON conversations(agent_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_updated
+  ON conversations(updated_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_conversations_external
   ON conversations(external_id) WHERE external_id IS NOT NULL;
 
@@ -193,7 +181,6 @@ CREATE TABLE IF NOT EXISTS job_runs (
   replay_of UUID REFERENCES job_runs(id) ON DELETE SET NULL,
   -- 'inbound' | 'scheduler' | 'trigger' | 'portal'
   source TEXT NOT NULL,
-  agent_id TEXT NOT NULL,
   profile TEXT,
   -- Human-readable one-liner for the Runs list (job description, message preview).
   label TEXT,
@@ -227,7 +214,6 @@ DO $$ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_job_runs_status ON job_runs(status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_job_runs_agent ON job_runs(agent_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_job_runs_trace ON job_runs(trace_id) WHERE trace_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_job_runs_created ON job_runs(created_at DESC);
 
@@ -235,7 +221,6 @@ CREATE INDEX IF NOT EXISTS idx_job_runs_created ON job_runs(created_at DESC);
 -- only where it was, why, and a hash to recognize it by. See lib/purge.ts.
 CREATE TABLE IF NOT EXISTS purges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_id TEXT NOT NULL,
   -- 'message' | 'file'
   kind TEXT NOT NULL,
   conversation_id UUID,
@@ -249,7 +234,7 @@ CREATE TABLE IF NOT EXISTS purges (
   trace_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_purges_agent ON purges(agent_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purges_created ON purges(created_at DESC);
 `;
 
 let schemaEnsured = false;
@@ -263,7 +248,6 @@ export async function ensureSchema(): Promise<void> {
 // --- Queries ---
 
 export async function createConversation(
-  agentId: string,
   title: string,
   externalId?: string,
   profile?: string,
@@ -275,12 +259,12 @@ export async function createConversation(
   // If external_id collides (race between concurrent inbound messages on the
   // same thread), return the existing row instead of throwing.
   const result = await getPool().query(
-    `INSERT INTO conversations (id, agent_id, profile, title, external_id, messages, thread_context)
-     VALUES ($1, $2, $3, $4, $5, '[]'::jsonb, $6)
+    `INSERT INTO conversations (id, profile, title, external_id, messages, thread_context)
+     VALUES ($1, $2, $3, $4, '[]'::jsonb, $5)
      ON CONFLICT (external_id) WHERE external_id IS NOT NULL DO UPDATE
        SET updated_at = conversations.updated_at
      RETURNING *`,
-    [id, agentId, profile ?? null, title, externalId ?? null, threadContext ? JSON.stringify(threadContext) : null]
+    [id, profile ?? null, title, externalId ?? null, threadContext ? JSON.stringify(threadContext) : null]
   );
   return rowToConversation(result.rows[0]);
 }
@@ -307,24 +291,12 @@ export async function getConversationByExternalId(
   return rowToConversation(result.rows[0]);
 }
 
-export async function listConversations(
-  agentId?: string,
-  limit = 20
-): Promise<Conversation[]> {
+export async function listConversations(limit = 20): Promise<Conversation[]> {
   await ensureSchema();
-  let query: string;
-  let params: (string | number)[];
-
-  if (agentId) {
-    query = `SELECT * FROM conversations WHERE agent_id = $1
-             ORDER BY updated_at DESC LIMIT $2`;
-    params = [agentId, limit];
-  } else {
-    query = `SELECT * FROM conversations ORDER BY updated_at DESC LIMIT $1`;
-    params = [limit];
-  }
-
-  const result = await getPool().query(query, params);
+  const result = await getPool().query(
+    `SELECT * FROM conversations ORDER BY updated_at DESC LIMIT $1`,
+    [limit]
+  );
   return result.rows.map(rowToConversation);
 }
 
@@ -347,27 +319,25 @@ export async function appendMessages(
      SET messages = messages || $1::jsonb,
          updated_at = now()
      WHERE id = $2
-     RETURNING agent_id, jsonb_array_length(messages) AS len`,
+     RETURNING jsonb_array_length(messages) AS len`,
     [JSON.stringify(newMessages), conversationId]
   );
   if (result.rows.length === 0) return null;
-  const agentId = result.rows[0].agent_id as string;
   const startSeq = Number(result.rows[0].len) - newMessages.length;
 
   // Imported lazily: the mirror reads conversations back through this module.
   import("./conversation-mirror")
-    .then((m) => m.mirrorAppended(agentId, conversationId, startSeq, newMessages.length))
+    .then((m) => m.mirrorAppended(conversationId, startSeq, newMessages.length))
     .catch((err) => console.error(`[DB] Conversation mirror failed for ${conversationId}:`, err));
 
   return startSeq;
 }
 
-/** Every conversation belonging to an agent, oldest first (mirror backfill). */
-export async function listAgentConversations(agentId: string): Promise<Conversation[]> {
+/** Every conversation, oldest first (mirror backfill). */
+export async function listAllConversations(): Promise<Conversation[]> {
   await ensureSchema();
   const result = await getPool().query(
-    `SELECT * FROM conversations WHERE agent_id = $1 ORDER BY created_at ASC`,
-    [agentId]
+    `SELECT * FROM conversations ORDER BY created_at ASC`
   );
   return result.rows.map(rowToConversation);
 }
@@ -425,7 +395,6 @@ export async function tombstoneMessage(
 }
 
 export interface PurgeRecord {
-  agentId: string;
   kind: "message" | "file";
   conversationId?: string;
   seq?: number;
@@ -440,10 +409,9 @@ export interface PurgeRecord {
 export async function recordPurge(r: PurgeRecord): Promise<void> {
   await ensureSchema();
   await getPool().query(
-    `INSERT INTO purges (agent_id, kind, conversation_id, seq, path, reason, note, content_sha256, trust_tier, trace_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    `INSERT INTO purges (kind, conversation_id, seq, path, reason, note, content_sha256, trust_tier, trace_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [
-      r.agentId,
       r.kind,
       r.conversationId ?? null,
       r.seq ?? null,
@@ -605,7 +573,6 @@ function rowToTelegramMessage(row: Record<string, unknown>): TelegramMessageReco
 function rowToConversation(row: Record<string, unknown>): Conversation {
   return {
     id: row.id as string,
-    agent_id: row.agent_id as string,
     profile: (row.profile as string | null) ?? null,
     session_id: row.session_id as string | null,
     title: row.title as string | null,

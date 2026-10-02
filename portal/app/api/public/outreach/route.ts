@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { workspaceRoot, defaultAgentId } from "@/lib/harness";
+import { workspace } from "@/lib/harness";
 
 const PUBLIC_TOKEN_COOKIE = "public_token";
 
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const dataDir = path.join(workspaceRoot, await defaultAgentId(), "outreach");
+  const dataDir = path.join(workspace, "outreach");
   let entries: unknown[] = [];
 
   try {

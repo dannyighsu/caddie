@@ -17,9 +17,6 @@ import { readFile, realpath, stat } from "node:fs/promises";
 import { basename, relative, resolve, isAbsolute } from "node:path";
 
 const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
-// The agent this server is mounted for — injected by the launcher, so schedule
-// tools default to "run me" instead of making the model name itself.
-const AGENT_ID = process.env.IGNIS_AGENT_ID || "buri";
 // The agent's working directory, injected by the launcher. File attachments
 // must resolve inside it, so the tool can't be used to post arbitrary files
 // off the host.
@@ -144,7 +141,7 @@ const tools = [
         },
         from: {
           type: "string",
-          description: "Optional attribution label (e.g., 'Buri').",
+          description: "Optional attribution label (e.g. your name).",
         },
         notificationChannel: {
           type: "string",
@@ -169,22 +166,17 @@ const tools = [
   {
     name: "schedule_recurring",
     description:
-      "Create a recurring scheduled job that runs an agent on a cron schedule. " +
+      "Create a recurring scheduled job that runs you on a cron schedule. " +
       "USE THIS for any recurring task request like 'every weekday at 9am', 'every hour', etc. " +
       "DO NOT use Claude Code's built-in CronCreate — that is blocked. " +
       "Notifications/results are delivered to the configured notificationChannel (defaults to slack).",
     inputSchema: {
       type: "object",
       properties: {
-        agentId: {
-          type: "string",
-          description:
-            "Agent to run. Omit to schedule yourself, which is almost always what you want.",
-        },
         profile: {
           type: "string",
           description:
-            "Named run variant from the agent's agent.json profiles — currently only 'extended' (a higher turn limit, for long research jobs). NOT a skill name: to run a skill, put its invocation in `prompt`. Omit for the default configuration.",
+            "Named run variant from agent.json's profiles — currently only 'extended' (a higher turn limit, for long research jobs). NOT a skill name: to run a skill, put its invocation in `prompt`. Omit for the default configuration.",
         },
         cron: {
           type: "string",
@@ -220,15 +212,10 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        agentId: {
-          type: "string",
-          description:
-            "Agent to run. Omit to schedule yourself, which is almost always what you want.",
-        },
         profile: {
           type: "string",
           description:
-            "Named run variant from the agent's agent.json profiles — currently only 'extended'. NOT a skill name. Omit for the default configuration.",
+            "Named run variant from agent.json's profiles — currently only 'extended'. NOT a skill name. Omit for the default configuration.",
         },
         prompt: {
           type: "string",
@@ -510,7 +497,6 @@ async function handleScheduleReminder(args) {
 async function handleScheduleRecurring(args) {
   const result = await callControl({
     action: "schedule",
-    agentId: args.agentId ?? AGENT_ID,
     cron: args.cron,
     prompt: args.prompt,
     ...(args.profile && { profile: args.profile }),
@@ -524,7 +510,6 @@ async function handleScheduleRecurring(args) {
 async function handleScheduleOneshotRun(args) {
   const result = await callControl({
     action: "run",
-    agentId: args.agentId ?? AGENT_ID,
     prompt: args.prompt,
     scheduledFor: args.scheduledFor,
     ...(args.profile && { profile: args.profile }),

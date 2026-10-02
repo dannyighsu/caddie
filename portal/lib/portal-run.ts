@@ -25,7 +25,6 @@ import { beginRun, finishFromResult, failOrchestration } from "./job-ledger";
 
 /** Serializable inputs for a portal run — the replay envelope's `portal` variant. */
 export interface PortalRunInput {
-  agentId: string;
   prompt: string;
   profile?: string;
   /** Team owner the run is attributed to. */
@@ -48,7 +47,7 @@ export interface PortalRunResult {
 }
 
 /**
- * Run an agent from the portal. Ledgers the execution (so a failure is
+ * Run the agent from the portal. Ledgers the execution (so a failure is
  * replayable) and returns the launch outcome. Throws only on setup errors
  * (e.g. a missing conversation) — a failed agent run returns success: false.
  */
@@ -73,17 +72,16 @@ export async function runPortalAgent(
   } else {
     const title =
       input.prompt.length > 80 ? input.prompt.substring(0, 80) + "..." : input.prompt;
-    conversation = await createConversation(input.agentId, title, undefined, input.profile);
+    conversation = await createConversation(title, undefined, input.profile);
   }
 
-  const label = `${input.agentId}${input.profile ? `:${input.profile}` : ""} — ${
+  const label = `${input.profile ?? "default"} — ${
     input.prompt.length > 60 ? input.prompt.substring(0, 60) + "..." : input.prompt
   }`;
 
   const runId = await beginRun(
     { source: "portal", input },
     {
-      agentId: input.agentId,
       profile: input.profile,
       label,
       replayOf: opts.replayOf,
@@ -93,7 +91,6 @@ export async function runPortalAgent(
   try {
     const launcher = getLauncher();
     const result = await launcher.launch({
-      agentId: input.agentId,
       profile: input.profile,
       identity: toRunIdentity(portalIdentity(input.portalOwner)),
       prompt: input.prompt,
@@ -123,7 +120,7 @@ export async function runPortalAgent(
       await updateSessionId(conversation.id, result.sessionId);
     }
 
-    await finishFromResult(runId, input.agentId, result);
+    await finishFromResult(runId, result);
 
     return {
       success: result.success,

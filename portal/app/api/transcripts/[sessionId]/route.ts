@@ -2,15 +2,14 @@ import { readTranscript } from "@/lib/transcripts";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   const { sessionId } = await params;
-  const agentId = request.nextUrl.searchParams.get("agentId") ?? "buri";
 
   try {
-    const steps = await readTranscript(agentId, sessionId);
-    return NextResponse.json({ sessionId, agentId, steps });
+    const steps = await readTranscript(sessionId);
+    return NextResponse.json({ sessionId, steps });
   } catch (err) {
     return NextResponse.json(
       { error: `Transcript not found: ${err instanceof Error ? err.message : err}` },

@@ -1,8 +1,8 @@
 /**
  * Agent Launcher
  *
- * The core function of the harness. Loads an agent config, resolves its
- * persona, capabilities, and resolvers, then delegates execution to the runtime.
+ * The core function of the harness. Loads the agent config, resolves its
+ * system prompt, capabilities, and resolvers, then delegates execution to the runtime.
  *
  * Mounts skills into the workspace so Claude Code discovers them natively —
  * shared core skills plus the agent's own, or just the ones a profile grants.
@@ -13,7 +13,7 @@
 import { readFile, mkdir, symlink, lstat, readdir, copyFile, unlink, rm, readlink } from "fs/promises";
 import { resolve, dirname } from "path";
 import type { AgentRuntime } from "../runtime/types.js";
-import { defaultWorkspaceRoot } from "../workspace.js";
+import { workspaceDir } from "../workspace.js";
 import { resolveCapabilities } from "../capability/mcp-resolver.js";
 import {
   loadPermissions,
@@ -37,53 +37,50 @@ const TEMPLATE_VAR_PATTERN = /\{\{(\w+)\}\}/g;
 export const DEFAULT_MAX_TURNS = 150;
 
 export interface LauncherConfig {
-  /** Directory containing agent subdirectories. */
-  agentsDir: string;
+  /** The agent definition: agent.json, SYSTEM.md, PERSONA.md, skills, seed config. */
+  agentDir: string;
   /** Directory containing capability JSON files. */
   capabilitiesDir: string;
   /** Directory containing resolver definitions and modules. */
   resolversDir?: string;
-  /** Root directory for agent workspaces. Defaults to `defaultWorkspaceRoot()`. */
-  workspaceRoot?: string;
+  /** The agent's working directory. Defaults to `workspaceDir()`. */
+  workspace?: string;
   /**
-   * Directory of shared, instance-agnostic skills mounted for every agent.
+   * Directory of shared, instance-agnostic skills mounted on every run.
    * Defaults to <harnessRoot>/skills/core.
    */
   coreSkillsDir?: string;
 }
 
-/**
- * Load and parse an agent.json config file.
- */
-async function loadAgentConfig(
-  agentsDir: string,
-  agentId: string
-): Promise<{ config: AgentConfig; agentDir: string }> {
-  const agentDir = resolve(agentsDir, agentId);
-  const configPath = resolve(agentDir, "agent.json");
-  const content = await readFile(configPath, "utf-8");
-  const config = JSON.parse(content) as AgentConfig;
-  return { config, agentDir };
+async function loadAgentConfig(agentDir: string): Promise<AgentConfig> {
+  const content = await readFile(resolve(agentDir, "agent.json"), "utf-8");
+  return JSON.parse(content) as AgentConfig;
 }
 
+/** Who this install's agent is. Not tracked: each install writes its own. */
+export const PERSONA_FILE = "PERSONA.md";
+/** How the agent works, the same for every install. */
+export const SYSTEM_FILE = "SYSTEM.md";
+
 /**
- * Load and interpolate the persona template.
+ * The system prompt: the install's persona, then the shared system
+ * instructions, with `{{var}}` interpolated. A missing persona fails the run
+ * rather than launching an agent that doesn't know who it is or whom it serves.
  */
-async function loadPersona(
-  personaRef: string,
+async function loadSystemPrompt(
   agentDir: string,
   context: Record<string, string>
 ): Promise<string> {
-  let template: string;
-
-  if (personaRef.startsWith("./") || personaRef.endsWith(".md")) {
-    const personaPath = resolve(agentDir, personaRef);
-    template = await readFile(personaPath, "utf-8");
-  } else {
-    template = personaRef;
+  let persona: string;
+  try {
+    persona = await readFile(resolve(agentDir, PERSONA_FILE), "utf-8");
+  } catch {
+    throw new Error(
+      `No ${PERSONA_FILE} in ${agentDir}. Copy PERSONA.example.md to ${PERSONA_FILE} and fill it in.`
+    );
   }
-
-  return template.replace(TEMPLATE_VAR_PATTERN, (match, key) => {
+  const system = await readFile(resolve(agentDir, SYSTEM_FILE), "utf-8");
+  return `${persona.trim()}\n\n${system.trim()}`.replace(TEMPLATE_VAR_PATTERN, (match, key) => {
     return context[key] ?? match;
   });
 }
@@ -186,7 +183,7 @@ export function resolveProfileCapabilities(
  * Mount skills into the workspace at `.claude/skills`, layering two sources:
  *
  *   1. `harness/skills/core/` — instance-agnostic mechanism (scheduling, skill
- *      authoring, repo mounting). Shared by every agent and every install, so a
+ *      authoring, repo mounting). Shared by every install, so a
  *      fix lands once instead of being copied into each agent directory.
  *   2. `<agentDir>/.claude/skills/` — this agent's own skills. On a name
  *      collision the agent's wins, so an install can override a core skill
@@ -300,11 +297,11 @@ async function ensureSkillsSrcLink(
  */
 export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
   const {
-    agentsDir,
+    agentDir,
     capabilitiesDir,
     resolversDir,
-    workspaceRoot = defaultWorkspaceRoot(),
-    coreSkillsDir = resolve(agentsDir, "..", "skills", "core"),
+    workspace = workspaceDir(),
+    coreSkillsDir = resolve(agentDir, "..", "skills", "core"),
   } = config;
 
   /**
@@ -312,17 +309,14 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
    */
   async function launch(input: AgentInput): Promise<AgentResult> {
     // 1. Load agent config and apply profile overrides
-    const { config: baseAgent, agentDir } = await loadAgentConfig(
-      agentsDir,
-      input.agentId
-    );
+    const baseAgent = await loadAgentConfig(agentDir);
 
     const profile = input.profile ? baseAgent.profiles?.[input.profile] : undefined;
     if (input.profile && !profile) {
       // Don't fail the run — a bad profile name shouldn't take down a scheduled
       // job — but never let it pass silently either.
       console.warn(
-        `[Launcher] Unknown profile "${input.profile}" for agent "${baseAgent.id}" — ` +
+        `[Launcher] Unknown profile "${input.profile}" — ` +
           `running the base configuration. Known profiles: ` +
           `${Object.keys(baseAgent.profiles ?? {}).join(", ") || "(none)"}`
       );
@@ -336,8 +330,8 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       configFiles: { ...baseAgent.configFiles, ...profile?.configFiles },
     };
 
-    // 2. Determine working directory and ensure it exists
-    const workingDirectory = resolve(workspaceRoot, agent.id);
+    // 2. Ensure the working directory exists
+    const workingDirectory = workspace;
     await mkdir(workingDirectory, { recursive: true });
 
     // 3. Bootstrap config (seed files, never overwrites existing)
@@ -366,7 +360,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     //    link hooks into the workspace.
     await mountSkills(agentDir, coreSkillsDir, workingDirectory, profile?.skills);
     await ensureSkillsSrcLink(agentDir, workingDirectory);
-    const harnessRoot = resolve(agentsDir, "..");
+    const harnessRoot = resolve(agentDir, "..");
     await ensureHarnessClaudeConfig(harnessRoot, workingDirectory);
 
     // 4. Run resolvers (pre-run data fetching, skipped on session resume)
@@ -379,19 +373,15 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       });
     }
 
-    // 4b. Load and interpolate persona. The persona is kept static (no per-run
+    // 4b. Load and interpolate the system prompt. It is kept static (no per-run
     // values) so it stays a stable prefix for prompt caching — dynamic values
     // go in the run-context block below instead.
-    const personaContext = { ...resolverContext, ...(input.context ?? {}) };
-    const persona = await loadPersona(
-      agent.persona,
-      agentDir,
-      personaContext
-    );
+    const promptContext = { ...resolverContext, ...(input.context ?? {}) };
+    const systemPrompt = await loadSystemPrompt(agentDir, promptContext);
 
-    // 4c. Build run context preamble — placed AFTER the static persona and just
+    // 4c. Build run context preamble — placed AFTER the static system prompt and just
     // before the user message, so the volatile per-run values (identity, time,
-    // paths) come last and don't bust the cacheable persona prefix.
+    // paths) come last and don't bust the cacheable prefix.
     const contextLines: string[] = [
       `Origin channel: ${input.identity.originChannel}`,
       `Sender: ${input.identity.senderIdentity}`,
@@ -530,15 +520,13 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     const resolved = trustFiltered.kept.length > 0
       ? await resolveCapabilities(trustFiltered.kept, capabilitiesDir, {
           HARNESS_ROOT: harnessRoot,
-          IGNIS_AGENT_ID: agent.id,
           IGNIS_WORKSPACE: workingDirectory,
         })
       : undefined;
 
-    // Tell every capability server which agent it is serving, so tools can
-    // default to it instead of asking the model to name its own agent id —
-    // where that agent's workspace is, for tools that hand it files — and the
-    // run's trust tier, for tools that narrow what they do on a guest run.
+    // Tell every capability server where the workspace is, for tools that hand
+    // it files, and the run's trust tier, for tools that narrow what they do on
+    // a guest run.
     const mcpServers = resolved && Object.keys(resolved.servers).length > 0
       ? Object.fromEntries(
           Object.entries(resolved.servers).map(([name, server]) => [
@@ -547,7 +535,6 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
               ...server,
               env: {
                 ...server.env,
-                IGNIS_AGENT_ID: agent.id,
                 IGNIS_WORKSPACE: workingDirectory,
                 IGNIS_TRUST_TIER: trustTier,
               },
@@ -569,9 +556,9 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
 
     const enableChrome = agent.enableChrome || (resolved?.flags.includes("chrome") ?? false);
 
-    // 7. Build full prompt: persona + context preamble + user prompt
+    // 7. Build full prompt: system prompt + context preamble + user prompt
     // Always prepend a fresh timestamp so the agent has the current time
-    // even on session resumes (where the persona is not re-rendered).
+    // even on session resumes (where the system prompt is not re-rendered).
     const currentTime = input.context?.currentTime;
     const timeHeader = currentTime ? `[Current time: ${currentTime}]\n\n` : "";
     const userPrompt = `${timeHeader}${input.prompt}`;
@@ -579,7 +566,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     const contextPreamble = contextLines.length > 0 ? contextLines.join("\n\n") + "\n\n---\n\n" : "";
     const fullPrompt = input.sessionId
       ? userPrompt
-      : `${persona}\n\n---\n\n${contextPreamble}${userPrompt}`;
+      : `${systemPrompt}\n\n---\n\n${contextPreamble}${userPrompt}`;
 
     // 8. Execute via runtime, snapshotting journaled files as they change so a
     // team member's mid-run edit survives the agent overwriting the file.

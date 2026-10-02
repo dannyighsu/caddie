@@ -27,7 +27,6 @@ import { getConversationByExternalId, addSeenChannelIds } from "./db";
 import { selectInboundBody, isForwardedMessage, bareEmail } from "./email-threading";
 import { downloadInboundAttachments, collectThreadAttachments } from "./gmail/attachments";
 import { formatBytes, type GmailPart } from "./gmail/parts";
-import { defaultAgentId } from "./harness";
 
 /**
  * Process a fully-parsed inbound email: loop-guard, body selection, identity
@@ -106,12 +105,10 @@ export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
   // files: the messaging layer matches attachments to turns by those markers,
   // and they're stored with the message, so a file stays resolvable when the
   // thread is re-read on a later turn.
-  const agentId = existing?.agent_id ?? (await defaultAgentId());
   const { saved, failed } = await downloadInboundAttachments(
     toFetch,
     email.messageId,
     email.threadId,
-    agentId,
   );
   const markers = saved.map((a) => `[attachment:${a.fileName}]`);
   // Anything attached but not in the workspace is still named, with why — the
@@ -127,7 +124,7 @@ export async function handleReceivedEmail(email: ReceivedEmail): Promise<void> {
   const promptText = [bodyText, ...markers, ...notices].join("\n");
   // Pass everything saved for the thread, not just this message's — the
   // messaging layer narrows it to what the conversation window references.
-  const attachments = await collectThreadAttachments(agentId, email.threadId);
+  const attachments = await collectThreadAttachments(email.threadId);
   if (toFetch.length > 0 || unfetched.length > 0 || attachments.length > 0) {
     console.log(
       `[Email Handler] Attachments: saved=${saved.length} failed=${failed.length} ` +

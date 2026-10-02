@@ -1,4 +1,4 @@
-.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke google-auth gog-auth expose unexpose rag-setup rag-rebuild
+.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke google-auth gog-auth expose unexpose keep-awake allow-sleep rag-setup rag-rebuild
 
 # Network exposure (see the "Network exposure" section in README.md).
 IGNIS_PORT ?= 3000
@@ -6,13 +6,13 @@ TAILNET_PORT   ?= 8443
 # Paths reachable from the PUBLIC internet via Tailscale Funnel. Everything else
 # is served to the tailnet + localhost only. Keep this list minimal — it is the
 # entire public attack surface.
-FUNNEL_PATHS := /api/telegram/webhook /api/email/webhook
+FUNNEL_PATHS := /api/telegram/webhook
 
 # Start the Ignis control plane in PRODUCTION mode (next build + next start).
 # Use this for the long-lived process: `next start` has no Turbopack dev
 # compiler, so memory stays flat/bounded. The dev server (`make dev`) leaks
 # compiled-module strings over long uptime — see portal/scripts/mem-logger.cjs.
-# Workspace defaults to ~/.ignis; override with make run WORKSPACE_ROOT=/path
+# Workspace defaults to ~/.ignis; override with make run WORKSPACE_DIR=/path
 #
 # `make run` wraps `make serve` in a tmux session (TMUX_SESSION, default
 # "ignis") so the server outlives the terminal. Detach with C-b d, reattach
@@ -35,7 +35,7 @@ run:
 		tmux kill-session -t "=$(TMUX_SESSION)" 2>/dev/null || true; \
 	fi; \
 	tmux new-session -d -s "$(TMUX_SESSION)" -c "$(CURDIR)" \
-		"$(MAKE) --no-print-directory serve $(if $(WORKSPACE_ROOT),WORKSPACE_ROOT=$(WORKSPACE_ROOT)); echo '[run] server exited.'; exec \$$SHELL"; \
+		"$(MAKE) --no-print-directory serve $(if $(WORKSPACE_DIR),WORKSPACE_DIR=$(WORKSPACE_DIR)); echo '[run] server exited.'; exec \$$SHELL"; \
 	echo "[run] started tmux session '$(TMUX_SESSION)'."; \
 	if [ -t 1 ]; then exec tmux attach -t "=$(TMUX_SESSION)"; \
 	else echo "[run] no TTY — attach with: tmux attach -t $(TMUX_SESSION)"; fi
@@ -75,6 +75,19 @@ unexpose:
 	else \
 		echo "[unexpose] tailscale not found; nothing to clear."; \
 	fi
+
+# Keep this Mac running with the lid closed, so the agent stays reachable. One
+# system-wide pmset flag that stops all sleep — idle and lid — until
+# `make allow-sleep`, and survives a reboot. macOS only; see docs/SETUP.md.
+keep-awake:
+	@test "$$(uname)" = Darwin || { echo "[keep-awake] macOS only — see docs/SETUP.md for Linux."; exit 1; }
+	sudo pmset -a disablesleep 1
+	@pmset -g | grep -i sleepdisabled || true
+
+allow-sleep:
+	@test "$$(uname)" = Darwin || { echo "[allow-sleep] macOS only."; exit 1; }
+	sudo pmset -a disablesleep 0
+	@pmset -g | grep -i sleepdisabled || true
 
 # Start the Ignis control plane with the Next dev server (hot reload).
 # For active development only — do NOT leave running for hours; the Turbopack
@@ -145,19 +158,17 @@ agent-tools:
 rag-setup:
 	portal/scripts/setup-rag.sh
 
-# Drop and rebuild an agent's search index — after an embedding-model change or
-# a workspace move (portal health says when). Asks the running portal to do it,
+# Drop and rebuild the search index — after an embedding-model change or a
+# workspace move (portal health says when). Asks the running portal to do it,
 # so it can't race a sync; with the portal down, deletes the index and the next
 # start rebuilds it.
-#   make rag-rebuild AGENT=buri
 rag-rebuild:
-	@test -n "$(AGENT)" || { echo "usage: make rag-rebuild AGENT=<agent id>"; exit 1; }
 	@if curl -sf -o /dev/null http://localhost:$(IGNIS_PORT)/api/control; then \
-		echo "[rag-rebuild] asking the portal to rebuild $(AGENT)'s index (this can take a while)…"; \
+		echo "[rag-rebuild] asking the portal to rebuild the index (this can take a while)…"; \
 		curl -sS -X POST http://localhost:$(IGNIS_PORT)/api/control \
-			-H 'Content-Type: application/json' -d '{"action":"rag_rebuild","agentId":"$(AGENT)"}'; echo; \
+			-H 'Content-Type: application/json' -d '{"action":"rag_rebuild"}'; echo; \
 	else \
-		ws="$${WORKSPACE_ROOT:-$$HOME/.ignis}"; case "$$ws" in "~"*) ws="$$HOME$${ws#\~}";; esac; ws="$$ws/$(AGENT)"; \
+		ws="$${WORKSPACE_DIR:-$$HOME/.ignis}"; case "$$ws" in "~"*) ws="$$HOME$${ws#\~}";; esac; \
 		rm -rf "$$ws/.rag/db" "$$ws/.rag/manifest.json"; \
 		echo "[rag-rebuild] portal not running — removed $$ws/.rag/db; the next start rebuilds it."; \
 	fi

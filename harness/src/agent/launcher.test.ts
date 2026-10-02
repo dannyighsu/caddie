@@ -53,9 +53,6 @@ function mockRuntime(output?: Partial<AgentRuntimeOutput>): AgentRuntime {
 }
 
 const baseAgentConfig = {
-  id: "test-agent",
-  name: "Test Agent",
-  persona: "./persona.md",
   capabilities: [],
 };
 
@@ -69,12 +66,12 @@ describe("createLauncher", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
 
-    // Default mocks: agent.json and persona.md
+    // Default mocks: agent.json, PERSONA.md and SYSTEM.md
     mockFs.readFile.mockImplementation(async (path: any) => {
       if (String(path).endsWith("agent.json")) {
         return JSON.stringify(baseAgentConfig);
       }
-      if (String(path).endsWith("persona.md")) {
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) {
         return "You are {{role}}. Today is {{date}}.";
       }
       throw new Error(`Unmocked readFile: ${path}`);
@@ -89,12 +86,11 @@ describe("createLauncher", () => {
   it("launches an agent and returns success result", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     const result = await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "Do something",
     });
@@ -107,12 +103,11 @@ describe("createLauncher", () => {
   it("interpolates persona template variables from context", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "hello",
       context: { role: "assistant", date: "2025-01-01" },
@@ -125,12 +120,11 @@ describe("createLauncher", () => {
   it("preserves unresolved template vars", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "hello",
       context: { role: "bot" }, // date is not provided
@@ -144,12 +138,11 @@ describe("createLauncher", () => {
   it("combines persona and prompt with separator", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "Do the task",
     });
@@ -159,15 +152,47 @@ describe("createLauncher", () => {
     expect(call.prompt).toContain("Do the task");
   });
 
+  it("puts the install's persona before the shared system prompt", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
+      if (p.endsWith("PERSONA.md")) return "You are {{role}}.";
+      if (p.endsWith("SYSTEM.md")) return "How you work.";
+      throw new Error(`Unmocked readFile: ${path}`);
+    });
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
+
+    await launcher.launch({ identity: ID, prompt: "go", context: { role: "Ada" } });
+
+    const { prompt } = (runtime.execute as any).mock.calls[0][0];
+    expect(prompt.startsWith("You are Ada.\n\nHow you work.")).toBe(true);
+  });
+
+  it("refuses to run without a PERSONA.md", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
+      if (p.endsWith("SYSTEM.md")) return "How you work.";
+      throw new Error("ENOENT");
+    });
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
+
+    await expect(launcher.launch({ identity: ID, prompt: "go" })).rejects.toThrow(
+      /Copy PERSONA\.example\.md/
+    );
+    expect(runtime.execute).not.toHaveBeenCalled();
+  });
+
   it("orders the prompt static-first: persona, then run context (identity), then time, then user message", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: { trustTier: "team", senderIdentity: "Danny (owner)", originChannel: "portal" },
       prompt: "PROMPT_MARKER",
       context: { currentTime: "2025-01-01 10:00" },
@@ -191,12 +216,11 @@ describe("createLauncher", () => {
   it("derives the run-record path from an injected clock", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "go",
       now: new Date("2026-09-22T19:03:00Z"),
@@ -210,12 +234,11 @@ describe("createLauncher", () => {
   it("skips persona prefix on session resume", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "continue working",
       sessionId: "sess-existing",
@@ -229,12 +252,11 @@ describe("createLauncher", () => {
   it("returns error result when runtime fails", async () => {
     const runtime = mockRuntime({ error: "timeout" });
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     const result = await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "test",
     });
@@ -259,7 +281,7 @@ describe("createLauncher", () => {
           },
         });
       }
-      if (String(path).endsWith("persona.md")) {
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) {
         return "persona";
       }
       throw new Error(`Unmocked: ${path}`);
@@ -267,12 +289,11 @@ describe("createLauncher", () => {
 
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "go",
       profile: "heavy",
@@ -293,7 +314,7 @@ describe("createLauncher", () => {
       if (String(path).endsWith("agent.json")) {
         return JSON.stringify({ ...baseAgentConfig, capabilities: ["local-rag"] });
       }
-      if (String(path).endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) return "persona";
       throw new Error(`Unmocked: ${path}`);
     });
     vi.mocked(resolveCapabilities).mockResolvedValueOnce({
@@ -306,25 +327,24 @@ describe("createLauncher", () => {
 
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
-      workspaceRoot: "/ws",
+      workspace: "/ws",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: { ...ID, trustTier: "guest" },
       prompt: "go",
     });
 
     // Capability JSON can reference the workspace (a per-agent DB path).
     const provided = vi.mocked(resolveCapabilities).mock.calls.at(-1)![2];
-    expect(provided).toMatchObject({ IGNIS_WORKSPACE: "/ws/test-agent", IGNIS_AGENT_ID: "test-agent" });
+    expect(provided).toMatchObject({ IGNIS_WORKSPACE: "/ws" });
 
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.mcpServers["local-rag"].env).toMatchObject({
       DB_PATH: "/x",
-      IGNIS_WORKSPACE: "/ws/test-agent",
+      IGNIS_WORKSPACE: "/ws",
       IGNIS_TRUST_TIER: "guest",
     });
     expect(call.disallowedTools).toEqual(["mcp__local-rag__delete_file"]);
@@ -341,20 +361,19 @@ describe("createLauncher", () => {
           profiles: { extended: { maxTurns: 300 } },
         });
       }
-      if (String(path).endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) return "persona";
       throw new Error(`Unmocked: ${path}`);
     });
 
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     // "feed-scan" is a skill, not a profile — the mistake the scheduling tool
     // used to invite. It must not pass silently.
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "go",
       profile: "feed-scan",
@@ -369,11 +388,11 @@ describe("createLauncher", () => {
   it("uses default maxTurns when not specified", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
-    await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "test" });
+    await launcher.launch({ identity: ID, prompt: "test" });
 
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.maxTurns).toBe(150);
@@ -384,18 +403,17 @@ describe("createLauncher", () => {
       if (String(path).endsWith("agent.json")) {
         return JSON.stringify({ ...baseAgentConfig, capabilities: ["calendar", "web-search"] });
       }
-      if (String(path).endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) return "persona";
       throw new Error(`Unmocked: ${path}`);
     });
 
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: { trustTier: "guest", senderIdentity: "g", originChannel: "g" },
       prompt: "go",
     });
@@ -412,18 +430,17 @@ describe("createLauncher", () => {
       if (String(path).endsWith("agent.json")) {
         return JSON.stringify({ ...baseAgentConfig, capabilities: ["calendar"] });
       }
-      if (String(path).endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) return "persona";
       throw new Error(`Unmocked: ${path}`);
     });
 
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: { trustTier: "team", senderIdentity: "h", originChannel: "h" },
       prompt: "go",
     });
@@ -440,7 +457,7 @@ describe("createLauncher", () => {
       if (String(path).endsWith("agent.json")) {
         return JSON.stringify({ ...baseAgentConfig, capabilities: ["calendar", "web-search"] });
       }
-      if (String(path).endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) return "persona";
       throw new Error(`Unmocked: ${path}`);
     });
 
@@ -451,12 +468,11 @@ describe("createLauncher", () => {
 
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: { trustTier: "guest", senderIdentity: "g", originChannel: "g" },
       prompt: "go",
     });
@@ -476,7 +492,7 @@ describe("createLauncher", () => {
     mockFs.readFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
-      if (p.endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(p)) return "persona";
       if (p.endsWith("state/golf-tee-times.md")) {
         return "## Directives\n- Only check Saturday. (expires: 2099-01-01)\n\n## State\npaused_until: none";
       }
@@ -484,10 +500,9 @@ describe("createLauncher", () => {
     });
 
     const runtime = mockRuntime();
-    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "PROMPT_MARKER",
       stateKey: "golf-tee-times",
@@ -504,17 +519,16 @@ describe("createLauncher", () => {
     mockFs.readFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
-      if (p.endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(p)) return "persona";
       if (p.endsWith("jobs/golf-tee-times.md")) return "PROCEDURE: check GolfNow";
       if (p.endsWith("state/golf-tee-times.md")) return "## State\npaused_until: none";
       throw new Error(`Unmocked: ${path}`);
     });
 
     const runtime = mockRuntime();
-    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "PROMPT_MARKER",
       stateKey: "golf-tee-times",
@@ -533,16 +547,15 @@ describe("createLauncher", () => {
     mockFs.readFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
-      if (p.endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(p)) return "persona";
       if (p.endsWith("jobs/golf-tee-times.md")) return "PROCEDURE";
       throw new Error(`Unmocked: ${path}`);
     });
 
     const runtime = mockRuntime();
-    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "go",
       stateKey: "golf-tee-times",
@@ -556,10 +569,9 @@ describe("createLauncher", () => {
   it("does not inject anything when the job has no state file yet", async () => {
     // Default mock throws for state/*.md (unmocked) — the read is swallowed.
     const runtime = mockRuntime();
-    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "hello",
       stateKey: "golf-tee-times",
@@ -575,16 +587,15 @@ describe("createLauncher", () => {
     mockFs.readFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
-      if (p.endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(p)) return "persona";
       if (p.includes("/state/")) { seen.push(p); throw new Error("ENOENT"); }
       throw new Error(`Unmocked: ${path}`);
     });
 
     const runtime = mockRuntime();
-    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
 
     await launcher.launch({
-      agentId: "test-agent",
       identity: ID,
       prompt: "go",
       stateKey: "../../config/preferences",
@@ -605,7 +616,7 @@ describe("createLauncher", () => {
     mockFs.readFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
-      if (p.endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(p)) return "persona";
       if (p.endsWith("team/danny.md")) return "# Danny\n- Founder of Deep Agents";
       if (p.endsWith("team/betty.md")) return "# Betty\n- PM at Peregrine";
       throw new Error(`Unmocked: ${path}`);
@@ -613,9 +624,8 @@ describe("createLauncher", () => {
 
     // Team turn: both member files injected.
     const runtime = mockRuntime();
-    const hh = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const hh = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
     await hh.launch({
-      agentId: "test-agent",
       identity: { trustTier: "team", senderIdentity: "Danny", originChannel: "email" },
       prompt: "go",
     });
@@ -626,9 +636,8 @@ describe("createLauncher", () => {
 
     // Guest turn: member files must NOT be injected.
     const guestRt = mockRuntime();
-    const guest = createLauncher(guestRt, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const guest = createLauncher(guestRt, { agentDir: "/agent", capabilitiesDir: "/caps" });
     await guest.launch({
-      agentId: "test-agent",
       identity: { trustTier: "guest", senderIdentity: "stranger", originChannel: "email" },
       prompt: "go",
     });
@@ -646,8 +655,8 @@ describe("createLauncher", () => {
 
     try {
       const runtime = mockRuntime();
-      const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
-      await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+      const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
+      await launcher.launch({ identity: ID, prompt: "go" });
       const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
 
       expect(prompt).toContain("Team directory");
@@ -657,9 +666,8 @@ describe("createLauncher", () => {
 
       // A guest run must never see private addresses.
       const guestRt = mockRuntime();
-      const guest = createLauncher(guestRt, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+      const guest = createLauncher(guestRt, { agentDir: "/agent", capabilitiesDir: "/caps" });
       await guest.launch({
-        agentId: "test-agent",
         identity: { trustTier: "guest", senderIdentity: "stranger", originChannel: "email" },
         prompt: "go",
       });
@@ -674,11 +682,11 @@ describe("createLauncher", () => {
   it("passes harnessRoot to runtime", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
     });
 
-    await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "test" });
+    await launcher.launch({ identity: ID, prompt: "test" });
 
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.harnessRoot).toBe("/");
@@ -725,9 +733,9 @@ describe("resolveProfileCapabilities", () => {
 });
 
 describe("skill mounting", () => {
-  const AGENT_SKILLS = "/agents/test-agent/.claude/skills";
+  const AGENT_SKILLS = "/agent/.claude/skills";
   const CORE_SKILLS = "/skills/core";
-  const DEST = "/workspace/test-agent/.claude/skills";
+  const DEST = "/workspace/.claude/skills";
 
   /** readdir that returns the given directory names for the given paths. */
   function dirs(byPath: Record<string, string[]>) {
@@ -743,9 +751,9 @@ describe("skill mounting", () => {
 
   function launcher(runtime: any) {
     return createLauncher(runtime, {
-      agentsDir: "/agents",
+      agentDir: "/agent",
       capabilitiesDir: "/caps",
-      workspaceRoot: "/workspace",
+      workspace: "/workspace",
       coreSkillsDir: CORE_SKILLS,
     });
   }
@@ -761,7 +769,7 @@ describe("skill mounting", () => {
           profiles: { scoped: { skills: ["feed-scan"] } },
         });
       }
-      if (String(path).endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) return "persona";
       throw new Error(`Unmocked: ${path}`);
     });
     mockFs.mkdir.mockResolvedValue(undefined as any);
@@ -782,7 +790,7 @@ describe("skill mounting", () => {
     );
 
     const runtime = mockRuntime();
-    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+    await launcher(runtime).launch({ identity: ID, prompt: "go" });
 
     expect(mockFs.symlink).toHaveBeenCalledWith(
       `${CORE_SKILLS}/manage-schedules`, `${DEST}/manage-schedules`
@@ -798,7 +806,7 @@ describe("skill mounting", () => {
     );
 
     const runtime = mockRuntime();
-    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+    await launcher(runtime).launch({ identity: ID, prompt: "go" });
 
     expect(mockFs.symlink).toHaveBeenCalledWith(
       `${AGENT_SKILLS}/repo-mount`, `${DEST}/repo-mount`
@@ -815,7 +823,7 @@ describe("skill mounting", () => {
 
     const runtime = mockRuntime();
     await launcher(runtime).launch({
-      agentId: "test-agent", identity: ID, prompt: "go", profile: "scoped",
+      identity: ID, prompt: "go", profile: "scoped",
     });
 
     const linked = mockFs.symlink.mock.calls.map((c: any) => String(c[1]));
@@ -833,7 +841,7 @@ describe("skill mounting", () => {
     );
 
     const runtime = mockRuntime();
-    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+    await launcher(runtime).launch({ identity: ID, prompt: "go" });
 
     // Recursing through that link would delete the agent's real skills.
     expect(mockFs.unlink).toHaveBeenCalledWith(DEST);
@@ -849,7 +857,7 @@ describe("skill mounting", () => {
     });
 
     const runtime = mockRuntime();
-    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+    await launcher(runtime).launch({ identity: ID, prompt: "go" });
     expect(mockFs.unlink).toHaveBeenCalledWith(`${DEST}/metrics-check`);
   });
 
@@ -860,15 +868,15 @@ describe("skill mounting", () => {
     );
 
     const runtime = mockRuntime();
-    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+    await launcher(runtime).launch({ identity: ID, prompt: "go" });
 
     expect(mockFs.symlink).toHaveBeenCalledWith(
-      AGENT_SKILLS, "/workspace/test-agent/.claude/skills-src"
+      AGENT_SKILLS, "/workspace/.claude/skills-src"
     );
   });
 
   it("relinks skills-src that still points at the repo's old path", async () => {
-    const LINK = "/workspace/test-agent/.claude/skills-src";
+    const LINK = "/workspace/.claude/skills-src";
     mockFs.readdir.mockImplementation(dirs({ [AGENT_SKILLS]: ["feed-scan"] }));
     mockFs.lstat.mockImplementation(async (p: any) => {
       const path = String(p);
@@ -876,10 +884,10 @@ describe("skill mounting", () => {
       if (path === LINK) return { isSymbolicLink: () => true } as any;
       throw new Error("ENOENT");
     });
-    mockFs.readlink.mockResolvedValue("/old-repo/agents/test-agent/.claude/skills" as any);
+    mockFs.readlink.mockResolvedValue("/old-repo/agent/.claude/skills" as any);
 
     const runtime = mockRuntime();
-    await launcher(runtime).launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+    await launcher(runtime).launch({ identity: ID, prompt: "go" });
 
     // A link that exists but points elsewhere is dangling after a repo move.
     expect(mockFs.unlink).toHaveBeenCalledWith(LINK);
@@ -891,7 +899,7 @@ describe("config journal", () => {
   const drift = [
     {
       relPath: "config/team/betty.md",
-      snapshotPath: "/agents/test-agent/config-history/team/betty.md.stamp",
+      snapshotPath: "/agent/config-history/team/betty.md.stamp",
       deleted: false,
       removedLines: ["- Sign outside mail as \"Buri H.\" (Betty, 2026-09-19)"],
     },
@@ -902,7 +910,7 @@ describe("config journal", () => {
     mockFs.readFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
-      if (p.endsWith("persona.md")) return "persona";
+      if (/(PERSONA|SYSTEM)\.md$/.test(p)) return "persona";
       throw new Error(`Unmocked readFile: ${path}`);
     });
     mockFs.mkdir.mockResolvedValue(undefined as any);
@@ -918,14 +926,14 @@ describe("config journal", () => {
 
   it("snapshots config before and after the run", async () => {
     const runtime = mockRuntime();
-    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps", workspaceRoot: "/workspace" });
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps", workspace: "/workspace" });
 
-    await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+    await launcher.launch({ identity: ID, prompt: "go" });
 
     // Both ends: the run-start snapshot preserves what was there, the run-end
     // one becomes the baseline the next run's drift check compares against.
     expect(journalConfig).toHaveBeenCalledTimes(2);
-    expect(journalConfig).toHaveBeenCalledWith("/agents/test-agent", "/workspace/test-agent");
+    expect(journalConfig).toHaveBeenCalledWith("/agent", "/workspace");
     // Detection runs before the snapshot, or the loss would be journaled as fact.
     expect(detectConfigDrift).toHaveBeenCalledBefore(vi.mocked(journalConfig));
   });
@@ -933,10 +941,10 @@ describe("config journal", () => {
   it("snapshots config even when the run throws", async () => {
     const runtime = mockRuntime();
     (runtime.execute as any).mockRejectedValue(new Error("boom"));
-    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
 
     await expect(
-      launcher.launch({ agentId: "test-agent", identity: ID, prompt: "go" })
+      launcher.launch({ identity: ID, prompt: "go" })
     ).rejects.toThrow("boom");
 
     // A crashed run still edited files; a missed snapshot becomes phantom drift.
@@ -948,9 +956,8 @@ describe("config journal", () => {
     vi.mocked(describeConfigDrift).mockReturnValue("DRIFT_NOTE");
 
     const runtime = mockRuntime();
-    const team = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const team = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
     await team.launch({
-      agentId: "test-agent",
       identity: { trustTier: "team", senderIdentity: "Danny", originChannel: "email" },
       prompt: "go",
     });
@@ -958,9 +965,8 @@ describe("config journal", () => {
 
     // Guest turn: config content is team-private and never surfaces.
     const guestRt = mockRuntime();
-    const guest = createLauncher(guestRt, { agentsDir: "/agents", capabilitiesDir: "/caps" });
+    const guest = createLauncher(guestRt, { agentDir: "/agent", capabilitiesDir: "/caps" });
     await guest.launch({
-      agentId: "test-agent",
       identity: { trustTier: "guest", senderIdentity: "stranger", originChannel: "email" },
       prompt: "go",
     });
@@ -973,8 +979,8 @@ describe("config journal", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const runtime = mockRuntime();
-    const launcher = createLauncher(runtime, { agentsDir: "/agents", capabilitiesDir: "/caps" });
-    const result = await launcher.launch({ agentId: "test-agent", identity: ID, prompt: "go" });
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
+    const result = await launcher.launch({ identity: ID, prompt: "go" });
 
     expect(result.success).toBe(true);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("Config journal failed"));

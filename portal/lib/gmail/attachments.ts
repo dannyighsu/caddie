@@ -36,13 +36,12 @@ export async function downloadInboundAttachments(
   parts: GmailPart[],
   messageId: string,
   threadId: string,
-  agentId: string,
 ): Promise<{ saved: Attachment[]; failed: GmailPart[] }> {
   const saved: Attachment[] = [];
   const failed: GmailPart[] = [];
   if (parts.length === 0) return { saved, failed };
 
-  const dir = await runArtifactsDir(agentId, threadScope(threadId));
+  const dir = await runArtifactsDir(threadScope(threadId));
 
   for (const [index, part] of parts.entries()) {
     try {
@@ -97,11 +96,10 @@ export async function downloadInboundAttachments(
  * marker in old history is simply omitted from the prompt, never an error.
  */
 export async function collectThreadAttachments(
-  agentId: string,
   threadId: string,
 ): Promise<Attachment[]> {
   try {
-    const dir = await runArtifactsDir(agentId, threadScope(threadId));
+    const dir = await runArtifactsDir(threadScope(threadId));
     const files = await readdir(dir);
     return files.map((fileName) => {
       const mimeType = mimeFromFileName(fileName);

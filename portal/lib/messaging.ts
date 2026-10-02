@@ -16,7 +16,6 @@ import {
   appendMessages,
   type Message,
 } from "./db";
-import { defaultAgentId } from "./harness";
 import { currentTimePST } from "./helpers";
 import { assembleInboundPrompt, type Attachment } from "./inbound-prompt";
 import {
@@ -112,7 +111,6 @@ export interface InboundMessageParams {
 export interface InboundMessageResult {
   rawText?: string;
   conversationId: string;
-  agentId: string;
   profile?: string;
   /** The job-run ledger id for this execution (for linking replays). */
   runId?: string;
@@ -122,7 +120,7 @@ export interface InboundMessageResult {
  * Process an inbound message from any channel.
  *
  * 1. Lookup or create conversation by external ID
- * 2. Create new conversations against the base agent (default profile)
+ * 2. Create new conversations on the default profile
  * 3. Launch agent with conversation history as context (fresh session each time)
  * 4. Persist messages
  * 5. Reply via the provided replyFn
@@ -148,14 +146,18 @@ export async function handleInboundMessage(
   const trustTier = toTrustTier(identity);
 
   const traceId = createTraceId();
-  await createTrace(traceId, traceName, {
-    ...traceMetadata,
-    identityKind: identity.kind,
-    identityUser: identity.kind === "authenticated" ? identity.userId : "guest",
-    trustTier,
-  });
+  await createTrace(
+    traceId,
+    {
+      ...traceMetadata,
+      identityKind: identity.kind,
+      identityUser: identity.kind === "authenticated" ? identity.userId : "guest",
+      trustTier,
+    },
+    `${traceName}-run`
+  );
 
-  // Assigned once the conversation (and thus the agent) is known, right before
+  // Assigned once the conversation (and thus the profile) is known, right before
   // the launch. A throw before that point predates any job identity and is
   // handled by the outer catch's channel reply; it isn't ledgered.
   let runId: string | undefined;
@@ -169,13 +171,12 @@ export async function handleInboundMessage(
       // profile chosen once (e.g. from the portal) carries across replies.
       profile = conversation.profile ?? undefined;
     } else {
-      // Inbound messages always run the base agent on its default profile.
-      // Profiles are an explicit choice — made from the portal or on a
-      // scheduled job — never inferred from message text.
-      const agentId = await defaultAgentId();
+      // Inbound messages always run the default profile. Profiles are an
+      // explicit choice — made from the portal or on a scheduled job — never
+      // inferred from message text.
       const title = text.length > 80 ? text.substring(0, 80) + "..." : text;
-      conversation = await createConversation(agentId, title, externalId, undefined);
-      console.log(`[Messaging] New thread -> ${agentId}`);
+      conversation = await createConversation(title, externalId);
+      console.log(`[Messaging] New thread (${traceName})`);
     }
 
     // Build prompt with conversation history for continuity. Each run is a
@@ -200,7 +201,6 @@ export async function handleInboundMessage(
     runId = await beginRun(
       { source: "inbound", params: serializableParams },
       {
-        agentId: conversation.agent_id,
         profile,
         label: `${traceName}: ${text.substring(0, 60)}${text.length > 60 ? "..." : ""}`,
         traceId,
@@ -233,7 +233,6 @@ export async function handleInboundMessage(
 
     const launcher = getLauncher();
     const launchInput = {
-      agentId: conversation.agent_id,
       profile,
       identity: toRunIdentity(identity),
       prompt: fullPrompt,
@@ -323,7 +322,6 @@ export async function handleInboundMessage(
     // rawText and populates `error`, and must not be recorded as a success.
     // (The owner is alerted about API-layer failures via the launcher wrapper.)
     await completeTrace(traceId, {
-      agentId: conversation.agent_id,
       success: result.success,
       error: result.error,
     });
@@ -331,12 +329,11 @@ export async function handleInboundMessage(
     // Record the run's outcome in the ledger — an API-layer failure returns no
     // rawText and populates `error`, and is classified apart from an agent-task
     // error so the Runs list shows why it failed.
-    await finishFromResult(runId, conversation.agent_id, result);
+    await finishFromResult(runId, result);
 
     return {
       rawText,
       conversationId: conversation.id,
-      agentId: conversation.agent_id,
       profile,
       runId,
     };

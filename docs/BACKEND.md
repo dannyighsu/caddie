@@ -30,11 +30,11 @@ The three client classes map onto the three network-exposure tiers (see
   route exposed to the public internet. Sender identity and trust tier are
   resolved here, at the boundary. (Email inbound is polled from Gmail in-process,
   not a webhook; its identity/trust is resolved in `lib/email` all the same.)
-- **Control API** — `/api/control` (plus `/api/agents/[id]/run`). The imperative
-  command surface: run agents, send notifications, and create / trigger / update
+- **Control API** — `/api/control` (plus `/api/agent/run`). The imperative
+  command surface: run the agent, send notifications, and create / trigger / update
   / delete scheduled jobs. Called by the portal and by the agent's own
   tools/skills — never by external senders.
-- **Dashboard / read** — `/api/agents*`, `/api/conversations*`,
+- **Dashboard / read** — `/api/agent*`, `/api/conversations*`,
   `/api/transcripts*`, `/api/settings/*`, `/api/health`. CRUD + observability for
   the UI.
 - **Tracing** — `/api/traces`. Receives Claude Code hook events emitted from

@@ -1,10 +1,9 @@
 /**
- * Workspace index: keeps each agent's local search index in sync with its
- * workspace.
+ * Workspace index: keeps the local search index in sync with the workspace.
  *
  * The agent searches the index through the `local-rag` capability
  * (mcp-local-rag, read-only for the agent). This module is the index's only
- * writer. Every change goes through one per-agent queue, drained by a worker
+ * writer. Every change goes through one queue, drained by a worker
  * process (scripts/rag-worker.mjs) that keeps the embedding model loaded.
  *
  * Changes are found by content hash against a manifest
@@ -29,7 +28,7 @@ import { existsSync } from "fs";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "fs/promises";
 import { resolve } from "path";
 import { createInterface } from "readline";
-import { defaultWorkspaceRoot } from "@ignis/harness";
+import { workspaceDir } from "@ignis/harness";
 import {
   RAG_DIR,
   RAG_MODEL_NAME,
@@ -58,7 +57,6 @@ export function ragEnabled(): boolean {
 }
 
 export interface IndexStatus {
-  agentId: string;
   enabled: boolean;
   syncing: boolean;
   lastSync: string | null;
@@ -151,9 +149,9 @@ class RagWorker {
   }
 }
 
-// --- Per-agent index ---
+// --- The index ---
 
-class AgentIndex {
+class WorkspaceIndex {
   readonly workspace: string;
   private readonly ragDir: string;
   private readonly manifestPath: string;
@@ -166,10 +164,10 @@ class AgentIndex {
   private idleTimer: NodeJS.Timeout | null = null;
   /** rel path → last seen size/mtime/hash, so unchanged files aren't re-read every sync. */
   private hashCache = new Map<string, { size: number; mtimeMs: number; sha256: string }>();
-  private status: Omit<IndexStatus, "agentId" | "enabled">;
+  private status: Omit<IndexStatus, "enabled">;
 
-  constructor(readonly agentId: string) {
-    this.workspace = resolve(defaultWorkspaceRoot(), agentId);
+  constructor() {
+    this.workspace = workspaceDir();
     this.ragDir = resolve(this.workspace, RAG_DIR);
     this.manifestPath = resolve(this.ragDir, "manifest.json");
     this.lockPath = resolve(this.ragDir, "writer.lock");
@@ -177,7 +175,7 @@ class AgentIndex {
   }
 
   getStatus(): IndexStatus {
-    return { agentId: this.agentId, enabled: ragEnabled(), ...this.status };
+    return { enabled: ragEnabled(), ...this.status };
   }
 
   /** Ask for a sync `delayMs` from now; repeated requests within the window collapse. */
@@ -204,7 +202,7 @@ class AgentIndex {
   private enqueue(task: () => Promise<void>): Promise<void> {
     const run = this.chain.then(task).catch((err) => {
       this.status.lastError = err instanceof Error ? err.message : String(err);
-      console.error(`[RagIndex:${this.agentId}] ${this.status.lastError}`);
+      console.error(`[RagIndex] ${this.status.lastError}`);
     });
     this.chain = run;
     return run;
@@ -221,7 +219,7 @@ class AgentIndex {
         manifest.failures = manifest.failures.filter((p) => p !== relPath);
         this.hashCache.delete(relPath);
         await this.saveManifest(manifest);
-        console.log(`[RagIndex:${this.agentId}] removed ${relPath}`);
+        console.log(`[RagIndex] removed ${relPath}`);
       });
       this.scheduleWorkerIdle();
     });
@@ -236,7 +234,7 @@ class AgentIndex {
       await rm(this.manifestPath, { force: true });
       this.hashCache.clear();
       this.status.rebuildRequired = null;
-      console.log(`[RagIndex:${this.agentId}] index dropped for rebuild`);
+      console.log(`[RagIndex] index dropped for rebuild`);
       await this.sync();
     });
   }
@@ -248,7 +246,7 @@ class AgentIndex {
       const reason = rebuildReason(manifest, this.workspace);
       if (reason) {
         this.status.rebuildRequired = reason;
-        console.warn(`[RagIndex:${this.agentId}] not syncing — rebuild required: ${reason}. Run: make rag-rebuild AGENT=${this.agentId}`);
+        console.warn(`[RagIndex] not syncing — rebuild required: ${reason}. Run: make rag-rebuild`);
         return;
       }
       this.status.rebuildRequired = null;
@@ -282,7 +280,7 @@ class AgentIndex {
           delete manifest.files[rel];
           removed++;
         } catch (err) {
-          console.error(`[RagIndex:${this.agentId}] delete failed for ${rel}: ${(err as Error).message}`);
+          console.error(`[RagIndex] delete failed for ${rel}: ${(err as Error).message}`);
         }
         await checkpoint();
       }
@@ -297,7 +295,7 @@ class AgentIndex {
           ingested++;
         } catch (err) {
           failed.add(rel);
-          console.error(`[RagIndex:${this.agentId}] ingest failed for ${rel}: ${(err as Error).message}`);
+          console.error(`[RagIndex] ingest failed for ${rel}: ${(err as Error).message}`);
         }
         manifest.failures = [...failed].sort();
         await checkpoint();
@@ -305,7 +303,7 @@ class AgentIndex {
 
       await worker.request({ op: "optimize" });
       console.log(
-        `[RagIndex:${this.agentId}] sync: ${ingested} ingested, ${removed} removed, ${manifest.failures.length} failing`
+        `[RagIndex] sync: ${ingested} ingested, ${removed} removed, ${manifest.failures.length} failing`
       );
     }
 
@@ -406,7 +404,7 @@ class AgentIndex {
   }
 
   /**
-   * Hold the per-agent writer lock for `fn`. Only one process may write an
+   * Hold the writer lock for `fn`. Only one process may write an
    * index; a second portal (say `make dev` beside `make run`) skips its sync
    * rather than interleaving writes with the first.
    */
@@ -415,7 +413,7 @@ class AgentIndex {
     try {
       const holder = Number((await readFile(this.lockPath, "utf-8")).trim());
       if (holder && holder !== process.pid && processAlive(holder)) {
-        console.warn(`[RagIndex:${this.agentId}] another process (pid ${holder}) owns the index; skipping`);
+        console.warn(`[RagIndex] another process (pid ${holder}) owns the index; skipping`);
         return;
       }
     } catch {
@@ -446,55 +444,50 @@ function processAlive(pid: number): boolean {
 // own indexer, and two writers.
 
 interface Registry {
-  indexes: Map<string, AgentIndex>;
+  index: WorkspaceIndex | null;
   started: boolean;
 }
 
 function registry(): Registry {
   const g = globalThis as { __ignisRagIndex?: Registry };
-  g.__ignisRagIndex ??= { indexes: new Map(), started: false };
+  g.__ignisRagIndex ??= { index: null, started: false };
   return g.__ignisRagIndex;
 }
 
-function indexFor(agentId: string): AgentIndex {
-  const { indexes } = registry();
-  let idx = indexes.get(agentId);
-  if (!idx) {
-    idx = new AgentIndex(agentId);
-    indexes.set(agentId, idx);
-  }
-  return idx;
+function theIndex(): WorkspaceIndex {
+  const reg = registry();
+  reg.index ??= new WorkspaceIndex();
+  return reg.index;
 }
 
-/** Request a sync of an agent's index. Never throws; a no-op when indexing is off. */
-export function requestIndexSync(agentId: string, delayMs = 0): void {
+/** Request a sync of the index. Never throws; a no-op when indexing is off. */
+export function requestIndexSync(delayMs = 0): void {
   try {
-    indexFor(agentId).requestSync(delayMs);
+    theIndex().requestSync(delayMs);
   } catch (err) {
-    console.error(`[RagIndex:${agentId}] could not request sync:`, err);
+    console.error(`[RagIndex] could not request sync:`, err);
   }
 }
 
 /** Remove a file's entries from the index right away (queued behind any running sync). */
-export function removeFromIndex(agentId: string, relPath: string): Promise<void> {
-  return indexFor(agentId).removeNow(relPath);
+export function removeFromIndex(relPath: string): Promise<void> {
+  return theIndex().removeNow(relPath);
 }
 
-/** Drop and rebuild an agent's index. Resolves when the rebuild finishes. */
-export function rebuildIndex(agentId: string): Promise<void> {
-  return indexFor(agentId).rebuild();
+/** Drop and rebuild the index. Resolves when the rebuild finishes. */
+export function rebuildIndex(): Promise<void> {
+  return theIndex().rebuild();
 }
 
-export function indexStatus(agentId: string): IndexStatus {
-  return indexFor(agentId).getStatus();
+export function indexStatus(): IndexStatus {
+  return theIndex().getStatus();
 }
 
 /**
- * Start indexing for these agents. Idempotent. `prepare` runs first for each
- * agent (the conversation mirror's backfill), so the first sync sees a
- * complete mirror.
+ * Start indexing. Idempotent. `prepare` runs first (the conversation mirror's
+ * backfill), so the first sync sees a complete mirror.
  */
-export function startWorkspaceIndex(agentIds: string[], prepare?: (agentId: string) => Promise<void>): void {
+export function startWorkspaceIndex(prepare?: () => Promise<void>): void {
   const reg = registry();
   if (reg.started) return;
   reg.started = true;
@@ -503,19 +496,15 @@ export function startWorkspaceIndex(agentIds: string[], prepare?: (agentId: stri
     console.log("[RagIndex] LOCAL_RAG_ENTRY not set (or not built) — workspace search is off. See `make rag-setup`.");
   }
 
-  for (const agentId of agentIds) {
-    (async () => {
-      try {
-        await prepare?.(agentId);
-      } catch (err) {
-        console.error(`[RagIndex:${agentId}] startup prepare failed:`, err);
-      }
-      requestIndexSync(agentId);
-    })();
-  }
+  (async () => {
+    try {
+      await prepare?.();
+    } catch (err) {
+      console.error(`[RagIndex] startup prepare failed:`, err);
+    }
+    requestIndexSync();
+  })();
 
-  const sweep = setInterval(() => {
-    for (const agentId of agentIds) requestIndexSync(agentId);
-  }, SWEEP_INTERVAL_MS);
+  const sweep = setInterval(() => requestIndexSync(), SWEEP_INTERVAL_MS);
   sweep.unref();
 }

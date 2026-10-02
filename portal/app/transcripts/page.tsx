@@ -14,7 +14,7 @@ export default function TranscriptsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/transcripts?agentId=buri")
+    fetch("/api/transcripts")
       .then((r) => r.json())
       .then(setTranscripts)
       .finally(() => setLoading(false));
@@ -60,7 +60,7 @@ export default function TranscriptsPage() {
           {transcripts.map((t) => (
             <Link
               key={t.sessionId}
-              href={`/transcripts/${t.sessionId}?agentId=buri`}
+              href={`/transcripts/${t.sessionId}`}
               className="block border border-line bg-surface rounded-xl p-3 shadow-sm hover:border-primary hover:shadow-md transition-all"
             >
               <div className="flex items-center justify-between text-sm">

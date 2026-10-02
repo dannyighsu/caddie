@@ -15,7 +15,6 @@ interface RunSummary {
   id: string;
   replay_of: string | null;
   source: "inbound" | "scheduler" | "trigger" | "portal";
-  agent_id: string;
   profile: string | null;
   label: string | null;
   status: RunStatus;
@@ -66,7 +65,7 @@ export default function RunsPage() {
   async function replay(run: RunSummary) {
     const confirmed = window.confirm(
       `Replay this run live?\n\n` +
-        `${run.label ?? run.agent_id}\n\n` +
+        `${run.label ?? run.source}\n\n` +
         `This re-runs the agent and ${run.deliversTo}. ` +
         `It may re-send real messages.`
     );
@@ -202,7 +201,7 @@ export default function RunsPage() {
                     </span>
                   </div>
                   <div className="text-sm text-ink font-medium truncate">
-                    {run.label ?? `${run.agent_id}${run.profile ? `:${run.profile}` : ""}`}
+                    {run.label ?? `${run.source}${run.profile ? `:${run.profile}` : ""}`}
                   </div>
                   {run.error && (
                     <div className="text-xs text-ink-faint font-mono line-clamp-2 break-words">

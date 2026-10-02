@@ -35,7 +35,7 @@ File a ticket when the cause is the machinery:
 - **A task you couldn't finish for ordinary reasons** — the site was down, there
   was no availability, the person didn't write back. That's a reply, not a ticket.
 - **A preference or standing instruction** → `config/`, per **Preferences and
-  memory** in your persona.
+  memory** in your system prompt.
 - **A change to one of your skills** → the `manage-skills` skill, and only when a
   team member explicitly asks.
 - **One-off steering for a recurring job** → `state/<job>.md`.
@@ -62,7 +62,7 @@ File a ticket when the cause is the machinery:
 ### Step 1 — Investigate before you write
 
 A ticket with no evidence costs more than it saves. Use your self-diagnosis
-tools (**Capabilities → Self-diagnosis** in your persona) before writing a line:
+tools (**Capabilities → Self-diagnosis** in your system prompt) before writing a line:
 
 1. `list_runs` — find the run. Filter to `failed` when you're chasing an error;
    otherwise locate it by time. Note its `sessionId`.

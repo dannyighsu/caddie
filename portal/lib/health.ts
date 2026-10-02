@@ -8,7 +8,7 @@
 import { spawn } from "child_process";
 import { resolve } from "path";
 import { readdir, readFile, access } from "fs/promises";
-import { defaultAgentId, workspaceRoot } from "./harness";
+import { workspace } from "./harness";
 import { indexStatus } from "./workspace-index";
 
 interface CapabilityDef {
@@ -148,13 +148,7 @@ export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
   process.env.HARNESS_ROOT = harnessRoot;
   const results: HealthCheckResult[] = [];
 
-  let agentId: string | null = null;
-  try {
-    agentId = await defaultAgentId();
-    runtimeVars = { IGNIS_AGENT_ID: agentId, IGNIS_WORKSPACE: resolve(workspaceRoot, agentId) };
-  } catch {
-    runtimeVars = {};
-  }
+  runtimeVars = { IGNIS_WORKSPACE: workspace };
 
   try {
     const entries = await readdir(capabilitiesDir);
@@ -181,20 +175,20 @@ export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
     console.warn("[Health] Could not read capabilities directory");
   }
 
-  if (agentId) results.push(indexHealth(agentId));
+  results.push(indexHealth());
 
   return results;
 }
 
-/** The workspace search index for an agent: whether it's on, current, and healthy. */
-function indexHealth(agentId: string): HealthCheckResult {
-  const s = indexStatus(agentId);
-  const name = `workspace-index:${agentId}`;
+/** The workspace search index: whether it's on, current, and healthy. */
+function indexHealth(): HealthCheckResult {
+  const s = indexStatus();
+  const name = "workspace-index";
   if (!s.enabled) {
     return { name, type: "index", status: "skipped", message: "LOCAL_RAG_ENTRY not set — see make rag-setup" };
   }
   if (s.rebuildRequired) {
-    return { name, type: "index", status: "error", message: `Rebuild required (make rag-rebuild AGENT=${agentId}): ${s.rebuildRequired}` };
+    return { name, type: "index", status: "error", message: `Rebuild required (make rag-rebuild): ${s.rebuildRequired}` };
   }
   if (s.lastError) return { name, type: "index", status: "error", message: s.lastError };
   const synced = s.lastSync ? `last sync ${s.lastSync}` : s.syncing ? "first sync in progress" : "not synced yet";

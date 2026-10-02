@@ -86,13 +86,13 @@ export function startScheduler(): void {
       if (dueJobs.length === 0) return;
 
       for (const job of dueJobs) {
-        console.log(`[Scheduler] Firing job: ${job.id} (agent: ${job.agentId}, profile: ${job.profile ?? "default"})`);
+        console.log(`[Scheduler] Firing job: ${job.id} (profile: ${job.profile ?? "default"})`);
 
         // Mark as fired first (prevents re-firing on slow runs)
         await markJobFired(job.id);
 
-        // Fire async — don't block the poller. executeJob takes a per-agent
-        // active-run lock: if a run for this agent+profile is still in flight
+        // Fire async — don't block the poller. executeJob takes a per-profile
+        // active-run lock: if a run for this profile is still in flight
         // (long run, or a manual "run now"), this occurrence is skipped rather
         // than run concurrently and clobber the shared workspace.
         executeJob(job, { source: "scheduler" })
@@ -122,7 +122,7 @@ export interface ExecuteJobResult {
   rawText?: string;
   error?: string;
   /**
-   * True when the job did not run because another run for the same agent was
+   * True when the job did not run because another run for the same profile was
    * already active (concurrency lock not acquired). Not a failure — the
    * caller should treat this as "try again later".
    */
@@ -131,13 +131,13 @@ export interface ExecuteJobResult {
   runId?: string;
 }
 
-/** Active-run lock key: one in-flight agent run per agent+profile. */
+/** Active-run lock key: one in-flight agent run per profile. */
 function runLockKey(job: ScheduledJob): string {
-  return `${job.agentId}:${job.profile ?? "default"}`;
+  return job.profile ?? "default";
 }
 
 /**
- * Whether an agent run for this job's agent is currently in flight. Notify jobs
+ * Whether an agent run for this job's profile is currently in flight. Notify jobs
  * take no lock, so they are never "active". Advisory (non-atomic) — the real
  * guard is the atomic acquire inside executeJob; this exists so callers can
  * give immediate "already running" feedback before firing a long run.
@@ -181,7 +181,7 @@ function buildThreadContext(job: ScheduledJob, source: JobSource): ThreadContext
  *     instead of spamming the channel.
  *
  * "run" (agent) jobs take an active-run lock so a manual trigger can't overlap
- * a scheduled fire (or another trigger) for the same agent and clobber the
+ * a scheduled fire (or another trigger) for the same profile and clobber the
  * shared workspace. "notify" jobs have no such lock (no agent workspace).
  */
 export async function executeJob(
@@ -195,7 +195,6 @@ export async function executeJob(
   const traceId = createTraceId();
   const envelope: RunEnvelope = { source: opts.source, job };
   const runId = await beginRun(envelope, {
-    agentId: job.agentId,
     profile: job.profile,
     label: jobLabel(job),
     traceId,
@@ -232,7 +231,7 @@ export async function executeJob(
     }
 
     try {
-      await createTrace(traceId, job.agentId, {
+      await createTrace(traceId, {
         trigger: opts.source,
         jobId: job.id,
         profile: job.profile,
@@ -260,7 +259,6 @@ export async function executeJob(
 
     const launcher = getLauncher();
     const result = await launcher.launch({
-      agentId: job.agentId,
       profile: job.profile,
       stateKey,
       identity: {
@@ -304,7 +302,7 @@ export async function executeJob(
       await notifyFailure(job, result.error || "Unknown error");
     }
 
-    await finishFromResult(runId, job.agentId, result);
+    await finishFromResult(runId, result);
 
     return {
       success: result.success,
@@ -326,12 +324,7 @@ export async function executeJob(
 
 /** One-liner label for the Runs list. */
 function jobLabel(job: ScheduledJob): string {
-  return (
-    job.description ??
-    `${job.agentId}${job.profile ? `:${job.profile}` : ""}${
-      job.action === "notify" ? " (notify)" : ""
-    }`
-  );
+  return job.description ?? job.id;
 }
 
 /**
@@ -369,7 +362,7 @@ async function executeNotifyJob(job: ScheduledJob, source: JobSource): Promise<E
  */
 async function notifyFailure(job: ScheduledJob, error: string): Promise<void> {
   const channel = job.notificationChannel ?? DEFAULT_NOTIFICATION_CHANNEL;
-  const label = job.description ?? `${job.agentId}${job.profile ? `:${job.profile}` : ""}`;
+  const label = job.description ?? job.id;
   const message = `:warning: *Scheduled job failed:* ${label}\n\`\`\`${error.substring(0, 500)}\`\`\``;
 
   try {

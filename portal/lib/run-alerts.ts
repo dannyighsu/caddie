@@ -16,10 +16,11 @@ import type { AgentResult } from "@ignis/harness";
 import { classifyRunFailure } from "./failure-classifier";
 import { sendEmail, isEmailConfigured } from "./email";
 import { teamOwner } from "@ignis/harness";
+import { agentName } from "./agent-name";
 
-function transcriptUrl(agentId: string, sessionId: string): string {
+function transcriptUrl(sessionId: string): string {
   const base = process.env.PORTAL_URL ?? "http://localhost:3000";
-  return `${base}/transcripts/${sessionId}?agentId=${agentId}`;
+  return `${base}/transcripts/${sessionId}`;
 }
 
 /**
@@ -27,31 +28,31 @@ function transcriptUrl(agentId: string, sessionId: string): string {
  * throws — a failed alert must not mask the underlying run failure.
  */
 export async function alertOwnerOnApiFailure(
-  agentId: string,
   result: Pick<AgentResult, "success" | "error" | "sessionId">
 ): Promise<void> {
   if (result.success) return;
 
   // Only API-layer failures alert the owner; ordinary agent-task errors surface
   // through each channel's normal error path.
-  const classified = await classifyRunFailure(agentId, result);
+  const classified = await classifyRunFailure(result);
   if (!classified || classified.failureClass !== "api") return;
   const { code, detail } = classified;
+  const name = agentName();
 
   const to = teamOwner()?.emails[0];
   if (!to || !isEmailConfigured()) {
     console.error(
-      `[RunAlerts] API-layer failure for "${agentId}" (${code}) but email is not configured: ${detail}`
+      `[RunAlerts] API-layer failure (${code}) but email is not configured: ${detail}`
     );
     return;
   }
 
   const link = result.sessionId
-    ? `\nTranscript: ${transcriptUrl(agentId, result.sessionId)}\n`
+    ? `\nTranscript: ${transcriptUrl(result.sessionId)}\n`
     : "";
-  const subject = `⚠️ ${agentId} run failed at the API layer (${code})`;
+  const subject = `⚠️ ${name} run failed at the API layer (${code})`;
   const body =
-    `A run for agent "${agentId}" failed before it could complete.\n\n` +
+    `A ${name} run failed before it could complete.\n\n` +
     `Error: ${detail}\n` +
     link +
     `\nThis is an infrastructure failure at the Claude API layer — not an agent ` +
@@ -61,7 +62,7 @@ export async function alertOwnerOnApiFailure(
   try {
     await sendEmail(to, subject, body);
     console.log(
-      `[RunAlerts] Emailed ${to} about API-layer failure (${code}) for "${agentId}".`
+      `[RunAlerts] Emailed ${to} about API-layer failure (${code}).`
     );
   } catch (err) {
     console.error(`[RunAlerts] Failed to deliver API-failure alert email:`, err);

@@ -1,7 +1,7 @@
 /**
  * Config Journal
  *
- * `<workspace>/<agent>/config/` holds the only copy of everything the agent has
+ * `<workspace>/config/` holds the only copy of everything the agent has
  * been told to remember — shared preferences and each member's standing
  * instructions. It is unversioned, outside the repo, and written by both the agent and
  * whoever is at the keyboard, with no locking and no change detection. An editor
@@ -13,7 +13,7 @@
  * So the harness keeps its own copy. At the start and end of every run, and
  * whenever a file changes while a run is in progress, each config file whose
  * contents have changed is written to a new timestamped snapshot under the agent
- * *definition* (`harness/agents/<agent>/config-history/`).
+ * *definition* (`harness/agent/config-history/`).
  * Living outside the workspace is the point: a write that clobbers the live file
  * cannot reach the backup. Snapshots are append-only — nothing here is ever
  * overwritten or pruned, since deletion is the failure mode being defended

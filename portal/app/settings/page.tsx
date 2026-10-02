@@ -132,7 +132,6 @@ export default function SettingsPage() {
 
 interface Job {
   id: string;
-  agentId: string;
   profile?: string;
   cron?: string;
   nextRun: number;
@@ -146,7 +145,6 @@ function Schedules() {
   const [loaded, setLoaded] = useState(false);
 
   // New job form
-  const [agentId, setAgentId] = useState("buri");
   const [profile, setProfile] = useState("");
   const [cron, setCron] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -167,7 +165,7 @@ function Schedules() {
   }, []);
 
   async function handleCreate() {
-    if (!cron.trim() || !agentId.trim()) return;
+    if (!cron.trim()) return;
     setCreating(true);
     try {
       await fetch("/api/control", {
@@ -175,7 +173,6 @@ function Schedules() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "schedule",
-          agentId,
           profile: profile || undefined,
           cron,
           prompt: prompt || undefined,
@@ -265,7 +262,7 @@ function Schedules() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-ink">
-                      {job.agentId}{job.profile ? `:${job.profile}` : ""}
+                      {job.profile ?? "default"}
                     </span>
                     {job.cron && (
                       <span className="text-xs font-mono text-ink-faint">{job.cron}</span>
@@ -305,21 +302,13 @@ function Schedules() {
       {/* New job form */}
       <div className="border border-line bg-surface rounded-xl p-4 shadow-sm space-y-3">
         <p className="text-sm text-ink-soft">Create a recurring schedule</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-ink-soft mb-1">Agent</label>
-            <input
-              value={agentId}
-              onChange={(e) => setAgentId(e.target.value)}
-              className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
-            />
-          </div>
+        <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-medium text-ink-soft mb-1">Profile</label>
             <input
               value={profile}
               onChange={(e) => setProfile(e.target.value)}
-              placeholder="e.g. xmanager"
+              placeholder="e.g. extended"
               className="w-full bg-surface-muted border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-primary focus:bg-surface transition-colors"
             />
           </div>

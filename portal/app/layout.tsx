@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 import OwnerSelector from "./owner-selector";
 import { teamRoster } from "@ignis/harness";
+import { agentName } from "@/lib/agent-name";
 
-export const metadata: Metadata = {
-  title: "Buri Agent Portal",
-  description: "Agent control plane",
-};
+export function generateMetadata(): Metadata {
+  return { title: agentName(), description: "Agent control plane" };
+}
 
 export default function RootLayout({
   children,
@@ -19,8 +19,8 @@ export default function RootLayout({
         <header className="sticky top-0 z-10 border-b border-line bg-surface/85 backdrop-blur px-6 py-3 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-ink">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/buri-icon.png" alt="Buri" className="h-8 w-8" />
-            Buri Agent Portal
+            <img src="/agent-icon.png" alt={agentName()} className="h-8 w-8" />
+            {agentName()}
           </a>
           <div className="flex items-center gap-3">
             <OwnerSelector options={teamRoster().map(({ id, name }) => ({ id, name }))} />

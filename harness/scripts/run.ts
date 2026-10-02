@@ -1,53 +1,53 @@
 /**
- * Smoke test — launches an agent via the harness CLI.
+ * Smoke test — launches the agent via the harness CLI.
  *
  * Usage:
- *   pnpm smoke                                    # defaults to writer agent
- *   pnpm smoke -- --agent writer --prompt "..."
+ *   pnpm smoke
+ *   pnpm smoke -- --profile extended --prompt "..."
  */
 
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { createRuntime } from "../src/runtime/factory.js";
 import { createLauncher } from "../src/agent/launcher.js";
-import { defaultWorkspaceRoot } from "../src/workspace.js";
+import { workspaceDir } from "../src/workspace.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(__dirname, "..");
 
-function parseArgs(): { agentId: string; prompt: string } {
+function parseArgs(): { profile?: string; prompt: string } {
   const args = process.argv.slice(2);
-  let agentId = "buri";
+  let profile: string | undefined;
   let prompt = "Suggest 3 article ideas about AI agents in production. Keep it brief.";
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--agent" && args[i + 1]) {
-      agentId = args[++i];
+    if (args[i] === "--profile" && args[i + 1]) {
+      profile = args[++i];
     } else if (args[i] === "--prompt" && args[i + 1]) {
       prompt = args[++i];
     }
   }
 
-  return { agentId, prompt };
+  return { profile, prompt };
 }
 
 async function main() {
-  const { agentId, prompt } = parseArgs();
+  const { profile, prompt } = parseArgs();
 
-  console.log(`[smoke] Launching agent: ${agentId}`);
+  console.log(`[smoke] Launching the agent (profile: ${profile ?? "default"})`);
   console.log(`[smoke] Prompt: ${prompt.substring(0, 80)}...`);
 
   const runtime = createRuntime();
   const launcher = createLauncher(runtime, {
-    agentsDir: resolve(harnessRoot, "agents"),
+    agentDir: resolve(harnessRoot, "agent"),
     capabilitiesDir: resolve(harnessRoot, "capabilities"),
     resolversDir: resolve(harnessRoot, "resolvers"),
     // Same workspace the server uses, so a smoke run exercises the real one.
-    workspaceRoot: defaultWorkspaceRoot(),
+    workspace: workspaceDir(),
   });
 
   const result = await launcher.launch({
-    agentId,
+    profile,
     identity: {
       trustTier: "team",
       senderIdentity: "CLI (smoke test)",

@@ -12,7 +12,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const ALLOWED_PUBLIC_API_PATHS = [
-  "/api/email/webhook",
   "/api/telegram/webhook",
   "/api/public/auth",
 ];

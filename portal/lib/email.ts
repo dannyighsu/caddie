@@ -21,7 +21,6 @@ import {
   type Message,
 } from "./db";
 import type { ThreadContext } from "./thread-context";
-import { defaultAgentId } from "./harness";
 import { teamLookup } from "@ignis/harness";
 import { parseMessageRefs, normalizeMessageId, summarizeEnvelope } from "./email-threading";
 import { isGmailConfigured, getSelfAddress } from "./gmail/client";
@@ -160,7 +159,6 @@ async function recordOutboundThread(
     ? existing.id
     : (
         await createConversation(
-          await defaultAgentId(),
           // "Notification" is the generic default subject; prefer a body snippet.
           subject && subject !== "Notification" ? subject : body.slice(0, 80),
           externalId,
@@ -329,7 +327,7 @@ export async function fetchMessage(messageId: string): Promise<ReceivedEmail | n
 }
 
 /**
- * Build a Buri {@link ReceivedEmail} from a parsed Gmail message. Computes both
+ * Build a {@link ReceivedEmail} from a parsed Gmail message. Computes both
  * bodies locally — `fullText` keeps quoted history; `extractedText` is the
  * quote-stripped visible reply — preserving the same dual-body contract that
  * AgentMail's `extracted_text` used to provide.
@@ -369,7 +367,7 @@ export function receivedFromGmail(m: GmailInbound): ReceivedEmail {
 
 /**
  * Human-readable envelope summary for the agent's run context: who else is on
- * the thread and whether Buri was addressed directly (To) or merely copied (Cc).
+ * the thread and whether the agent was addressed directly (To) or merely copied (Cc).
  * Gives the agent the facts to judge whether a reply is warranted — e.g. to stay
  * quiet on a group thread it wasn't really asked to answer. This is run context,
  * NOT stored in conversation history.

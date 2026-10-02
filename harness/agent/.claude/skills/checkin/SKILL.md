@@ -39,4 +39,4 @@ Use the `/manage-schedules` skill to schedule a one-shot run for the next check-
 - Their typical check-in rhythm (from preferences)
 - Default to ~2 hours from now if no better signal
 
-The scheduled run should use `agentId: "buri"` with `prompt: "/checkin"`.
+The scheduled run should use `prompt: "/checkin"`.

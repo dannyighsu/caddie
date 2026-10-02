@@ -35,12 +35,11 @@ export async function GET(request: NextRequest) {
   const status: RunStatusFilter = ["all", "failed", "active"].includes(statusParam)
     ? (statusParam as RunStatusFilter)
     : "failed";
-  const agentId = request.nextUrl.searchParams.get("agentId") ?? undefined;
   const limitParam = request.nextUrl.searchParams.get("limit");
   const limit = limitParam ? Math.min(Number(limitParam) || 50, 200) : 50;
 
   try {
-    const runs = await listRuns({ status, agentId, limit });
+    const runs = await listRuns({ status, limit });
     // Drop the (potentially large) envelope from the list payload — the UI only
     // needs the summary fields plus a delivery hint; replay reads the envelope
     // server-side by id.

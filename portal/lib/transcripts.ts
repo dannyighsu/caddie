@@ -8,7 +8,7 @@
 import { readFile } from "fs/promises";
 import { resolve } from "path";
 import { homedir } from "os";
-import { workspaceRoot } from "./harness";
+import { workspace } from "./harness";
 
 export interface TranscriptEntry {
   type: "assistant" | "user" | "progress" | "file-history-snapshot" | "last-prompt" | string;
@@ -39,24 +39,20 @@ export interface TranscriptStep {
 }
 
 /**
- * Derive the Claude Code project directory path from a workspace path.
+ * The Claude Code project directory for the workspace.
  */
-function getProjectDir(agentId: string): string {
-  const workspacePath = resolve(workspaceRoot, agentId);
+function getProjectDir(): string {
   // Claude Code maps every non-alphanumeric character to "-" — not just "/"
   // (e.g. the "." in ~/.ignis).
-  const projectHash = workspacePath.replace(/[^a-zA-Z0-9]/g, "-");
+  const projectHash = workspace.replace(/[^a-zA-Z0-9]/g, "-");
   return resolve(homedir(), ".claude", "projects", projectHash);
 }
 
 /**
  * Read and parse a session transcript.
  */
-export async function readTranscript(
-  agentId: string,
-  sessionId: string
-): Promise<TranscriptStep[]> {
-  const projectDir = getProjectDir(agentId);
+export async function readTranscript(sessionId: string): Promise<TranscriptStep[]> {
+  const projectDir = getProjectDir();
   const transcriptPath = resolve(projectDir, `${sessionId}.jsonl`);
 
   const content = await readFile(transcriptPath, "utf-8");
@@ -148,11 +144,8 @@ export interface ApiError {
  * infrastructure the team owner must fix (usually re-auth). Returns the
  * last such error found, or null if the session had none / can't be read.
  */
-export async function getApiError(
-  agentId: string,
-  sessionId: string
-): Promise<ApiError | null> {
-  const projectDir = getProjectDir(agentId);
+export async function getApiError(sessionId: string): Promise<ApiError | null> {
+  const projectDir = getProjectDir();
   const transcriptPath = resolve(projectDir, `${sessionId}.jsonl`);
 
   let content: string;
@@ -190,12 +183,10 @@ export async function getApiError(
 }
 
 /**
- * List available session transcripts for an agent.
+ * List available session transcripts.
  */
-export async function listTranscripts(
-  agentId: string
-): Promise<Array<{ sessionId: string; size: number; modified: string }>> {
-  const projectDir = getProjectDir(agentId);
+export async function listTranscripts(): Promise<Array<{ sessionId: string; size: number; modified: string }>> {
+  const projectDir = getProjectDir();
 
   try {
     const { readdir, stat } = await import("fs/promises");

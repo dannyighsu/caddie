@@ -1,6 +1,6 @@
 # Ignis
 
-Agents that run the business. Each agent is a declarative config (JSON + persona prompt + optional skills) that the Agent Harness executes via an underlying runtime (currently Claude Code CLI).
+An agent that runs the business. An install is one machine running one agent: a declarative config (JSON + system prompt + persona + optional skills) that the Agent Harness executes via an underlying runtime (currently Claude Code CLI). Variation between runs is a profile of that agent, never a second agent.
 
 ## Repository Structure
 
@@ -8,8 +8,8 @@ Agents that run the business. Each agent is a declarative config (JSON + persona
 ignis/
 ├── harness/              # Agent Harness library (@ignis/harness)
 │   ├── src/              # Runtime, launcher, capability + resolver system
-│   ├── agents/           # Agent definitions (agent.json + persona.md + skills)
-│   ├── skills/core/      # Shared skills, mounted for every agent
+│   ├── agent/            # The agent (agent.json + SYSTEM.md + PERSONA.md + skills)
+│   ├── skills/core/      # Shared skills, mounted on every run
 │   ├── capabilities/     # MCP server configs (JSON files)
 │   ├── credentials/      # OAuth tokens (gitignored)
 │   ├── resolvers/        # Pre-run data fetchers (e.g., Google Calendar)
@@ -17,130 +17,38 @@ ignis/
 ├── portal/               # Control plane + API server (Next.js)
 ```
 
-## Quick Start
+## Setup
 
-First-time setup, in order. Steps 1–4 get an agent running; 5 connects it to the
-outside world.
+**[docs/SETUP.md](docs/SETUP.md)** sets up an install from a fresh machine, in
+order: host tools, Postgres and Redis, configuration and persona, Google,
+Tailscale, keeping a laptop awake, channels, and optional workspace search.
 
-**1. Install what the runtime needs**
-
-- **Node.js** and **pnpm** 10.22+
-- **`claude` CLI** on PATH — the Claude Code CLI is the runtime driver
-- **Bun** — only for the `notion` and `web-search` capabilities, which launch
-  their MCP servers with `bunx`. Skip it and those two sit out; nothing breaks.
-- **Postgres** and **Redis** — an empty database is enough. The schema is
-  created on first use; there is no migration step.
+Once it is set up:
 
 ```bash
-pnpm install
-make agent-tools   # poppler + a Python venv with pypdf, so the agent can read PDFs
+make run              # portal on http://localhost:3000, inside tmux
 ```
-
-The agent runs directly on this machine, so the command-line tools it reaches
-for from Bash have to be installed here — `make agent-tools` covers them.
-
-**2. Configure**
-
-```bash
-cp portal/.env.example portal/.env.local
-```
-
-Fill in the `REQUIRED` block — that's `POSTGRES_URL`, `REDIS_URL`, one team
-member, and Google credentials. The template splits everything else into
-variables that already have working defaults and optional per-feature blocks
-(Slack, Telegram, Notion, tracing), so the required set is short.
-
-The **team roster** is what makes the agent usable: an inbound sender who isn't
-on it is treated as a guest, and guests are granted nothing. At minimum:
-
-```bash
-TEAM_MEMBER_A_NAME=Your Name
-TEAM_MEMBER_A_EMAIL=you@example.com
-```
-
-**3. Authorize Google** (Calendar + Gmail — the agent's inbox and calendar)
-
-In Google Cloud: enable the Calendar and Gmail APIs, then create an OAuth 2.0
-**Desktop app** credential with `http://localhost:3456/oauth2callback` as an
-authorized redirect URI. Put the client id and secret in `.env.local`, then:
-
-```bash
-make google-auth      # opens a browser; writes harness/credentials/ (gitignored)
-```
-
-Run it once per install. Skip this only if you want a portal-only agent with no
-email and no calendar.
-
-*Optional: Google Sheets, Docs & Slides* (the agent's `google-workspace` skill).
-Enable the Sheets, Docs, Slides and Drive APIs in the same Google Cloud project,
-install the
-[`gog`](https://github.com/openclaw/gogcli) CLI, and authorize the agent's
-Google account. This reuses the OAuth client above:
-
-```bash
-brew install openclaw/tap/gogcli
-make gog-auth ACCOUNT=agent@example.com   # opens a browser; token goes in the OS keyring
-```
-
-Then set `GOG_ACCOUNT` to the same address in `.env.local`.
-
-**4. Check it runs**
-
-```bash
-make smoke            # launches the agent directly through the harness
-```
-
-This needs no server, no Postgres, and no Redis — it verifies the `claude` CLI,
-the agent config, and your capability credentials. Anything unconfigured is
-reported as skipped rather than failing the run, so read the output: a
-capability you expected to see missing means a variable didn't land.
-
-```bash
-make run              # portal on http://localhost:3000
-```
-
-Open the portal and talk to the agent from the **Conversations** tab.
 
 > `make run` serves a production build — use it for anything long-lived. For
 > active development with hot reload, `make dev`.
 
-**5. Connect channels** (each optional, each independent)
-
-Email arrives once step 3 is done. For the rest, see
-[TELEGRAM.md](docs/TELEGRAM.md) and the Slack section in
-[portal/README.md](portal/README.md); both are just env vars plus setup on
-the provider's side. To reach the agent from outside your machine, see
-[Network exposure](#network-exposure).
-
-**6. Workspace search** (optional)
-
-Lets the agent search every conversation it has had and the files in its
-workspace, locally, with no data leaving the machine:
-
-```bash
-make rag-setup        # clones + builds mcp-local-rag beside this repo; prints LOCAL_RAG_ENTRY
-```
-
-Add the printed `LOCAL_RAG_ENTRY=…` line to `portal/.env.local` and restart
-(`make run`). On startup the portal mirrors each conversation message into
-`<workspace>/conversations/` and indexes the workspace into
-`<workspace>/.rag/`, then keeps both in sync. The first run downloads a ~90 MB
-embedding model. Index status shows up in portal health. After an
-embedding-model change or a workspace move, `make rag-rebuild AGENT=buri`.
-
 ### Making it yours
 
-A fresh clone ships the `buri` agent. To adapt it, edit these — all of it is
-also editable in the portal's **Config** tab:
+| What | Where | Tracked |
+|---|---|---|
+| Who the agent is — name, role, whom it serves, voice | `harness/agent/PERSONA.md` | no — copy `PERSONA.example.md` |
+| How the agent works, the same for every install | `harness/agent/SYSTEM.md` | yes |
+| Shared standing instructions | `~/.ignis/config/preferences.md` | no — workspace |
+| Per-person profiles | `~/.ignis/config/team/<member>.md` | no — workspace |
+| Recurring job procedures | `~/.ignis/jobs/<job>.md` | no — workspace |
 
-| What | Where |
-|---|---|
-| Voice, boundaries, how it represents you | `harness/agents/buri/persona.md` |
-| Shared standing instructions | `harness/agents/buri/config/preferences.md` |
-| Per-person profiles | `harness/agents/buri/config/team/<member>.md` |
-| Recurring job procedures | `~/.ignis/buri/jobs/<job>.md` (workspace — see below) |
+All of these are also editable in the portal's **Config** tab. Changes take
+effect on the agent's next run, with nothing to rebuild or restart.
 
-Changes take effect on the agent's next run. Nothing to rebuild or restart.
+A rule every install should follow belongs in `SYSTEM.md`; anything naming a
+particular person, place or household belongs in `PERSONA.md` or the
+workspace. `harness/agent/config/` holds seed files, copied into the workspace
+only when the workspace doesn't have them yet.
 
 Job procedures live in the workspace, not the repo: a job names real places,
 people and match criteria for one install. On a scheduled run the launcher
@@ -149,28 +57,24 @@ carried state and one-off directives in `state/<job>.md` beside it. Writing the
 file doesn't schedule anything — cadence is Redis state, set through the control
 API (`action: "schedule"`) or by asking the agent (`manage-schedules` skill).
 
-## Creating an Agent
-
-An agent is a directory under `harness/agents/` containing a config and a persona.
-
-### 1. Create the agent directory
+## The agent
 
 ```
-harness/agents/<id>/
+harness/agent/
 ├── agent.json
-├── persona.md
-└── .claude/skills/       # optional: Claude Code native skills
+├── SYSTEM.md             # committed: how the agent works
+├── PERSONA.md            # per install, untracked: who it is
+├── PERSONA.example.md    # the template for PERSONA.md
+├── config/               # seed files for the workspace's config/
+└── .claude/skills/       # the agent's own skills
     └── <skill-name>/
         └── SKILL.md
 ```
 
-### 2. Define agent.json
+### agent.json
 
 ```json
 {
-  "id": "buri",
-  "name": "Buri",
-  "persona": "./persona.md",
   "capabilities": ["reply", "notion", "browser"],
   "resolvers": ["google-calendar"],
   "profiles": {
@@ -188,19 +92,17 @@ harness/agents/<id>/
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `id` | yes | Unique identifier, matches the directory name |
-| `name` | yes | Human-readable name shown in the dashboard |
-| `persona` | yes | Path to persona markdown (relative to agent dir), or inline string |
 | `capabilities` | yes | Capability names (references JSON files in `harness/capabilities/`) |
 | `resolvers` | no | Pre-run resolver names (references files in `harness/resolvers/`) |
 | `maxTurns` | no | Max agent loop iterations. Default: 150 |
 | `enableChrome` | no | Enable Chrome browser automation. Can also be set via the `chrome` capability |
 | `outputSchema` | no | JSON Schema for structured output. Omit for free-form mode |
-| `profiles` | no | Named run variants of this same agent — see below |
+| `configFiles` | no | Workspace files injected into the run context, as `{ name: path }` |
+| `profiles` | no | Named run variants — see below |
 
 ### Profiles
 
-A profile is a **run variant of one agent**, not a second agent. It keeps the
+A profile is a **run variant of the agent**, not a second agent. It keeps the
 agent's identity, persona, and workspace, and varies only what the run can reach
 and how long it may run.
 
@@ -228,53 +130,43 @@ run the base configuration.
 
 ```bash
 # Run with the extended profile (higher turn ceiling, for long research jobs)
-curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","profile":"extended","prompt":"/feed-scan"}'
+curl -X POST localhost:3000/api/control -d '{"action":"run","profile":"extended","prompt":"/feed-scan"}'
 
-# Run with no profile (default: notion + google-calendar)
-curl -X POST localhost:3000/api/control -d '{"action":"run","agentId":"buri","prompt":"Do a check-in"}'
+# Run the base configuration
+curl -X POST localhost:3000/api/control -d '{"action":"run","prompt":"Do a check-in"}'
 
 # Schedule a recurring run every 30 minutes
-curl -X POST localhost:3000/api/control -d '{"action":"schedule","agentId":"buri","cron":"0,30 * * * *","prompt":"/feed-scan"}'
+curl -X POST localhost:3000/api/control -d '{"action":"schedule","cron":"0,30 * * * *","prompt":"/feed-scan"}'
 ```
 
-All profiles share the same workspace at `~/.ignis/buri/`.
+All profiles share the workspace at `~/.ignis/`.
 
-### 3. Write persona.md
+### The system prompt
 
-The persona is the system prompt. Supports `{{templateVar}}` interpolation -- the caller passes a `context` map and resolvers inject additional variables before launch.
+A run's system prompt is `PERSONA.md` followed by `SYSTEM.md`. Both support
+`{{templateVar}}` interpolation — the caller passes a `context` map and
+resolvers inject additional variables before launch. Unresolved `{{variables}}`
+are left as-is so you can spot missing context.
 
-```markdown
-# Persona: Buri
-
-You are a skilled assistant helping the user brainstorm,
-research, draft, and refine content.
-
-## Current Context
-Current time: {{currentTime}}
-```
-
-Unresolved `{{variables}}` are left as-is so you can spot missing context.
-
-### 4. Add skills (optional)
+### Skills
 
 Skills use Claude Code's native SKILL.md format, and come from two places:
 
 ```
-harness/skills/core/manage-schedules/SKILL.md      # shared by every agent
-harness/agents/buri/.claude/skills/feed-scan/SKILL.md   # this agent's own
+harness/skills/core/manage-schedules/SKILL.md      # shared by every install
+harness/agent/.claude/skills/feed-scan/SKILL.md    # the agent's own
 ```
 
 **Core skills** (`harness/skills/core/`) are instance-agnostic mechanism —
-scheduling, skill authoring, repo mounting. They live outside any agent so a fix
-lands once instead of being copied into each agent directory, and so a second
-install inherits them through `git pull`.
+scheduling, skill authoring, repo mounting. A second install inherits them
+through `git pull`.
 
-**Agent skills** live with the agent and belong to that install. On a name
-collision the agent's wins, so an install can override a core skill locally.
+**Agent skills** live with the agent. On a name collision the agent's wins, so
+an install can override a core skill locally.
 
-At launch both sources are mounted into the agent's workspace as
-`.claude/skills/` — a directory of per-skill symlinks, rebuilt each run. The
-agent invokes them via `/skill-name` in the prompt.
+At launch both sources are mounted into the workspace as `.claude/skills/` — a
+directory of per-skill symlinks, rebuilt each run. The agent invokes them via
+`/skill-name` in the prompt.
 
 The workspace also gets `.claude/skills-src/`, pointing at the agent's own skill
 directory. That's where an agent authors a skill: `.claude/skills/` is an
@@ -285,26 +177,22 @@ be swept on the next run.
 skill file is only ever stored in one place — the agent definition — and an edit
 takes effect on the agent's next run with no rebuild or restart. Two ways to make one:
 
-- **In the portal** — *Agents → \<agent\> → Config → Skills* lists every skill's
-  `SKILL.md`, edits it in place, and creates or deletes skills (deleting removes
-  the whole skill directory).
-- **By the agent itself** — an agent with `base-tools` can write its own
-  `.claude/skills/`. Whether it *may* is a persona rule, not a runtime one: Buri's
-  persona permits skill changes only when a team member explicitly asks on
-  that turn, and its `manage-skills` skill holds the format rules. Guest-tier runs
-  can't do it at all — `guest` is denied `base-tools`, so it has no Write, Edit,
-  or Bash.
+- **In the portal** — *Agent → Config → Skills* lists every skill's `SKILL.md`,
+  edits it in place, and creates or deletes skills (deleting removes the whole
+  skill directory).
+- **By the agent itself** — the agent with `base-tools` can write its own
+  `.claude/skills/`. Whether it *may* is a rule in `SYSTEM.md`, not a runtime
+  one: skill changes are permitted only when a team member explicitly asks on
+  that turn, and the `manage-skills` skill holds the format rules. Guest-tier
+  runs can't do it at all — `guest` is denied `base-tools`, so it has no Write,
+  Edit, or Bash.
 
 A new or renamed skill isn't visible until a fresh run, since skills are indexed
 at session start.
 
-### 5. Done
-
-The agent auto-appears in the portal dashboard.
-
 ## Adding a Capability
 
-Capabilities are MCP server configurations. Each is a JSON file in `harness/capabilities/` that agents reference by name.
+Capabilities are MCP server configurations. Each is a JSON file in `harness/capabilities/` that `agent.json` references by name.
 
 > A new capability is **denied by default** for every trust tier until you grant it in `harness/permissions.json`. Permissions (which tier gets which capabilities and the built-in tools) live in one place — see [docs/PERMISSIONS.md](docs/PERMISSIONS.md).
 
@@ -324,7 +212,7 @@ Capabilities are MCP server configurations. Each is a JSON file in `harness/capa
 }
 ```
 
-`${ENV_VAR}` references are resolved from `process.env` at runtime. A capability with an unresolved reference is **skipped** — not mounted with a blank value — so a missing credential costs you that capability rather than giving the agent a tool that fails at first use. The run proceeds, and the launcher logs which variable was missing. `HARNESS_ROOT`, `IGNIS_AGENT_ID` and `IGNIS_WORKSPACE` (the agent's workspace path, for per-agent state like a search index) are supplied by the launcher, not read from the environment.
+`${ENV_VAR}` references are resolved from `process.env` at runtime. A capability with an unresolved reference is **skipped** — not mounted with a blank value — so a missing credential costs you that capability rather than giving the agent a tool that fails at first use. The run proceeds, and the launcher logs which variable was missing. `HARNESS_ROOT` and `IGNIS_WORKSPACE` (the workspace path, for state like a search index) are supplied by the launcher, not read from the environment.
 
 A capability can also list `"disallowedTools"`: tools its server exposes that no run may call, by the server's own tool name. They're removed from the run with `--disallowedTools`. Use it when a third-party server bundles writes alongside the reads you want, as `local-rag` does.
 
@@ -402,7 +290,7 @@ starts, rather than giving the agent a tool.
 │  │ load agent.json + profile    │                    │
 │  │ → symlink skills + hooks     │                    │
 │  │ → run resolvers              │                    │
-│  │ → read + interpolate persona │                    │
+│  │ → persona + system prompt    │                    │
 │  │ → resolve MCP capabilities   │                    │
 │  │ → call runtime.execute()     │                    │
 │  └──────────────┬───────────────┘                    │
@@ -420,21 +308,20 @@ starts, rather than giving the agent a tool.
 - `createRuntime()` -- instantiates an `AgentRuntime`
 - `createLauncher(runtime, config)` -- returns `{ launch }` bound to agent and capability directories
 
-The **portal** imports the harness as a workspace dependency. The control API (`/api/control`) is the command surface for running agents, sending notifications, and managing schedules. Agents with orchestration logic have dedicated orchestrators that handle Slack posting, scheduling, and multi-step execution. See [docs/BACKEND.md](docs/BACKEND.md) for the API server's client classes and endpoint groups.
+The **portal** imports the harness as a workspace dependency. The control API (`/api/control`) is the command surface for running the agent, sending notifications, and managing schedules. See [docs/BACKEND.md](docs/BACKEND.md) for the API server's client classes and endpoint groups.
 
 ### Execution flow
 
-1. The control API receives a request (action + agent ID + optional profile)
-2. If agent/profile has an orchestrator, it handles the full lifecycle (run lock, launch, Slack, scheduling)
-3. Launcher loads `agent.json`, applies profile overrides, symlinks skills/hooks, runs resolvers, interpolates persona, resolves capabilities
-4. Runtime spawns `claude` CLI with the prompt + MCP configs
-5. Result (text + session ID + usage) is returned and persisted
+1. The control API receives a request (action + optional profile)
+2. Launcher loads `agent.json`, applies profile overrides, symlinks skills/hooks, runs resolvers, interpolates the persona and system prompt, resolves capabilities
+3. Runtime spawns `claude` CLI with the prompt + MCP configs
+4. Result (text + session ID + usage) is returned and persisted
 
-Session IDs enable multi-turn conversations. On resumption, resolvers and persona are skipped (the runtime has prior context).
+Session IDs enable multi-turn conversations. On resumption, resolvers and the system prompt are skipped (the runtime has prior context).
 
 ## Workspace
 
-Agent workspaces live at `~/.ignis/{agentId}/` by default (override with `WORKSPACE_ROOT`) — outside the repo, since a workspace is the agent's data, not app code. All profiles of an agent share the same workspace. Each agent gets its own directory containing:
+The agent's workspace is `~/.ignis/` by default (override with `WORKSPACE_DIR`) — outside the repo, since a workspace is the agent's data, not app code. All profiles share it. It contains:
 
 - `config/` -- persistent config files (editable via the control plane)
 - `jobs/` -- recurring-job procedures, one `<job>.md` each (written by you)
@@ -444,10 +331,10 @@ Agent workspaces live at `~/.ignis/{agentId}/` by default (override with `WORKSP
 - `.rag/` -- the search index, its embedding-model cache and sync manifest (derived; `make rag-rebuild`)
 - Everything else -- created by the agent during runs (task files, memory, run records, etc.)
 
-Override the workspace location with `WORKSPACE_ROOT`:
+Override the workspace location with `WORKSPACE_DIR`:
 
 ```bash
-make run WORKSPACE_ROOT=/path/to/workspace
+make run WORKSPACE_DIR=/path/to/workspace
 ```
 
 The workspace directory is gitignored.
@@ -464,6 +351,9 @@ make agent-tools  # host tools the agent uses (poppler, pypdf venv)
 make smoke        # run a quick smoke test via the harness
 make google-auth  # one-time Google Calendar + Gmail OAuth (opens browser, port 3456)
 make gog-auth ACCOUNT=...  # one-time Google Sheets/Docs/Slides auth for the gog CLI (opens browser)
+make keep-awake   # keep this Mac running with its lid closed (sudo); make allow-sleep undoes it
+make rag-setup    # build the optional workspace search server
+make rag-rebuild  # drop and rebuild the search index
 ```
 
 `make run` vs `make dev`: the dev server runs the Turbopack dev compiler, which
@@ -478,8 +368,8 @@ Or directly:
 ```bash
 cd portal && pnpm dev                                      # dev server (hot reload)
 cd portal && pnpm build && pnpm start                      # production server
-cd harness && pnpm smoke                                      # default: buri agent
-cd harness && pnpm smoke -- --agent buri --prompt "..."       # specify agent and prompt
+cd harness && pnpm smoke                                          # base configuration
+cd harness && pnpm smoke -- --profile extended --prompt "..."     # a profile and prompt
 ```
 
 ### Debugging memory
@@ -526,8 +416,8 @@ make unexpose   # tear down all serve/funnel config for this node
 ```
 
 Exposure config persists (via `tailscale ... --bg`) across app restarts until you
-run `make unexpose`. It requires the `tailscale` CLI and a tailnet with
-[Funnel enabled](https://tailscale.com/kb/1223/funnel); if `tailscale` isn't
+run `make unexpose`. It requires the `tailscale` daemon and a tailnet with
+Funnel enabled — [docs/SETUP.md](docs/SETUP.md#6-tailscale) sets both up; if `tailscale` isn't
 installed, `make run` still starts the server localhost-only (webhooks just won't
 be reachable from the internet). Tune via make variables `FUNNEL_PATHS`,
 `TAILNET_PORT`, `IGNIS_PORT`. Verify the live config with

@@ -1,7 +1,8 @@
 import { readFile, writeFile, unlink, mkdir, rm, lstat } from "fs/promises";
 import { resolve, basename } from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { workspaceRoot, agentsDir, coreSkillsDir } from "@/lib/harness";
+import { PERSONA_FILE, SYSTEM_FILE } from "@ignis/harness";
+import { workspace, agentDir, coreSkillsDir } from "@/lib/harness";
 
 /**
  * Catch-all so multi-segment names round-trip: a skill file is addressed as
@@ -18,23 +19,23 @@ class BadRequest extends Error {}
 /**
  * Resolve the actual filesystem path for a file based on its category.
  *
- * - persona: harness/agents/{id}/persona.md
- * - skill:      harness/agents/{id}/.claude/skills/{skillName}/{file}
- * - core-skill: harness/skills/core/{skillName}/{file} — shared by every agent
- * - config:  <workspaceRoot>/{id}/config/{filename}
+ * - persona:    harness/agent/{PERSONA.md,SYSTEM.md}
+ * - skill:      harness/agent/.claude/skills/{skillName}/{file}
+ * - core-skill: harness/skills/core/{skillName}/{file}
+ * - config:     <workspace>/config/{filename}
  *
  * Skills live in the agent *definition* (not the workspace) because that's
  * what the runtime links into `.claude/skills` — see the launcher's
  * mountSkills. Writing here is what makes an edit take effect on
  * the next run.
  */
-function resolveFilePath(
-  agentId: string,
-  segments: string[],
-  category?: string
-): string {
+function resolveFilePath(segments: string[], category?: string): string {
   if (category === "persona") {
-    return resolve(agentsDir, agentId, "persona.md");
+    const name = segments.join("/");
+    if (name !== PERSONA_FILE && name !== SYSTEM_FILE) {
+      throw new BadRequest(`persona files are ${PERSONA_FILE} and ${SYSTEM_FILE}`);
+    }
+    return resolve(agentDir, name);
   }
   if (category === "core-skill") {
     const [prefix, skill, file] = segments;
@@ -55,20 +56,20 @@ function resolveFilePath(
     if (!SKILL_NAME.test(skill) || !SKILL_FILE.test(file)) {
       throw new BadRequest("invalid skill name or file name");
     }
-    return resolve(agentsDir, agentId, ".claude", "skills", skill, file);
+    return resolve(agentDir, ".claude", "skills", skill, file);
   }
   // Default: config file
   const safe = basename(segments.join("/"));
-  return resolve(workspaceRoot, agentId, "config", safe);
+  return resolve(workspace, "config", safe);
 }
 
 /** The directory holding a skill, for whole-skill operations (create/delete). */
-function resolveSkillDir(agentId: string, segments: string[]): string {
+function resolveSkillDir(segments: string[]): string {
   const skill = segments[1];
   if (segments[0] !== "skills" || !skill || !SKILL_NAME.test(skill)) {
     throw new BadRequest("invalid skill path");
   }
-  return resolve(agentsDir, agentId, ".claude", "skills", skill);
+  return resolve(agentDir, ".claude", "skills", skill);
 }
 
 function badRequest(err: unknown): NextResponse | null {
@@ -80,14 +81,14 @@ function badRequest(err: unknown): NextResponse | null {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; filename: string[] }> }
+  { params }: { params: Promise<{ filename: string[] }> }
 ) {
-  const { id, filename } = await params;
+  const { filename } = await params;
   const category = request.nextUrl.searchParams.get("category") ?? undefined;
 
   let filePath: string;
   try {
-    filePath = resolveFilePath(id, filename, category);
+    filePath = resolveFilePath(filename, category);
   } catch (err) {
     return badRequest(err) ?? NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
@@ -102,9 +103,9 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; filename: string[] }> }
+  { params }: { params: Promise<{ filename: string[] }> }
 ) {
-  const { id, filename } = await params;
+  const { filename } = await params;
   const body = await request.json();
   const { content, category } = body as { content: string; category?: string };
 
@@ -114,13 +115,13 @@ export async function PUT(
 
   let filePath: string;
   try {
-    filePath = resolveFilePath(id, filename, category);
+    filePath = resolveFilePath(filename, category);
 
     if (category === "skill") {
       // Creating a new skill: its directory may not exist yet.
-      await mkdir(resolveSkillDir(id, filename), { recursive: true });
+      await mkdir(resolveSkillDir(filename), { recursive: true });
     } else if (!category || category === "config") {
-      await mkdir(resolve(workspaceRoot, id, "config"), { recursive: true });
+      await mkdir(resolve(workspace, "config"), { recursive: true });
     }
   } catch (err) {
     return badRequest(err) ?? NextResponse.json({ error: "Bad request" }, { status: 400 });
@@ -132,9 +133,9 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; filename: string[] }> }
+  { params }: { params: Promise<{ filename: string[] }> }
 ) {
-  const { id, filename } = await params;
+  const { filename } = await params;
   const category = request.nextUrl.searchParams.get("category") ?? undefined;
 
   // Deleting a skill removes the whole skill directory — dropping only SKILL.md
@@ -142,7 +143,7 @@ export async function DELETE(
   if (category === "skill") {
     let skillDir: string;
     try {
-      skillDir = resolveSkillDir(id, filename);
+      skillDir = resolveSkillDir(filename);
     } catch (err) {
       return badRequest(err) ?? NextResponse.json({ error: "Bad request" }, { status: 400 });
     }
@@ -156,7 +157,7 @@ export async function DELETE(
   }
 
   try {
-    await unlink(resolveFilePath(id, filename, category));
+    await unlink(resolveFilePath(filename, category));
     return NextResponse.json({ success: true });
   } catch (err) {
     return badRequest(err) ?? NextResponse.json({ error: "File not found" }, { status: 404 });

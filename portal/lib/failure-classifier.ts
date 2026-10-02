@@ -56,14 +56,13 @@ function matchesApiSignature(error: string | undefined): boolean {
  * Never throws — a transcript read failure degrades to string matching.
  */
 export async function classifyRunFailure(
-  agentId: string,
   result: { success: boolean; error?: string; sessionId?: string }
 ): Promise<ClassifiedFailure | null> {
   if (result.success) return null;
 
   // Canonical signal: the transcript's synthetic API-error entry.
   if (result.sessionId) {
-    const apiErr = await getApiError(agentId, result.sessionId).catch(() => null);
+    const apiErr = await getApiError(result.sessionId).catch(() => null);
     if (apiErr) {
       return { failureClass: "api", code: apiErr.type, detail: apiErr.message };
     }

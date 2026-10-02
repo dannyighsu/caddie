@@ -1,6 +1,6 @@
 # Email Setup
 
-Buri sends and receives email through its own **Gmail account** via the Gmail API.
+The agent sends and receives email through its own **Gmail account** via the Gmail API.
 Outbound goes through `gmail.users.messages.send`; inbound is pulled by an
 in-process poller (no webhook). Auth reuses the same Google OAuth token as Google
 Calendar.
@@ -86,7 +86,7 @@ TEAM_MEMBER_A_EMAIL=...        # comma-separated; first is primary
   arrives inline with a `cid:`, and is exactly what someone means by "see the
   image" — so size, not disposition, does the filtering.
 - Files land in the thread's run-artifacts directory
-  (`~/.ignis/<agent>/runs/<month>/<day>/artifacts/email-<threadId>/`), named
+  (`~/.ignis/runs/<month>/<day>/artifacts/email-<threadId>/`), named
   `<messageId>-<sanitized name>` so two messages on one thread can't clobber each
   other. The agent gets each one as a path it reads to view the image — the same
   channel-agnostic `Attachment` path Telegram uses.

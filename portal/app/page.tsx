@@ -1,32 +1,29 @@
 import Link from "next/link";
 import { getPortalStats, isStatsRange, type PortalStats, type StatsRange } from "@/lib/stats";
-import { DEFAULT_MAX_TURNS } from "@ignis/harness";
-
-interface Agent {
-  id: string;
-  name: string;
-  capabilities: string[];
-  maxTurns?: number;
-}
+import { DEFAULT_MAX_TURNS, type AgentConfig } from "@ignis/harness";
+import { agentName } from "@/lib/agent-name";
 
 interface Conversation {
   id: string;
-  agent_id: string;
   title: string | null;
   messages: { role: string; content: string }[];
   created_at: string;
   updated_at: string;
 }
 
-async function getAgents(): Promise<Agent[]> {
-  const { listAgents } = await import("@/lib/harness");
-  return listAgents();
+async function getAgent(): Promise<AgentConfig | null> {
+  try {
+    const { getAgentConfig } = await import("@/lib/harness");
+    return await getAgentConfig();
+  } catch {
+    return null;
+  }
 }
 
 async function getConversations(): Promise<Conversation[]> {
   try {
     const { listConversations } = await import("@/lib/db");
-    return await listConversations(undefined, 10);
+    return await listConversations(10);
   } catch {
     return [];
   }
@@ -113,8 +110,8 @@ export default async function Dashboard({
   const { range: rangeParam } = await searchParams;
   const range: StatsRange = isStatsRange(rangeParam) ? rangeParam : "24h";
 
-  const [agents, conversations, stats] = await Promise.all([
-    getAgents(),
+  const [agent, conversations, stats] = await Promise.all([
+    getAgent(),
     getConversations(),
     getStats(range),
   ]);
@@ -158,31 +155,21 @@ export default async function Dashboard({
       <section>
         <h2 className="flex items-center gap-2 text-xl font-semibold mb-4">
           <span className="h-4 w-1.5 rounded-full bg-accent" />
-          Agents
+          Agent
         </h2>
-        {agents.length === 0 ? (
-          <p className="text-ink-faint">No agents found.</p>
+        {!agent ? (
+          <p className="text-ink-faint">No agent.json found.</p>
         ) : (
-          <div className="grid gap-4">
-            {agents.map((agent) => (
-              <Link
-                key={agent.id}
-                href={`/agents/${agent.id}`}
-                className="block border border-line bg-surface rounded-xl p-4 shadow-sm hover:border-primary hover:shadow-md transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-ink">{agent.name}</h3>
-                    <p className="text-sm text-ink-soft mt-1">
-                      {agent.capabilities.join(", ")}
-                      {" · "}max {agent.maxTurns ?? DEFAULT_MAX_TURNS} turns
-                    </p>
-                  </div>
-                  <span className="text-xs font-mono text-primary bg-primary-soft rounded-md px-2 py-1">{agent.id}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <Link
+            href="/agent"
+            className="block border border-line bg-surface rounded-xl p-4 shadow-sm hover:border-primary hover:shadow-md transition-all"
+          >
+            <h3 className="font-semibold text-ink">{agentName()}</h3>
+            <p className="text-sm text-ink-soft mt-1">
+              {agent.capabilities.join(", ")}
+              {" · "}max {agent.maxTurns ?? DEFAULT_MAX_TURNS} turns
+            </p>
+          </Link>
         )}
       </section>
 
@@ -198,16 +185,13 @@ export default async function Dashboard({
             {conversations.map((conv) => (
               <Link
                 key={conv.id}
-                href={`/agents/${conv.agent_id}`}
+                href="/agent"
                 className="block border border-line bg-surface rounded-xl p-3 shadow-sm hover:border-primary hover:shadow-md transition-all"
               >
                 <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-ink">{conv.agent_id}</span>
-                    <span className="text-ink-soft truncate max-w-md">
-                      {conv.title || "Untitled"}
-                    </span>
-                  </div>
+                  <span className="text-ink-soft truncate max-w-md">
+                    {conv.title || "Untitled"}
+                  </span>
                   <div className="flex items-center gap-3 text-ink-faint">
                     <span>{conv.messages.length} msgs</span>
                     <span>

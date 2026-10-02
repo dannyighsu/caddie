@@ -35,7 +35,7 @@ const upMin = () => ((Date.now() - startedAt) / 60000).toFixed(1);
 // Classify this process so the (noisy, multi-process) output is scannable.
 // Evaluated lazily — process.title isn't set to "next-server" until Next boots.
 function role() {
-  if (process.env.IGNIS_AGENT_ID || process.env.IGNIS_TRACE_ID) return "agent";
+  if (process.env.IGNIS_WORKSPACE || process.env.IGNIS_TRACE_ID) return "agent";
   if ((process.title || "").includes("next-server")) return "server";
   return "child";
 }

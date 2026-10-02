@@ -25,7 +25,7 @@ import {
 import type { Message } from "./db.ts";
 
 const ID = "3f1c2b4a-5d6e-4f70-8a9b-0c1d2e3f4a5b";
-const WS = "/home/me/.ignis/buri";
+const WS = "/home/me/.ignis";
 
 test("channelOf reads the external id's namespace; portal chats have none", () => {
   assert.equal(channelOf("email:18a2f"), "email");

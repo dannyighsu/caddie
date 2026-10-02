@@ -112,7 +112,6 @@ export const SuiteConfig = z
     name: z.string(),
     description: z.string().optional(),
     driver: z.string(),
-    agent: z.string().default("buri"),
     /** Driver-specific defaults merged under each case. */
     defaults: z.record(z.unknown()).default({}),
   })

@@ -102,7 +102,7 @@ whatever branch and uncommitted state it happens to be in.
 
 **Never change what governs you.** These files decide what you are allowed to
 do, and most of them are read live rather than compiled — `permissions.json`,
-`persona.md`, `agent.json` and `config/` are re-read on every run,
+`SYSTEM.md`, `PERSONA.md`, `agent.json` and `config/` are re-read on every run,
 skills take effect on the next one, and `.claude/settings.json` and `scripts/`
 take effect on the very next tool call, inside the run that changed them. So a
 change here is not a proposal for a human to review later; it is already in
@@ -111,8 +111,8 @@ force.
 | Do not touch | Why |
 |---|---|
 | `harness/permissions.json` | the trust-tier policy — what each tier may do |
-| `harness/agents/*/agent.json` | which capabilities an agent is granted |
-| `harness/agents/*/persona.md` | your own instructions |
+| `harness/agent/agent.json` | which capabilities you are granted |
+| `harness/agent/SYSTEM.md`, `harness/agent/PERSONA.md` | your own instructions |
 | `harness/.claude/settings.json`, `harness/scripts/` | the hooks that enforce all of the above |
 
 If a fix genuinely seems to need one of these, **stop and say so** — in your

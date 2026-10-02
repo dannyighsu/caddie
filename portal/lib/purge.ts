@@ -27,15 +27,15 @@ import { teamRoster } from "@ignis/harness";
 import { conversationTitle, channelOf, resolvePurgeTarget } from "./rag-files";
 import { senderLabel } from "./conversation-history";
 import { getConversation, recordPurge, tombstoneMessage, type PurgeReason } from "./db";
-import { agentWorkspace, removeMirroredMessage } from "./conversation-mirror";
+import { removeMirroredMessage } from "./conversation-mirror";
 import { removeFromIndex } from "./workspace-index";
 import { sendEmail, isEmailConfigured } from "./email";
-import { getAgent } from "./harness";
+import { workspace } from "./harness";
+import { agentName } from "./agent-name";
 
 export const PURGE_REASONS: PurgeReason[] = ["phishing", "prompt-injection", "other"];
 
 export interface PurgeRequest {
-  agentId: string;
   /** The run's trust tier, injected by the harness. */
   trustTier: string;
   /** The inbound message the run is handling, injected by the harness. */
@@ -58,11 +58,10 @@ export async function purgeContent(req: PurgeRequest): Promise<PurgeResult> {
   if (!PURGE_REASONS.includes(req.reason)) {
     return { success: false, error: `reason must be one of: ${PURGE_REASONS.join(", ")}` };
   }
-  const workspace = agentWorkspace(req.agentId);
   const target = resolvePurgeTarget(req, workspace);
   if ("error" in target) return { success: false, error: target.error };
 
-  return target.kind === "message" ? purgeMessage(req, target) : purgeFile(req, workspace, target.rel);
+  return target.kind === "message" ? purgeMessage(req, target) : purgeFile(req, target.rel);
 }
 
 async function purgeMessage(
@@ -70,7 +69,7 @@ async function purgeMessage(
   { conversationId, seq }: { conversationId: string; seq: number }
 ): Promise<PurgeResult> {
   const conv = await getConversation(conversationId);
-  if (!conv || conv.agent_id !== req.agentId) return { success: false, error: `No conversation ${conversationId}.` };
+  if (!conv) return { success: false, error: `No conversation ${conversationId}.` };
 
   const result = await tombstoneMessage(conversationId, seq, {
     at: new Date().toISOString(),
@@ -81,12 +80,11 @@ async function purgeMessage(
 
   // Clean up downstream even when already purged: a crash between the
   // tombstone and here would otherwise leave the file and index entry behind.
-  const rel = await removeMirroredMessage(req.agentId, conv, seq);
-  await removeFromIndex(req.agentId, rel);
+  const rel = await removeMirroredMessage(conv, seq);
+  await removeFromIndex(rel);
   if (result.status === "already-purged") return { success: true, purged: rel, alreadyGone: true };
 
   await recordPurge({
-    agentId: req.agentId,
     kind: "message",
     conversationId,
     seq,
@@ -106,7 +104,7 @@ async function purgeMessage(
   return { success: true, purged: rel };
 }
 
-async function purgeFile(req: PurgeRequest, workspace: string, rel: string): Promise<PurgeResult> {
+async function purgeFile(req: PurgeRequest, rel: string): Promise<PurgeResult> {
   const abs = resolve(workspace, rel);
   let content: Buffer | null = null;
   try {
@@ -116,11 +114,10 @@ async function purgeFile(req: PurgeRequest, workspace: string, rel: string): Pro
     // Already gone. Still make sure the index forgets it.
   }
   await rm(abs, { force: true });
-  await removeFromIndex(req.agentId, rel);
+  await removeFromIndex(rel);
   if (!content) return { success: true, purged: rel, alreadyGone: true };
 
   await recordPurge({
-    agentId: req.agentId,
     kind: "file",
     path: rel,
     reason: req.reason,
@@ -136,17 +133,17 @@ async function purgeFile(req: PurgeRequest, workspace: string, rel: string): Pro
 /** One email to the team per purge. Best-effort: the purge itself already happened. */
 async function notifyTeam(req: PurgeRequest, where: string[], source: string | null): Promise<void> {
   const recipients = teamRoster().flatMap((m) => m.emails.slice(0, 1));
-  const agentName = (await getAgent(req.agentId))?.name ?? req.agentId;
+  const name = agentName();
   const reason = req.reason === "other" ? "unsafe content" : req.reason;
-  const subject = `${agentName} removed suspected ${reason}`;
+  const subject = `${name} removed suspected ${reason}`;
   const body = [
-    `${agentName} judged something to be suspected ${reason} and removed it from its history, workspace and search.`,
+    `${name} judged something to be suspected ${reason} and removed it from its history, workspace and search.`,
     "",
     ...where,
     ...(req.note ? [`Why: ${req.note}`] : []),
     "",
     source
-      ? `If this was a mistake, the original is still in ${source}; ${agentName} just can't see it anymore.`
+      ? `If this was a mistake, the original is still in ${source}; ${name} just can't see it anymore.`
       : `The text is gone for good.`,
   ].join("\n");
 
