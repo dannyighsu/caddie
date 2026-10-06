@@ -27,6 +27,7 @@ import {
   type SlackChannelSummary,
 } from "./slack-channels";
 import { teamLookup } from "@ignis/harness";
+import type { SlackFile } from "./slack-files";
 
 
 // --- Web API (sending) ---
@@ -251,6 +252,8 @@ export type SlackMessageHandler = (event: {
   ts: string;
   threadTs?: string;
   user: string;
+  /** Files uploaded with the message; downloaded by the handler. */
+  files?: SlackFile[];
 }) => Promise<void>;
 
 let socketClient: SocketModeClient | null = null;
@@ -286,7 +289,10 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
     }
 
     const text = (event.text as string ?? "").replace(/<@[A-Z0-9]+>/g, "").trim();
-    if (!text) {
+    const files = (event.files as SlackFile[] | undefined) ?? [];
+    // A file dropped in with a bare @mention ("@buri" + a screenshot) is a real
+    // message, so files alone are enough to dispatch on.
+    if (!text && files.length === 0) {
       console.log(
         `[Slack Socket] Skipping mention: empty text after stripping mention user=${event.user} channel=${event.channel}`,
       );
@@ -300,6 +306,7 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
         ts: event.ts as string,
         threadTs: event.thread_ts as string | undefined,
         user: event.user as string,
+        ...(files.length > 0 && { files }),
       });
     } catch (err) {
       console.error("[Slack Socket] Mention handler error:", err);

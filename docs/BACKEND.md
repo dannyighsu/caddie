@@ -51,6 +51,7 @@ Route handlers stay thin; the work is in `lib/`:
 | Scheduling + job execution | `scheduler.ts`, `redis.ts` |
 | Outbound messaging | `notification-channels.ts`, `slack.ts`, `telegram.ts`, `email.ts` |
 | Inbound channels + identity | `messaging.ts`, `*-handler.ts`, `identity.ts` |
+| Inbound attachments | `gmail/parts.ts` + `gmail/attachments.ts`, `slack-files.ts` + `slack-attachments.ts`, `mime.ts` (shared) |
 | Agent runs | `harness.ts` (launches via `@ignis/harness`) |
 | Persistence | `db.ts` (Postgres) |
 
