@@ -15,6 +15,7 @@ import {
   getDueJobs,
   markJobFired,
   overrideNextRun,
+  deferRecurringJob,
   acquireActiveRun,
   clearActiveRun,
   isRunActive,
@@ -93,8 +94,9 @@ export function startScheduler(): void {
 
         // Fire async — don't block the poller. executeJob takes a per-profile
         // active-run lock: if a run for this profile is still in flight
-        // (long run, or a manual "run now"), this occurrence is skipped rather
-        // than run concurrently and clobber the shared workspace.
+        // (long run, or a manual "run now"), this occurrence is deferred a few
+        // minutes rather than run concurrently and clobber the shared
+        // workspace.
         executeJob(job, { source: "scheduler" })
           .then((result) => {
             if (result.skipped) {
@@ -123,8 +125,9 @@ export interface ExecuteJobResult {
   error?: string;
   /**
    * True when the job did not run because another run for the same profile was
-   * already active (concurrency lock not acquired). Not a failure — the
-   * caller should treat this as "try again later".
+   * already active (concurrency lock not acquired). Not a failure — a recurring
+   * occurrence has been deferred to a later time (see `error` for when), and a
+   * manual trigger should simply be retried.
    */
   skipped?: boolean;
   /** The job-run ledger id for this execution (for linking replays). */
@@ -220,12 +223,34 @@ export async function executeJob(
     const acquired = await acquireActiveRun(lockKey);
     if (!acquired) {
       // A one-shot (no cron) occurrence is lost when skipped, so it's recorded
-      // as a replayable failure; a recurring one just fires again next tick.
-      await finishSkipped(runId, !job.cron);
+      // as a replayable failure. A recurring one is deferred a couple of
+      // minutes so it still runs: the poller already called markJobFired, which
+      // advanced nextRun to the next natural occurrence, so leaving it alone
+      // would silently drop this occurrence rather than retry it. Only for
+      // scheduled fires — a manual trigger must not shift the schedule.
+      const deferredTo =
+        job.cron && opts.source === "scheduler"
+          ? await deferRecurringJob(job.id)
+          : null;
+      const busy = `A run is already in progress for ${lockKey}`;
+      if (deferredTo) {
+        console.log(
+          `[Scheduler] Job ${job.id} deferred to ${deferredTo.toISOString()} — ${busy}`
+        );
+      }
+      await finishSkipped(
+        runId,
+        !job.cron,
+        deferredTo
+          ? `${busy}; occurrence deferred to ${deferredTo.toISOString()}.`
+          : `${busy}; not deferred (next scheduled occurrence is already due).`
+      );
       return {
         success: false,
         skipped: true,
-        error: `A run is already in progress for ${lockKey}`,
+        error: deferredTo
+          ? `${busy} — deferred to ${deferredTo.toISOString()}`
+          : busy,
         runId,
       };
     }

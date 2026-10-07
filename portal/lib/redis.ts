@@ -8,6 +8,7 @@
 import Redis from "ioredis";
 import type { NotificationChannel } from "./notification-channels";
 import type { TrustTier } from "./identity";
+import { computeDeferral } from "./defer";
 
 let redis: Redis | null = null;
 
@@ -124,6 +125,13 @@ export interface ScheduledJob {
   cron?: string;
   /** Precomputed next run time (epoch ms). */
   nextRun: number;
+  /**
+   * Set only while a recurring occurrence is being deferred because the
+   * active-run lock was busy (see `deferRecurringJob`): the epoch-ms time of the
+   * occurrence's own next natural cron fire, which the retries must not pass.
+   * Cleared whenever the job fires.
+   */
+  deferDeadline?: number;
   /** Whether the job is active. */
   enabled: boolean;
   /** Optional params passed to the launcher. */
@@ -310,8 +318,10 @@ export async function markJobFired(jobId: string): Promise<void> {
   const job = deserializeJob(data);
 
   if (job.cron) {
-    // Recurring: compute next occurrence and reschedule
+    // Recurring: compute next occurrence and reschedule. Firing ends any
+    // deferral of the previous occurrence, so the deadline goes away with it.
     job.nextRun = await computeNextRun(job.cron);
+    delete job.deferDeadline;
     await upsertJob(job);
   } else {
     // One-shot: remove entirely
@@ -356,6 +366,51 @@ export async function overrideNextRun(id: string, nextRun: Date): Promise<void> 
   const job = deserializeJob(data);
   job.nextRun = nextRun.getTime();
   await upsertJob(job);
+}
+
+/**
+ * Push a recurring occurrence a little further out because it couldn't acquire
+ * the active-run lock, so it is retried instead of lost.
+ *
+ * `markJobFired` has already advanced `nextRun` to the next natural cron
+ * occurrence by the time we know the lock was busy, so "it just fires again
+ * next tick" doesn't hold — without this the blocked occurrence is dropped
+ * silently. The retry never lands past that natural occurrence (the deadline),
+ * so a deferral can't displace a later fire or loop forever.
+ *
+ * Returns the new run time, or null if the occurrence wasn't deferred (not a
+ * recurring job, or its natural occurrence is already due and will cover it).
+ */
+export async function deferRecurringJob(
+  id: string,
+  delayMs?: number
+): Promise<Date | null> {
+  const r = getRedis();
+  const data = await r.hget(JOBS_HASH, id);
+  if (!data) return null;
+  const job = deserializeJob(data);
+  if (!job.cron) return null;
+
+  const deferral = computeDeferral({
+    now: Date.now(),
+    naturalNext: job.nextRun,
+    deadline: job.deferDeadline,
+    delayMs,
+  });
+
+  if (!deferral) {
+    // Out of runway — leave nextRun alone and stop carrying the deadline.
+    if (job.deferDeadline !== undefined) {
+      delete job.deferDeadline;
+      await upsertJob(job);
+    }
+    return null;
+  }
+
+  job.nextRun = deferral.nextRun;
+  job.deferDeadline = deferral.deadline;
+  await upsertJob(job);
+  return new Date(deferral.nextRun);
 }
 
 /**

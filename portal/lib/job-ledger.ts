@@ -206,18 +206,26 @@ export async function failOrchestration(id: string, error: string): Promise<void
  * Finish a run that never launched because another run for the same agent was
  * already active. A one-shot occurrence is lost when this happens, so it's
  * recorded as a failure ('dropped') and offered for replay; a recurring
- * occurrence just fires again next tick, so it's a benign 'skipped'.
+ * occurrence is deferred and runs shortly after, so it's a benign 'skipped'.
+ *
+ * `note` records why — and, for a deferred occurrence, when it will run — so a
+ * skipped row explains itself in the Runs list and in introspection.
  */
-export async function finishSkipped(id: string, dropped: boolean): Promise<void> {
+export async function finishSkipped(
+  id: string,
+  dropped: boolean,
+  note?: string
+): Promise<void> {
   if (dropped) {
     await finishRun(id, {
       status: "failed",
       failureClass: "dropped",
       error:
+        note ??
         "One-shot occurrence dropped: another run for this agent was already active.",
     });
   } else {
-    await finishRun(id, { status: "skipped" });
+    await finishRun(id, { status: "skipped", error: note });
   }
 }
 
