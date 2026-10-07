@@ -21,6 +21,11 @@
  * ledger's orchestration metadata (status, error, token cost, what triggered it)
  * when a matching row exists. They join on sessionId.
  *
+ * Ledger rows with NO transcript are listed too, flagged `noTranscript: true`.
+ * Those are occurrences that never launched a session — skipped/deferred for a
+ * busy concurrency lock, or failed during orchestration — and leaving them out
+ * made a dropped scheduled job look like nothing had happened at all.
+ *
  * Read-only and self-scoped — it can only ever see this agent's own runs, so it
  * exposes nothing new and is safe wherever the agent already runs.
  *
@@ -48,14 +53,15 @@ const tools = [
       "List your own recent runs — the actual Claude Code sessions you executed, most recent first. Each is a real run that captured what you did, and each has a `sessionId` you pass to `view_run` to read its full transcript. " +
       "Use this to self-diagnose: see what ran when (run time and duration), and — for runs that went through the orchestrator — whether they succeeded or failed, why they failed, what triggered them (inbound message, scheduled job, trigger, or portal), and their token cost. " +
       "Runs carry this extra status/error/cost detail only while their ledger row is retained (~7 days); older runs still list from their transcript on disk, just with less metadata. " +
-      "Defaults to all runs; filter to 'failed' to focus on ones to debug, or 'active' for runs in flight.",
+      "Occurrences that never launched a session at all are listed too, marked `noTranscript: true` and with no `sessionId` to view — a scheduled job that was skipped or deferred because another run held the concurrency lock shows up this way. " +
+      "Defaults to all runs; filter to 'failed' to focus on ones to debug, 'active' for runs in flight, or 'skipped' for occurrences that didn't run.",
     inputSchema: {
       type: "object",
       properties: {
         status: {
           type: "string",
-          enum: ["all", "failed", "active"],
-          description: "Which runs to list. 'all' (default). 'failed'/'active' filter by orchestrator status and so only include runs that still have a ledger row.",
+          enum: ["all", "failed", "active", "skipped"],
+          description: "Which runs to list. 'all' (default). 'failed'/'active'/'skipped' filter by orchestrator status and so only include runs that still have a ledger row.",
         },
         limit: {
           type: "number",
@@ -125,7 +131,7 @@ async function fetchJsonSafe(url) {
 // --- Tool handlers ---
 
 async function handleListRuns(args) {
-  const status = ["all", "failed", "active"].includes(args.status) ? args.status : "all";
+  const status = ["all", "failed", "active", "skipped"].includes(args.status) ? args.status : "all";
   const limit = Math.min(Math.max(Number(args.limit) || 20, 1), 200);
 
   // Source of truth = the actual Claude Code run transcripts on disk (one per
@@ -145,9 +151,10 @@ async function handleListRuns(args) {
     }
   }
 
-  const enrich = (sessionId, ranAt, sizeBytes, run) => ({
+  const enrich = (sessionId, ranAt, sizeBytes, run, noTranscript = false) => ({
     sessionId,
     ranAt,
+    ...(noTranscript ? { noTranscript: true } : {}),
     ...(sizeBytes != null ? { sizeKB: Math.round(sizeBytes / 1024) } : {}),
     ...(run
       ? {
@@ -171,6 +178,20 @@ async function handleListRuns(args) {
     runs = transcripts.map((t) =>
       enrich(t.sessionId, t.modified, t.size, ledgerBySession.get(t.sessionId))
     );
+
+    // Then add ledger rows that have no transcript — an occurrence that never
+    // launched a session (skipped/deferred for a busy lock, or an orchestration
+    // failure). Without these, a dropped scheduled fire is invisible here.
+    const haveTranscript = new Set(transcripts.map((t) => t.sessionId));
+    if (Array.isArray(ledger)) {
+      for (const r of ledger) {
+        if (r.session_id && haveTranscript.has(r.session_id)) continue;
+        runs.push(enrich(r.session_id ?? undefined, r.created_at, null, r, true));
+      }
+      // Merged two sources, so re-sort: most recent first.
+      runs.sort((a, b) => (Date.parse(b.ranAt) || 0) - (Date.parse(a.ranAt) || 0));
+      basis = "transcripts on disk, plus ledger rows with no transcript";
+    }
   } else if (Array.isArray(ledger)) {
     // Fallback: transcript listing unavailable — list from the ledger instead.
     basis = "job-run ledger (transcript listing unavailable)";
@@ -192,6 +213,7 @@ async function handleListRuns(args) {
   // status filter applies to orchestrator status, so it needs a ledger row.
   if (status === "failed") runs = runs.filter((r) => r.status === "failed");
   else if (status === "active") runs = runs.filter((r) => r.status === "running");
+  else if (status === "skipped") runs = runs.filter((r) => r.status === "skipped");
 
   runs = runs.slice(0, limit);
 
@@ -200,10 +222,14 @@ async function handleListRuns(args) {
   }
 
   const enriched = runs.filter((r) => r.status).length;
+  const noTranscript = runs.filter((r) => r.noTranscript).length;
   const header =
     `${runs.length} run(s) from ${basis}, most recent first. ` +
     `${enriched}/${runs.length} have orchestrator status/error/cost detail; ` +
-    `pass any run's sessionId to view_run to read its full transcript.`;
+    `pass any run's sessionId to view_run to read its full transcript.` +
+    (noTranscript
+      ? ` ${noTranscript} never launched a session (noTranscript: true) — nothing to view_run; read its status/error instead.`
+      : "");
 
   return {
     content: [{ type: "text", text: `${header}\n\n${JSON.stringify(runs, null, 2)}` }],
