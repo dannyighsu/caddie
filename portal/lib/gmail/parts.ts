@@ -20,6 +20,10 @@
  */
 
 import type { gmail_v1 } from "googleapis";
+import { baseMime, isViewableImage, safeAttachmentName } from "../mime.ts";
+
+// Re-exported so callers keep reaching email's own vocabulary through ./parts.
+export { formatBytes, isViewableImage, mimeFromFileName } from "../mime.ts";
 
 /** Case-insensitive lookup of one header on a single MIME part. */
 function partHeader(p: gmail_v1.Schema$MessagePart, name: string): string | undefined {
@@ -113,15 +117,6 @@ function envInt(name: string, fallback: number): number {
 }
 
 /**
- * Viewable raster images only. SVG is excluded on purpose: it's markup that can
- * carry script, and it isn't something the agent can view as an image anyway.
- */
-export function isViewableImage(mimeType: string): boolean {
-  const type = baseMime(mimeType);
-  return type.startsWith("image/") && type !== "image/svg+xml";
-}
-
-/**
  * Pick the images worth showing the agent, largest-first when over the cap but
  * returned in the message's own order so they line up with the body text.
  *
@@ -195,91 +190,12 @@ export function selectInboundFiles(parts: GmailPart[]): {
   return { fetch, listOnly };
 }
 
-/** Lower-cased mime type without parameters (`; charset=…`). */
-function baseMime(mimeType: string): string {
-  return mimeType.toLowerCase().split(";")[0].trim();
-}
-
-/** "1.2 MB"-style size for the agent's run context. */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 // --- Filenames ---
 
-const EXT_BY_MIME: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png",
-  "image/gif": "gif",
-  "image/webp": "webp",
-  "image/bmp": "bmp",
-  "image/tiff": "tiff",
-  "image/heic": "heic",
-  "image/heif": "heif",
-  "application/pdf": "pdf",
-  "text/calendar": "ics",
-  "text/csv": "csv",
-  "text/plain": "txt",
-  "application/zip": "zip",
-  "message/rfc822": "eml",
-  "application/msword": "doc",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-  "application/vnd.ms-excel": "xls",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
-  "application/vnd.ms-powerpoint": "ppt",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
-};
-
-const MIME_BY_EXT: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  gif: "image/gif",
-  webp: "image/webp",
-  bmp: "image/bmp",
-  tiff: "image/tiff",
-  heic: "image/heic",
-  heif: "image/heif",
-  pdf: "application/pdf",
-  ics: "text/calendar",
-  csv: "text/csv",
-  txt: "text/plain",
-  zip: "application/zip",
-  eml: "message/rfc822",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  xls: "application/vnd.ms-excel",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-};
-
 /**
- * A safe, collision-resistant name for a saved attachment.
- *
- * Sender-supplied filenames reach us verbatim, so directory components and
- * anything outside a conservative character set are stripped — the name becomes
- * a path under the workspace, and a `../` in it must not escape. The Gmail
- * message id is prefixed because the directory is per *thread*: two messages in
- * one thread both attaching `image.png` would otherwise overwrite each other.
+ * A safe, collision-resistant name for a saved attachment. The Gmail message id
+ * is the prefix because the directory is per *thread*. See ../mime.
  */
 export function safeAttachmentFileName(part: GmailPart, messageId: string, index: number): string {
-  const type = baseMime(part.mimeType);
-  const isImage = type.startsWith("image/");
-  const ext = EXT_BY_MIME[type] ?? (isImage ? "img" : "bin");
-  const base = (part.fileName.split(/[\\/]/).pop() ?? "")
-    .replace(/[^A-Za-z0-9._-]/g, "-")
-    .replace(/^[.-]+/, "")
-    .slice(0, 64);
-  const name = base || `${isImage ? "image" : "file"}-${index + 1}.${ext}`;
-  return `${messageId}-${name.includes(".") ? name : `${name}.${ext}`}`;
-}
-
-/** Best-effort mime type for a file we already saved, from its extension. */
-export function mimeFromFileName(fileName: string): string {
-  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  return MIME_BY_EXT[ext] ?? "application/octet-stream";
+  return safeAttachmentName(part.fileName, part.mimeType, messageId, index);
 }
