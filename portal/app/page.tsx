@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPortalStats, isStatsRange, type PortalStats, type StatsRange } from "@/lib/stats";
 import { DEFAULT_MAX_TURNS, type AgentConfig } from "@ignis/harness";
 import { agentName } from "@/lib/agent-name";
+import { FirstRunTeam } from "./settings/team-roster";
 
 interface Conversation {
   id: string;
@@ -15,6 +16,16 @@ async function getAgent(): Promise<AgentConfig | null> {
   try {
     const { getAgentConfig } = await import("@/lib/harness");
     return await getAgentConfig();
+  } catch {
+    return null;
+  }
+}
+
+/** Null when the roster couldn't be read — don't offer the first-run form then. */
+async function getTeamSize(): Promise<number | null> {
+  try {
+    const { getTeamRoster } = await import("@/lib/team");
+    return (await getTeamRoster()).length;
   } catch {
     return null;
   }
@@ -110,14 +121,16 @@ export default async function Dashboard({
   const { range: rangeParam } = await searchParams;
   const range: StatsRange = isStatsRange(rangeParam) ? rangeParam : "24h";
 
-  const [agent, conversations, stats] = await Promise.all([
+  const [agent, conversations, stats, teamSize] = await Promise.all([
     getAgent(),
     getConversations(),
     getStats(range),
+    getTeamSize(),
   ]);
 
   return (
     <div className="space-y-10">
+      {teamSize === 0 && <FirstRunTeam />}
       {stats && (
         <section>
           <div className="flex items-center justify-between mb-4">

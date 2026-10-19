@@ -27,6 +27,7 @@ import {
   type SlackChannelSummary,
 } from "./slack-channels";
 import { teamLookup } from "@ignis/harness";
+import { teamRoster } from "./team";
 import type { SlackFile } from "./slack-files";
 
 
@@ -331,7 +332,7 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
 
 /** Slack user id -> team member id, from the roster. */
 function teamSlackMap(): Map<string, UserId> {
-  return teamLookup("slackId");
+  return teamLookup(teamRoster(), "slackId");
 }
 
 /**

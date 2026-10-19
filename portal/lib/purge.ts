@@ -23,7 +23,7 @@
 import { createHash } from "crypto";
 import { stat, readFile, rm } from "fs/promises";
 import { resolve } from "path";
-import { teamRoster } from "@ignis/harness";
+import { getTeamRoster } from "./team";
 import { conversationTitle, channelOf, resolvePurgeTarget } from "./rag-files";
 import { senderLabel } from "./conversation-history";
 import { getConversation, recordPurge, tombstoneMessage, type PurgeReason } from "./db";
@@ -132,7 +132,7 @@ async function purgeFile(req: PurgeRequest, rel: string): Promise<PurgeResult> {
 
 /** One email to the team per purge. Best-effort: the purge itself already happened. */
 async function notifyTeam(req: PurgeRequest, where: string[], source: string | null): Promise<void> {
-  const recipients = teamRoster().flatMap((m) => m.emails.slice(0, 1));
+  const recipients = (await getTeamRoster()).flatMap((m) => m.emails.slice(0, 1));
   const name = agentName();
   const reason = req.reason === "other" ? "unsafe content" : req.reason;
   const subject = `${name} removed suspected ${reason}`;

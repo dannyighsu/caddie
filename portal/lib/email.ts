@@ -22,6 +22,7 @@ import {
 } from "./db";
 import type { ThreadContext } from "./thread-context";
 import { teamLookup } from "@ignis/harness";
+import { teamRoster } from "./team";
 import { parseMessageRefs, normalizeMessageId, summarizeEnvelope } from "./email-threading";
 import { isGmailConfigured, getSelfAddress } from "./gmail/client";
 import {
@@ -419,14 +420,14 @@ function parseAuthenticationResults(value: string): AuthResults {
 
 /** Email address -> team member id, from the roster. */
 function teamEmailMap(): Map<string, UserId> {
-  return teamLookup("emails");
+  return teamLookup(teamRoster(), "emails");
 }
 
 /**
  * Resolve an inbound email to a team identity or fall back to guest.
  *
  * Requires both:
- *   1. `From` address matches DANNY_EMAIL or BETTY_EMAIL (case-insensitive).
+ *   1. `From` address is one of a team member's emails on the roster (case-insensitive).
  *   2. An Authentication-Results header with spf=pass, dkim=pass, dmarc=pass.
  *
  * Any failure downgrades to guest — we'd rather lose authenticated access

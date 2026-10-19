@@ -1,94 +1,60 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { teamRoster, teamOwner, teamMember, teamMemberLabel, teamLookup } from "./roster.js";
+import { describe, it, expect } from "vitest";
+import { teamMemberId, teamOwner, teamMember, teamMemberLabel, teamLookup, type TeamMember } from "./roster.js";
 
-const TWO = {
-  TEAM_MEMBER_A_NAME: "Danny",
-  TEAM_MEMBER_A_EMAIL: "danny@example.com, Danny@work.example.com",
-  TEAM_MEMBER_A_SLACK_ID: "U_DANNY",
-  TEAM_MEMBER_B_NAME: "Betty",
-  TEAM_MEMBER_B_EMAIL: "betty@example.com",
-  TEAM_MEMBER_B_TELEGRAM_ID: "999",
-} as NodeJS.ProcessEnv;
+const TWO: TeamMember[] = [
+  {
+    id: "danny",
+    name: "Danny",
+    emails: ["danny@example.com", "danny@work.example.com"],
+    slackId: "U_DANNY",
+    isOwner: true,
+  },
+  { id: "betty", name: "Betty", emails: ["betty@example.com"], telegramId: "999", isOwner: false },
+];
 
-afterEach(() => vi.restoreAllMocks());
-
-describe("teamRoster", () => {
-  it("reads configured slots in order", () => {
-    expect(teamRoster(TWO).map((m) => m.id)).toEqual(["danny", "betty"]);
-  });
-
-  it("derives an id from the name and normalizes emails", () => {
-    const [danny] = teamRoster(TWO);
-    expect(danny.id).toBe("danny");
-    expect(danny.name).toBe("Danny");
-    expect(danny.emails).toEqual(["danny@example.com", "danny@work.example.com"]);
-  });
-
-  it("honors an explicit id so a rename doesn't orphan history", () => {
-    const env = { ...TWO, TEAM_MEMBER_A_NAME: "Daniel", TEAM_MEMBER_A_ID: "danny" };
-    expect(teamRoster(env)[0]).toMatchObject({ id: "danny", name: "Daniel" });
-  });
-
-  it("slugifies a multi-word name", () => {
-    expect(teamRoster({ TEAM_MEMBER_A_NAME: "Ana María" } as NodeJS.ProcessEnv)[0].id)
-      .toBe("ana-mar-a");
-  });
-
-  it("treats a slot with no name as unused, and skips gaps", () => {
-    const env = { TEAM_MEMBER_B_NAME: "Betty" } as NodeJS.ProcessEnv;
-    expect(teamRoster(env).map((m) => m.id)).toEqual(["betty"]);
-  });
-
-  it("returns an empty roster when nothing is configured", () => {
-    expect(teamRoster({} as NodeJS.ProcessEnv)).toEqual([]);
-  });
-
-  it("drops a duplicate id rather than letting one member shadow the other", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const env = { TEAM_MEMBER_A_NAME: "Sam", TEAM_MEMBER_B_NAME: "Sam" } as NodeJS.ProcessEnv;
-    expect(teamRoster(env)).toHaveLength(1);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('duplicates member id "sam"'));
+describe("teamMemberId", () => {
+  it("slugifies a name", () => {
+    expect(teamMemberId("Danny")).toBe("danny");
+    expect(teamMemberId("  Ana María ")).toBe("ana-mar-a");
   });
 });
 
 describe("teamOwner", () => {
-  it("is the first configured slot", () => {
+  it("is the member flagged as owner, wherever they sit", () => {
     expect(teamOwner(TWO)?.id).toBe("danny");
+    expect(teamOwner([...TWO].reverse())?.id).toBe("danny");
   });
 
-  it("is the first *configured* slot, not slot A, when A is empty", () => {
-    expect(teamOwner({ TEAM_MEMBER_B_NAME: "Betty" } as NodeJS.ProcessEnv)?.id).toBe("betty");
-  });
-
-  it("is null on an unconfigured instance", () => {
-    expect(teamOwner({} as NodeJS.ProcessEnv)).toBeNull();
+  it("is null when no one is the owner", () => {
+    expect(teamOwner([])).toBeNull();
+    expect(teamOwner([{ ...TWO[1] }])).toBeNull();
   });
 });
 
 describe("teamMember / teamMemberLabel", () => {
   it("looks a member up by id", () => {
-    expect(teamMember("betty", TWO)?.name).toBe("Betty");
+    expect(teamMember(TWO, "betty")?.name).toBe("Betty");
   });
 
   it("returns null for an id not on the roster", () => {
-    expect(teamMember("nobody", TWO)).toBeNull();
+    expect(teamMember(TWO, "nobody")).toBeNull();
   });
 
-  it("falls back to the raw id so pre-rename history still renders", () => {
-    expect(teamMemberLabel("someone-who-left", TWO)).toBe("someone-who-left");
+  it("falls back to the raw id so a removed member's history still renders", () => {
+    expect(teamMemberLabel(TWO, "someone-who-left")).toBe("someone-who-left");
   });
 });
 
 describe("teamLookup", () => {
   it("maps every address to its member, case-insensitively", () => {
-    const map = teamLookup("emails", TWO);
+    const map = teamLookup(TWO, "emails");
     expect(map.get("danny@example.com")).toBe("danny");
     expect(map.get("danny@work.example.com")).toBe("danny");
     expect(map.get("betty@example.com")).toBe("betty");
   });
 
   it("maps single-valued channel ids and omits members without one", () => {
-    expect(teamLookup("slackId", TWO)).toEqual(new Map([["u_danny", "danny"]]));
-    expect(teamLookup("telegramId", TWO)).toEqual(new Map([["999", "betty"]]));
+    expect(teamLookup(TWO, "slackId")).toEqual(new Map([["u_danny", "danny"]]));
+    expect(teamLookup(TWO, "telegramId")).toEqual(new Map([["999", "betty"]]));
   });
 });

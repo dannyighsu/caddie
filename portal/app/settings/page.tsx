@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { TeamRoster } from "./team-roster";
 
 interface SlackChannel {
   channelId: string;
@@ -55,6 +56,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-10">
       <h1 className="text-2xl font-semibold">Settings</h1>
+
+      <TeamRoster />
 
       {/* Slack */}
       <section className="space-y-4">

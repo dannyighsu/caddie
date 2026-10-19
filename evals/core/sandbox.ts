@@ -28,7 +28,7 @@ import { chmod, cp, mkdir, readFile, readdir, symlink, writeFile, stat } from "f
 import { existsSync } from "fs";
 import { resolve } from "path";
 import { workspaceDir } from "@ignis/harness";
-import { Anonymizer, REPO_ROOT, realAddressAliases } from "./team.ts";
+import { Anonymizer, REPO_ROOT, readLiveRoster, realAddressAliases } from "./team.ts";
 
 const REAL_HARNESS = resolve(REPO_ROOT, "harness");
 
@@ -146,7 +146,7 @@ export async function createSandbox(opts: SandboxOptions): Promise<Sandbox> {
   const targetConfig = resolve(workspace, "config");
   await mkdir(targetConfig, { recursive: true });
   if (existsSync(liveConfig)) {
-    await copyAnonymized(liveConfig, targetConfig, new Anonymizer(realAddressAliases()));
+    await copyAnonymized(liveConfig, targetConfig, new Anonymizer(realAddressAliases(await readLiveRoster())));
   }
 
   const binDir = resolve(opts.runDir, "bin");

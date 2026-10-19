@@ -4,9 +4,10 @@
  * Email-Team MCP Server
  *
  * A minimal-privilege escalation tool: email the team members — and ONLY them.
- * Like `reply`, the destination is NOT chosen by the agent: recipients are
- * resolved server-side from the TEAM_MEMBER_* roster, so the agent picks which
- * member by id (or "all") and can never redirect this to an arbitrary address.
+ * Like `reply`, the destination is NOT chosen by the agent: the portal resolves
+ * recipients from the team roster, so the agent picks which member by id (or
+ * "all") and can never redirect this to an arbitrary address. This process
+ * never sees an address at all.
  *
  * That's what makes it safe to grant at GUEST trust. When an unverified sender
  * writes in (e.g. replying to mail the agent sent), the agent can loop the team
@@ -14,16 +15,16 @@
  * Contrast with `send_email` (the `email` capability), which takes an
  * agent-supplied recipient and therefore stays team-trust only.
  *
- * Delivery is proxied through the control API (`notify` action, email channel),
- * the same path as `send_email`, so the outbound thread is recorded and a team
- * reply comes back with full context.
+ * Delivery goes through the control API's `email_team` action, which sends
+ * along the same path as `send_email`, so the outbound thread is recorded and
+ * a team reply comes back with full context.
  *
- * The tool's `to` enum is generated from the roster at startup, so each install
- * exposes its own people's ids rather than a hardcoded pair.
+ * The tool's `to` enum is generated at startup from IGNIS_TEAM, so each install
+ * exposes its own people's ids.
  *
  * Env:
  *   PORTAL_URL       — Base URL for the portal control API (default: http://localhost:3000)
- *   TEAM_MEMBER_*    — The roster; see harness/src/team/roster.ts
+ *   IGNIS_TEAM       — JSON [{ id, name }] of the roster, set by the launcher
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -32,40 +33,14 @@ import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprot
 
 const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 
-/**
- * The team roster, read from TEAM_MEMBER_* env. Duplicated here rather than
- * imported because this file runs as a standalone MCP process with no build
- * step — it can't import the harness's compiled TS. Keep in sync with
- * harness/src/team/roster.ts.
- */
+/** The roster's ids and names, as the launcher passed them. No addresses. */
 function roster() {
-  const members = [];
-  for (const slot of ["A", "B"]) {
-    const name = process.env[`TEAM_MEMBER_${slot}_NAME`]?.trim();
-    if (!name) continue;
-    const id =
-      process.env[`TEAM_MEMBER_${slot}_ID`]?.trim() ||
-      name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    const email = (process.env[`TEAM_MEMBER_${slot}_EMAIL`] ?? "")
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean)[0];
-    members.push({ id, name, email: email ?? null });
+  try {
+    const members = JSON.parse(process.env.IGNIS_TEAM ?? "[]");
+    return Array.isArray(members) ? members : [];
+  } catch {
+    return [];
   }
-  return members;
-}
-
-/** Resolve the "to" selector into [{ member, address }], skipping unconfigured members. */
-function resolveRecipients(to) {
-  const all = roster();
-  const selected = to === "all" ? all : all.filter((m) => m.id === to);
-  const resolved = [];
-  const missing = [];
-  for (const member of selected) {
-    if (member.email) resolved.push({ member: member.id, address: member.email });
-    else missing.push(member.id);
-  }
-  return { resolved, missing };
 }
 
 const server = new Server(
@@ -135,19 +110,6 @@ async function handleEmailTeam(args) {
     };
   }
 
-  const { resolved, missing } = resolveRecipients(to);
-  if (resolved.length === 0) {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `No team address is configured for: ${missing.join(", ") || to}. Cannot send.`,
-        },
-      ],
-      isError: true,
-    };
-  }
-
   // Forward source-task facts (if this run came from a task) so the created
   // thread is linked for reply continuity — same as send_email.
   let threadContext;
@@ -156,35 +118,31 @@ async function handleEmailTeam(args) {
     try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
   }
 
-  const sent = [];
-  const failed = [];
-  for (const { member, address } of resolved) {
-    try {
-      const res = await fetch(`${PORTAL_URL}/api/control`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "notify",
-          channel: "email",
-          to: address,
-          subject,
-          ...(message && { message }),
-          ...(html && { html }),
-          ...(threadContext && { threadContext }),
-        }),
-      });
-      const result = await res.json();
-      if (result.success) sent.push(member);
-      else failed.push(`${member} (${result.error ?? "unknown error"})`);
-    } catch (err) {
-      failed.push(`${member} (${err.message})`);
-    }
+  let result;
+  try {
+    const res = await fetch(`${PORTAL_URL}/api/control`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "email_team",
+        to,
+        subject,
+        ...(message && { message }),
+        ...(html && { html }),
+        ...(threadContext && { threadContext }),
+      }),
+    });
+    result = await res.json();
+  } catch (err) {
+    return { content: [{ type: "text", text: `Failed to reach the portal: ${err.message}` }], isError: true };
   }
 
+  const { sent = [], missing = [], failed = [] } = result;
   const parts = [];
   if (sent.length) parts.push(`Sent to ${sent.join(" and ")}.`);
   if (missing.length) parts.push(`No address configured for ${missing.join(", ")}.`);
   if (failed.length) parts.push(`Failed for ${failed.join("; ")}.`);
+  if (!parts.length) parts.push(result.error ?? "Nothing was sent.");
 
   return {
     content: [{ type: "text", text: parts.join(" ") }],

@@ -9,6 +9,7 @@
  */
 
 import { teamMemberLabel } from "@ignis/harness";
+import { teamRoster } from "./team";
 import type { Message } from "./db";
 import type { ResolvedIdentity } from "./identity";
 import { renderThreadContext, type ThreadContext } from "./thread-context";
@@ -71,7 +72,7 @@ export function assembleInboundPrompt(input: InboundPromptInput): string {
 
 function currentMessageLabel(identity: ResolvedIdentity): string {
   if (identity.kind === "guest") return "Guest";
-  return teamMemberLabel(identity.userId);
+  return teamMemberLabel(teamRoster(), identity.userId);
 }
 
 /**

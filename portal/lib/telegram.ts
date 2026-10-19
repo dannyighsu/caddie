@@ -12,6 +12,7 @@
 
 import type { ResolvedIdentity, UserId } from "./identity";
 import { teamLookup } from "@ignis/harness";
+import { teamRoster } from "./team";
 
 const API_BASE = "https://api.telegram.org";
 
@@ -342,7 +343,7 @@ function escapeRegex(str: string): string {
 
 /** Telegram user id -> team member id, from the roster. */
 function teamTelegramMap(): Map<string, UserId> {
-  return teamLookup("telegramId");
+  return teamLookup(teamRoster(), "telegramId");
 }
 
 /**

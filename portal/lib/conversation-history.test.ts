@@ -9,6 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { renderHistoryLines } from "./conversation-history.ts";
+import { primeTeamRoster } from "./team.ts";
 import type { Message } from "./db.ts";
 
 function msg(role: "user" | "assistant", content: string): Message {
@@ -78,4 +79,16 @@ test("renderHistoryLines shows a purged message as a placeholder, never its text
   const lines = renderHistoryLines([msg("assistant", "sent the brochure"), purged, msg("assistant", "noted")]);
   assert.equal(lines.length, 3);
   assert.equal(lines[1], "[Guest]: [removed — suspected phishing]");
+});
+
+test("renderHistoryLines labels a team member by roster name, and a removed one by raw id", () => {
+  primeTeamRoster([{ id: "alex", name: "Alex", emails: ["alex@team.example"], isOwner: true }]);
+  const from = (userId: string): Message => ({
+    ...msg("user", `hi from ${userId}`),
+    sender: { kind: "authenticated", userId },
+  });
+  const lines = renderHistoryLines([from("alex"), from("someone-who-left")]);
+
+  assert.match(lines[0], /Alex/);
+  assert.match(lines[1], /someone-who-left/);
 });

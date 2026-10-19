@@ -26,7 +26,7 @@ import type { Driver, Evidence, LoadedCase, RunOptions, SuiteConfig } from "../c
 import { startFakePortal } from "../core/fake-portal.ts";
 import { createSandbox } from "../core/sandbox.ts";
 import { collectTranscript } from "../core/transcript.ts";
-import { AGENT_ADDRESS, FAKE_TEAM, bare } from "../core/team.ts";
+import { AGENT_ADDRESS, FAKE_TEAM, bare, fakeRoster } from "../core/team.ts";
 
 const Turn = z
   .object({
@@ -160,6 +160,7 @@ export const inboundMessage: Driver = {
           agentDir: sandbox.agentDir,
           capabilitiesDir: sandbox.capabilitiesDir,
           workspace: sandbox.workspace,
+          team: fakeRoster,
         }
       );
       const launchInput = {

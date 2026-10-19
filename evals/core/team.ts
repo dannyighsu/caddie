@@ -2,45 +2,45 @@
  * The eval's stand-in team, and the anonymizer that maps real addresses onto it.
  *
  * Committed cases never carry real addresses or phone numbers. Every run uses
- * this fake roster (exported as TEAM_MEMBER_* env so the launcher, identity
- * labels and `email_team` all agree), and the live `config/` copied into a
- * sandbox is passed through the same anonymizer so standing instructions that
- * name the team's real addresses point at the fake ones.
+ * this fake roster (primed into the portal's roster cache and passed to the
+ * launcher, so identity labels, the team directory and `email_team` all
+ * agree), and the live `config/` copied into a sandbox is passed through the
+ * same anonymizer so standing instructions that name the team's real addresses
+ * point at the fake ones.
  */
 
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
+import type { TeamMember } from "@ignis/harness";
 
 export const REPO_ROOT = resolve(import.meta.dirname, "..", "..");
 
 export interface FakeMember {
-  slot: "A" | "B";
   id: string;
   name: string;
   email: string;
 }
 
+/** Fixed, so committed cases don't depend on who is on a given install's roster. */
 export const FAKE_TEAM: FakeMember[] = [
-  { slot: "A", id: "danny", name: "Danny", email: "danny@team.example" },
-  { slot: "B", id: "betty", name: "Betty", email: "betty@team.example" },
+  { id: "danny", name: "Danny", email: "danny@team.example" },
+  { id: "betty", name: "Betty", email: "betty@team.example" },
 ];
+
+/** The domain every fake team address lives on. */
+const TEAM_DOMAIN = "team.example";
 
 /** The agent's own inbox in every eval run. */
 export const AGENT_ADDRESS = "buri@assistant.example";
 
-export function fakeRosterEnv(): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const m of FAKE_TEAM) {
-    env[`TEAM_MEMBER_${m.slot}_NAME`] = m.name;
-    env[`TEAM_MEMBER_${m.slot}_EMAIL`] = m.email;
-    env[`TEAM_MEMBER_${m.slot}_ID`] = m.id;
-  }
-  return env;
+/** FAKE_TEAM in the roster shape the launcher and portal take. The first is the owner. */
+export function fakeRoster(): TeamMember[] {
+  return FAKE_TEAM.map((m, i) => ({ id: m.id, name: m.name, emails: [m.email], isOwner: i === 0 }));
 }
 
 export function isTeamAddress(addr: string): boolean {
   const a = bare(addr);
-  return a === AGENT_ADDRESS || FAKE_TEAM.some((m) => m.email === a);
+  return a === AGENT_ADDRESS || a.endsWith(`@${TEAM_DOMAIN}`);
 }
 
 export function bare(field: string): string {
@@ -63,23 +63,52 @@ function readEnvFile(path: string): Record<string, string> {
   return out;
 }
 
+let liveRoster: Promise<TeamMember[]> | undefined;
+
 /**
- * Real → fake address map for the install's own people, read from the live
- * roster (portal/.env.local, overridable by process.env). Returns an empty
- * map on a clone without one, which is fine: there's no real config to scrub.
+ * The install's real roster, read once from the portal's Postgres (URL from
+ * portal/.env.local unless already in the environment). Empty on a clone with
+ * no database configured, which is fine: there's no real config to scrub. A
+ * configured database that can't be read is an error, not an empty roster —
+ * carrying on would copy real addresses into the sandbox unscrubbed.
  */
-export function realAddressAliases(extraAgentAddresses: string[] = []): Map<string, string> {
-  const env = { ...readEnvFile(resolve(REPO_ROOT, "portal", ".env.local")) };
-  for (const [k, v] of Object.entries(process.env)) {
-    if (k.startsWith("TEAM_MEMBER_") && v && !v.endsWith(".example")) env[k] = v;
-  }
-  const map = new Map<string, string>();
-  for (const m of FAKE_TEAM) {
-    for (const addr of (env[`TEAM_MEMBER_${m.slot}_EMAIL`] ?? "").split(",")) {
-      const a = addr.trim().toLowerCase();
-      if (a) map.set(a, m.email);
+export function readLiveRoster(): Promise<TeamMember[]> {
+  liveRoster ??= (async () => {
+    const env = readEnvFile(resolve(REPO_ROOT, "portal", ".env.local"));
+    process.env.POSTGRES_URL ??= env.POSTGRES_URL;
+    if (!process.env.POSTGRES_URL) return [];
+    const { readTeamRoster } = await import("./portal.ts");
+    try {
+      return await readTeamRoster();
+    } catch (err) {
+      throw new Error(`Couldn't read the team roster to scrub real addresses: ${(err as Error).message}`);
     }
+  })();
+  return liveRoster;
+}
+
+/** Close the database pool `readLiveRoster` opened, so the process can exit. */
+export async function closeLiveRoster(): Promise<void> {
+  if (!liveRoster) return;
+  const { getPool } = await import("./portal.ts");
+  await getPool().end();
+}
+
+/**
+ * Real → fake address map for the install's own people. A real member with a
+ * fake counterpart (same id) maps onto it; anyone else maps onto
+ * `<id>@team.example`, so no real member's address reaches the sandbox.
+ */
+export function realAddressAliases(
+  roster: TeamMember[],
+  extraAgentAddresses: string[] = []
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const member of roster) {
+    const fake = FAKE_TEAM.find((f) => f.id === member.id)?.email ?? `${member.id}@${TEAM_DOMAIN}`;
+    for (const addr of member.emails) map.set(addr.trim().toLowerCase(), fake);
   }
+  const env = readEnvFile(resolve(REPO_ROOT, "portal", ".env.local"));
   for (const a of [env.GMAIL_ADDRESS, ...extraAgentAddresses]) {
     if (a) map.set(a.trim().toLowerCase(), AGENT_ADDRESS);
   }

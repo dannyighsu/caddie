@@ -11,9 +11,15 @@ import { fileURLToPath } from "url";
 import { createRuntime } from "../src/runtime/factory.js";
 import { createLauncher } from "../src/agent/launcher.js";
 import { workspaceDir } from "../src/workspace.js";
+import type { TeamMember } from "../src/team/roster.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(__dirname, "..");
+
+/** A stand-in team, so a smoke run needs no Postgres. The real roster is the portal's. */
+const SMOKE_TEAM: TeamMember[] = [
+  { id: "smoke", name: "Smoke Test", emails: ["smoke@team.example"], isOwner: true },
+];
 
 function parseArgs(): { profile?: string; prompt: string } {
   const args = process.argv.slice(2);
@@ -44,6 +50,7 @@ async function main() {
     resolversDir: resolve(harnessRoot, "resolvers"),
     // Same workspace the server uses, so a smoke run exercises the real one.
     workspace: workspaceDir(),
+    team: () => SMOKE_TEAM,
   });
 
   const result = await launcher.launch({

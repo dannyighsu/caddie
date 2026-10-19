@@ -6,14 +6,15 @@
  * field into the shared messaging handler. Downstream code reads only this
  * field — never raw channel data — to decide trust.
  *
- * Who counts as a team member comes from the roster (`TEAM_MEMBER_*` env), so
- * each instance names its own people. See harness/src/team/roster.ts.
+ * Who counts as a team member comes from the roster (the `team_members`
+ * table), so each instance names its own people. See lib/team.ts.
  */
 
 import { teamMember, teamMemberLabel, teamOwner } from "@ignis/harness";
+import { teamRoster } from "./team";
 
 /**
- * A team member's stable id, from the roster (`TEAM_MEMBER_*` env). A plain
+ * A team member's stable id, from the roster. A plain
  * string rather than a union: the people differ per instance, so membership is
  * validated against the loaded roster at runtime, not by the type system.
  */
@@ -59,12 +60,12 @@ export function describeSender(identity: ResolvedIdentity): string {
     // The portal doesn't verify a specific person — access is gated by the
     // network boundary (localhost/tailnet). So we say "owner", not "verified".
     return identity.kind === "authenticated"
-      ? `${teamMemberLabel(identity.userId)} (team owner, via the control portal)`
+      ? `${teamMemberLabel(teamRoster(), identity.userId)} (team owner, via the control portal)`
       : "owner (via the control portal)";
   }
   const via = CHANNEL_LABELS[identity.channel];
   if (identity.kind === "authenticated") {
-    return `${teamMemberLabel(identity.userId)} (team member, verified via ${via})`;
+    return `${teamMemberLabel(teamRoster(), identity.userId)} (team member, verified via ${via})`;
   }
   return `unverified sender (guest, via ${via})`;
 }
@@ -95,13 +96,13 @@ export function portalIdentity(userId: UserId): ResolvedIdentity {
 }
 
 /**
- * Owner attributed to portal runs when the selector hasn't set one: the first
- * configured roster slot. Empty string on an unconfigured instance — portal
+ * Owner attributed to portal runs when the selector hasn't set one: the
+ * roster's owner. Empty string on an unconfigured instance — portal
  * runs are still team-trust (the network boundary gates them), they just have
  * no one to attribute to.
  */
 export function defaultPortalOwner(): UserId {
-  return teamOwner()?.id ?? "";
+  return teamOwner(teamRoster())?.id ?? "";
 }
 
 /**
@@ -109,5 +110,5 @@ export function defaultPortalOwner(): UserId {
  * A cookie naming someone no longer on the roster is not honored.
  */
 export function parsePortalOwner(value: string | undefined | null): UserId {
-  return value && teamMember(value) ? value : defaultPortalOwner();
+  return value && teamMember(teamRoster(), value) ? value : defaultPortalOwner();
 }

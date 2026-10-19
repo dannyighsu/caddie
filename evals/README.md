@@ -64,7 +64,11 @@ case.yaml ──▶ driver ──▶ sandbox (temp harness root + workspace) ─
   real envelope summary and identity helpers. The one-time "you didn't reply"
   reminder is replayed as well.
 - **Fake team.** Every run uses the Danny/Betty roster at `@team.example` and
-  the agent inbox `buri@assistant.example` (`core/team.ts`).
+  the agent inbox `buri@assistant.example` (`core/team.ts`). The live config
+  copied into the sandbox is scrubbed against the real roster, read from the
+  portal's Postgres: each real member's addresses map to the fake member with
+  the same id, or to `<id>@team.example`. If the database is configured but
+  unreachable, the run stops rather than copy real addresses unscrubbed.
 
 ## Writing a case
 

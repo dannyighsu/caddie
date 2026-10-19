@@ -647,36 +647,44 @@ describe("createLauncher", () => {
   });
 
   it("injects the team directory from the roster on a team turn only", async () => {
-    const prev = { ...process.env };
-    process.env.TEAM_MEMBER_A_NAME = "Danny";
-    process.env.TEAM_MEMBER_A_EMAIL = "danny@example.com, danny@alt.example.com";
-    process.env.TEAM_MEMBER_B_NAME = "Veronica";
-    process.env.TEAM_MEMBER_B_EMAIL = "veronica@example.com";
+    const team = () => [
+      {
+        id: "danny",
+        name: "Danny",
+        emails: ["danny@example.com", "danny@alt.example.com"],
+        isOwner: true,
+      },
+      { id: "veronica", name: "Veronica", emails: ["veronica@example.com"], isOwner: false },
+    ];
 
-    try {
-      const runtime = mockRuntime();
-      const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
-      await launcher.launch({ identity: ID, prompt: "go" });
-      const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps", team });
+    await launcher.launch({ identity: ID, prompt: "go" });
+    const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
 
-      expect(prompt).toContain("Team directory");
-      expect(prompt).toContain("- Danny: danny@example.com (also: danny@alt.example.com)");
-      // The roster is the only source of names — no hardcoded pair survives.
-      expect(prompt).toContain("- Veronica: veronica@example.com");
+    expect(prompt).toContain("Team directory");
+    expect(prompt).toContain("- Danny: danny@example.com (also: danny@alt.example.com)");
+    // The roster is the only source of names — no hardcoded pair survives.
+    expect(prompt).toContain("- Veronica: veronica@example.com");
 
-      // A guest run must never see private addresses.
-      const guestRt = mockRuntime();
-      const guest = createLauncher(guestRt, { agentDir: "/agent", capabilitiesDir: "/caps" });
-      await guest.launch({
-        identity: { trustTier: "guest", senderIdentity: "stranger", originChannel: "email" },
-        prompt: "go",
-      });
-      const guestPrompt: string = (guestRt.execute as any).mock.calls[0][0].prompt;
-      expect(guestPrompt).not.toContain("Team directory");
-      expect(guestPrompt).not.toContain("veronica@example.com");
-    } finally {
-      process.env = prev;
-    }
+    // A guest run must never see private addresses.
+    const guestRt = mockRuntime();
+    const guest = createLauncher(guestRt, { agentDir: "/agent", capabilitiesDir: "/caps", team });
+    await guest.launch({
+      identity: { trustTier: "guest", senderIdentity: "stranger", originChannel: "email" },
+      prompt: "go",
+    });
+    const guestPrompt: string = (guestRt.execute as any).mock.calls[0][0].prompt;
+    expect(guestPrompt).not.toContain("Team directory");
+    expect(guestPrompt).not.toContain("veronica@example.com");
+  });
+
+  it("omits the team directory when the roster is empty", async () => {
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
+    await launcher.launch({ identity: ID, prompt: "go" });
+    const prompt: string = (runtime.execute as any).mock.calls[0][0].prompt;
+    expect(prompt).not.toContain("Team directory");
   });
 
   it("passes harnessRoot to runtime", async () => {

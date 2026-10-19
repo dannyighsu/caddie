@@ -85,6 +85,19 @@ a capability, set its key to `true` under `guest`.
 > the other toggles. That's fine for `team`; just don't expect
 > "base-tools on + egress off" to actually contain a tier.
 
+## The agent's environment
+
+The agent's process doesn't inherit the portal's environment wholesale. The
+runtime passes an allowlist (`AGENT_ENV_NAMES` in
+`harness/src/runtime/claude-code.ts`): OS basics, proxies, `PORTAL_URL`,
+`GOG_ACCOUNT`, and `ANTHROPIC_*` and `CLAUDE_*`. The Postgres and Redis URLs,
+bot tokens and API keys stay with the portal, so a team run with Bash can't
+reach the database. That matters most for the team roster: being on it is what
+grants the team tier, and it lives in Postgres. Capability servers get their
+secrets through `${VAR}` substitution in their JSON, not by inheritance, so
+they're unaffected. If something the agent runs needs another variable, add it
+to the allowlist. Don't add a secret the portal holds for itself.
+
 ## Related
 
 - [BACKEND.md](./BACKEND.md) — the API server's client classes and endpoint groups

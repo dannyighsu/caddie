@@ -91,16 +91,26 @@ cp portal/.env.example portal/.env.local
 cp harness/agent/PERSONA.example.md harness/agent/PERSONA.md
 ```
 
-**`portal/.env.local`** — fill in the `REQUIRED` block: the two URLs above, the
-team roster, and Google credentials (step 4). Everything else either has a
+**`portal/.env.local`** — fill in the `REQUIRED` block: the two URLs above and
+Google credentials (step 4). Everything else either has a
 working default or is an optional feature that stays off until configured; the
 file says which is which. Set `AGENT_NAME` to what the portal and alerts should
 call the agent.
 
-The **team roster** (`TEAM_MEMBER_A_*`, `TEAM_MEMBER_B_*`) is who the agent
-trusts. An inbound sender who isn't on it is a guest, and guests are granted
-nothing, so with an empty roster the agent boots and can't do anything for
-anyone.
+The **team roster** is who the agent trusts. An inbound sender whose email,
+Slack id or Telegram id isn't on it is a guest, and guests are granted nothing,
+so with an empty roster the agent boots and can't do anything for anyone. It
+lives in Postgres, not `.env.local`: once the portal is running, its dashboard
+asks for the owner (portal runs are attributed to them and failure alerts go to
+them), and everyone else is added under **Settings → Team**. Without a browser:
+
+```bash
+make team-add NAME="Your Name" EMAIL="you@example.com,you@work.example.com"
+```
+
+The first member added is the owner. A member's id (a slug of the name unless
+you give one) is fixed once added, because conversation history and
+`config/team/<id>.md` refer to it.
 
 **`harness/agent/PERSONA.md`** — who this agent is: its name, its role, whom it
 serves, how it sounds. It comes first in the system prompt, ahead of

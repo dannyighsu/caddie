@@ -17,6 +17,41 @@ import type {
   AgentRuntimeOutput,
 } from "./types.js";
 
+/**
+ * What the agent's process inherits from the host. An allowlist, not a copy of
+ * `process.env`: the portal's env holds the Postgres and Redis URLs, bot tokens
+ * and API keys, and a run with Bash could otherwise use them — `psql` its way
+ * onto the team roster, for one. Capability servers get their own secrets
+ * through `${VAR}` substitution in their JSON (see capability/mcp-resolver.ts),
+ * so nothing they need has to pass through here.
+ *
+ * Add a name only when something the agent runs reads it and it isn't a secret
+ * the portal holds for itself.
+ */
+const AGENT_ENV_NAMES = new Set([
+  // OS and shell basics
+  "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "LANG", "TZ", "TMPDIR",
+  // Proxies and certificates, for hosts that need them to reach anything
+  "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+  "NODE_EXTRA_CA_CERTS",
+  // Read by the agent's own tools, hooks and skills
+  "PORTAL_URL",   // the control API, called by every egress tool and the trace hooks
+  "GOG_ACCOUNT",  // the google-workspace skill's default account
+]);
+const AGENT_ENV_PREFIXES = ["LC_", "XDG_", "ANTHROPIC_", "CLAUDE_"];
+
+/** The subset of `env` a run inherits. Exported for tests. */
+export function agentBaseEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) continue;
+    if (AGENT_ENV_NAMES.has(key) || AGENT_ENV_PREFIXES.some((p) => key.startsWith(p))) {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
@@ -202,7 +237,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
 
       const proc = spawn(this.binary, args, {
         cwd,
-        env: { ...process.env, CLAUDECODE: undefined, ...additionalEnv },
+        env: { ...agentBaseEnv(process.env), ...additionalEnv },
         stdio: ["pipe", "pipe", "pipe"],
       });
 

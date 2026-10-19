@@ -15,7 +15,7 @@ import { existsSync } from "fs";
 import { resolve } from "path";
 import { stringify } from "yaml";
 import { findTranscript } from "../core/transcript.ts";
-import { Anonymizer, FAKE_TEAM, realAddressAliases } from "../core/team.ts";
+import { Anonymizer, FAKE_TEAM, readLiveRoster, realAddressAliases, closeLiveRoster } from "../core/team.ts";
 import { SUITES_DIR } from "../core/load.ts";
 
 const SPEAKERS: Record<string, string> = Object.fromEntries([
@@ -151,7 +151,7 @@ async function main() {
   const parsed = parseInboundPrompt(await firstPrompt(transcript));
   const fixtures = fixturesFromTranscript(await readFile(transcript, "utf-8"));
 
-  const anon = new Anonymizer(realAddressAliases(agentAddresses));
+  const anon = new Anonymizer(realAddressAliases(await readLiveRoster(), agentAddresses));
   const a = (s: string) => anon.text(s);
   const kase = {
     id: caseId,
@@ -184,8 +184,10 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((err) => {
-    console.error((err as Error).message);
-    process.exit(1);
-  });
+  main()
+    .then(closeLiveRoster)
+    .catch((err) => {
+      console.error((err as Error).message);
+      process.exit(1);
+    });
 }

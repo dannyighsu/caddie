@@ -12,7 +12,7 @@
 import { createServer, type Server } from "http";
 import type { AddressInfo } from "net";
 import type { OutboundEffect } from "./types.ts";
-import { bare, isTeamAddress } from "./team.ts";
+import { bare, isTeamAddress, FAKE_TEAM } from "./team.ts";
 
 export interface FakePortal {
   url: string;
@@ -84,6 +84,23 @@ export async function startFakePortal(replyAudience: string[]): Promise<FakePort
         }
         effects.push({ kind: channel === "slack" ? "slack" : "other", to: [], external: false, body: text(body.message), raw: body });
         return reply({ success: true, ts: `${n}.000` });
+      }
+
+      if (body.action === "email_team") {
+        // The real portal resolves the ids against the roster and sends one
+        // email per member; record it as one effect to everyone it reached.
+        const who = text(body.to) || "all";
+        const members = who === "all" ? FAKE_TEAM : FAKE_TEAM.filter((m) => m.id === who);
+        if (members.length === 0) return reply({ success: false, error: `No team member with id "${who}".` });
+        effects.push({
+          kind: "email",
+          to: members.map((m) => m.email),
+          external: false,
+          subject: text(body.subject),
+          body: text(body.message) || stripHtml(text(body.html)),
+          raw: body,
+        });
+        return reply({ success: true, sent: members.map((m) => m.id), missing: [], failed: [] });
       }
 
       if (body.action === "purge") {

@@ -8,6 +8,7 @@
  */
 
 import { teamMemberLabel } from "@ignis/harness";
+import { teamRoster } from "./team.ts";
 import type { Message } from "./db";
 
 /** How many recent turns are carried into the next run's prompt. */
@@ -38,7 +39,7 @@ export function senderLabel(m: Message): string {
   if (m.role === "assistant") return "Assistant";
   if (!m.sender) return "User";
   if (m.sender.kind === "guest") return "Guest";
-  return teamMemberLabel(m.sender.userId);
+  return teamMemberLabel(teamRoster(), m.sender.userId);
 }
 
 /**

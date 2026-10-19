@@ -10,6 +10,7 @@ import { createRuntime, createLauncher, workspaceDir } from "@ignis/harness";
 import type { AgentConfig, AgentInput, AgentResult } from "@ignis/harness";
 import { mkdir, readFile } from "fs/promises";
 import { alertOwnerOnApiFailure } from "./run-alerts";
+import { teamRoster } from "./team";
 
 // The harness package lives alongside the portal in the monorepo
 const repoRoot = resolve(process.cwd(), "..");
@@ -76,6 +77,7 @@ function getRawLauncher() {
       capabilitiesDir: resolve(harnessRoot, "capabilities"),
       resolversDir,
       workspace,
+      team: teamRoster,
     });
   }
   return launcherInstance;
@@ -85,7 +87,7 @@ function getRawLauncher() {
  * The shared launcher, wrapped so that every launch site — inbound channel
  * messages, the console run route, the control API, and the scheduler — routes
  * through one chokepoint that alerts the owner on any API-layer failure. Keeps
- * "detect a failed run and email danny" in a single place instead of scattered
+ * "detect a failed run and email the owner" in a single place instead of scattered
  * across callers where a new entry point could silently skip it.
  */
 export function getLauncher() {

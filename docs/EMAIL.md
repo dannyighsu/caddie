@@ -41,14 +41,9 @@ GOOGLE_CLIENT_SECRET=...
 # EMAIL_MAX_IMAGES=5                 # per message, largest first
 ```
 
-Team identity for the auth gate — the roster (see `portal/.env.example`):
-
-```bash
-TEAM_MEMBER_A_NAME=...
-TEAM_MEMBER_A_EMAIL=...        # comma-separated; first is primary
-# TEAM_MEMBER_B_NAME=...
-# TEAM_MEMBER_B_EMAIL=...
-```
+Team identity for the auth gate comes from the team roster, edited in the
+portal under **Settings → Team** (or `make team-add`). Each member's first email
+is their primary.
 
 ## How it works
 
@@ -150,4 +145,4 @@ curl -X POST localhost:3000/api/control \
 | Sends fail with insufficient permission | Token lacks `gmail.modify` — re-run `make google-auth`. |
 | No inbound picked up | Confirm the poller started (server logs `[Gmail Poller] Started`) and messages are actually `INBOX`+`UNREAD`. |
 | Inbound image never reaches the agent | Likely under `EMAIL_MIN_IMAGE_BYTES` (8KB default) or past the 5-image cap; check the `[Email Attachments]` logs. |
-| Wrong sender identity / everyone is guest | Check the sender's address is on the `TEAM_MEMBER_*_EMAIL` roster and that inbound carries a passing `Authentication-Results` header. |
+| Wrong sender identity / everyone is guest | Check the sender's address is on the team roster (Settings → Team) and that inbound carries a passing `Authentication-Results` header. |

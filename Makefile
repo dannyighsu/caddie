@@ -1,4 +1,4 @@
-.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke google-auth gog-auth expose unexpose keep-awake allow-sleep rag-setup rag-rebuild
+.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke team-add google-auth gog-auth expose unexpose keep-awake allow-sleep rag-setup rag-rebuild
 
 # Network exposure (see the "Network exposure" section in README.md).
 IGNIS_PORT ?= 3000
@@ -172,6 +172,15 @@ rag-rebuild:
 		rm -rf "$$ws/.rag/db" "$$ws/.rag/manifest.json"; \
 		echo "[rag-rebuild] portal not running — removed $$ws/.rag/db; the next start rebuilds it."; \
 	fi
+
+# Add a team member without a browser (the portal's /settings does the same):
+#   make team-add NAME="Alex" EMAIL="alex@example.com,alt@example.com" [SLACK=U0123] [TELEGRAM=123] [ID=alex] [OWNER=1]
+# The first member added is the owner. Restart a running portal afterwards.
+team-add:
+	@test -n "$(NAME)" || { echo 'usage: make team-add NAME="Alex" EMAIL="alex@example.com" [SLACK=…] [TELEGRAM=…] [ID=…] [OWNER=1]'; exit 1; }
+	cd portal && node --no-warnings scripts/team-add.ts --name "$(NAME)" \
+		$(if $(EMAIL),--email "$(EMAIL)") $(if $(SLACK),--slack "$(SLACK)") \
+		$(if $(TELEGRAM),--telegram "$(TELEGRAM)") $(if $(ID),--id "$(ID)") $(if $(OWNER),--owner)
 
 # Run a quick smoke test via the harness directly
 smoke:

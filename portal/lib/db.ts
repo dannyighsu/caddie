@@ -235,6 +235,24 @@ CREATE TABLE IF NOT EXISTS purges (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_purges_created ON purges(created_at DESC);
+
+-- The team roster: who this install serves. Being on it is what grants the
+-- team trust tier. See lib/team.ts, the only writer.
+CREATE TABLE IF NOT EXISTS team_members (
+  -- Stable id, referenced by conversation history, the portal cookie and the
+  -- agent's config/team/<id>.md. Never changes after the row is created.
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  name TEXT NOT NULL CHECK (btrim(name) <> ''),
+  -- Lowercased; the first is the primary. Unique across members, enforced in
+  -- lib/team.ts since an index can't reach inside an array.
+  emails TEXT[] NOT NULL DEFAULT '{}',
+  slack_id TEXT UNIQUE,
+  telegram_id TEXT UNIQUE,
+  is_owner BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_team_members_owner ON team_members(is_owner) WHERE is_owner;
 `;
 
 let schemaEnsured = false;

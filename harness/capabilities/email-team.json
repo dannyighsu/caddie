@@ -1,6 +1,6 @@
 {
   "name": "email-team",
-  "description": "Email the team members and only them \u2014 the recipient is resolved by the harness from the TEAM_MEMBER_* roster, never chosen by the agent. Minimal-privilege escalation path granted at every trust tier (including guest) so the agent can loop the team in without being able to mail anyone new. Sending arbitrary outbound mail stays on the team-only `email` capability.",
+  "description": "Email the team members and only them \u2014 the recipient is resolved by the portal from the team roster, never chosen by the agent. Minimal-privilege escalation path granted at every trust tier (including guest) so the agent can loop the team in without being able to mail anyone new. Sending arbitrary outbound mail stays on the team-only `email` capability.",
   "server": {
     "command": "node",
     "args": [

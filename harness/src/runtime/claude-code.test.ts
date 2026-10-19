@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { delimiter, join } from "path";
-import { ClaudeCodeRuntime, DEFAULT_TIMEOUT_MS } from "./claude-code.js";
+import { ClaudeCodeRuntime, DEFAULT_TIMEOUT_MS, agentBaseEnv } from "./claude-code.js";
 
 describe("ClaudeCodeRuntime", () => {
   describe("constructor defaults", () => {
@@ -238,6 +238,42 @@ describe("ClaudeCodeRuntime", () => {
         workingDirectory: "/tmp",
       });
       expect(env.CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS).toBe("0");
+    });
+  });
+
+  describe("agentBaseEnv", () => {
+    it("passes the basics and the agent's own vars through", () => {
+      const env = agentBaseEnv({
+        PATH: "/usr/bin",
+        HOME: "/home/a",
+        LC_ALL: "en_US.UTF-8",
+        PORTAL_URL: "http://localhost:3000",
+        GOG_ACCOUNT: "agent@example.com",
+        CLAUDE_CONFIG_DIR: "/home/a/.claude",
+      });
+      expect(env).toEqual({
+        PATH: "/usr/bin",
+        HOME: "/home/a",
+        LC_ALL: "en_US.UTF-8",
+        PORTAL_URL: "http://localhost:3000",
+        GOG_ACCOUNT: "agent@example.com",
+        CLAUDE_CONFIG_DIR: "/home/a/.claude",
+      });
+    });
+
+    it("drops the portal's infrastructure and secrets", () => {
+      const env = agentBaseEnv({
+        PATH: "/usr/bin",
+        POSTGRES_URL: "postgres://x",
+        REDIS_URL: "redis://x",
+        SLACK_BOT_TOKEN: "xoxb",
+        TELEGRAM_BOT_TOKEN: "t",
+        NOTION_INTERNAL_TOKEN: "n",
+        GOOGLE_CLIENT_SECRET: "g",
+        LANGFUSE_SECRET_KEY: "l",
+        CLAUDECODE: "1",
+      });
+      expect(env).toEqual({ PATH: "/usr/bin" });
     });
   });
 

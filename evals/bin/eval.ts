@@ -18,7 +18,8 @@
 import { relative, resolve } from "path";
 import { loadSuite, listSuites } from "../core/load.ts";
 import { runSuite, type RunConfig } from "../core/runner.ts";
-import { fakeRosterEnv } from "../core/team.ts";
+import { fakeRoster, closeLiveRoster } from "../core/team.ts";
+import { primeTeamRoster } from "../core/portal.ts";
 
 const DEFAULTS: RunConfig = {
   model: "claude-sonnet-5",
@@ -83,11 +84,13 @@ async function main() {
   }
 
   // Every run uses the fake team, so identity labels, the team directory and
-  // email_team all agree with the anonymized case files.
-  Object.assign(process.env, fakeRosterEnv());
+  // email_team all agree with the anonymized case files. The driver hands the
+  // same roster to the launcher.
+  primeTeamRoster(fakeRoster());
 
   console.log(`${suiteName}: ${cases.length} case(s) × ${cfg.trials} on ${cfg.model}${cfg.judge ? `, judge ${cfg.judgeModel}` : ""}`);
   const summary = await runSuite(suiteName, suite, cases, cfg);
+  await closeLiveRoster();
   const passed = summary.cases.filter((c) => c.passed).length;
   console.log(`\n${passed}/${summary.cases.length} passed · report: ${relative(process.cwd(), resolve(summary.resultsDir, "report.md"))}`);
   process.exit(passed === summary.cases.length ? 0 : 1);

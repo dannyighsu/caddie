@@ -22,7 +22,7 @@ import {
   BASE_TOOLS_KEY,
 } from "../policy/permissions.js";
 import { runResolvers } from "../resolver/runner.js";
-import { teamRoster } from "../team/roster.js";
+import type { TeamMember } from "../team/roster.js";
 import {
   journalConfig,
   watchJournal,
@@ -50,6 +50,12 @@ export interface LauncherConfig {
    * Defaults to <harnessRoot>/skills/core.
    */
   coreSkillsDir?: string;
+  /**
+   * The current team roster, read at the start of every run. The portal backs
+   * this with its Postgres cache; smoke runs and evals pass a fixture. Defaults
+   * to an empty team.
+   */
+  team?: () => TeamMember[];
 }
 
 async function loadAgentConfig(agentDir: string): Promise<AgentConfig> {
@@ -299,6 +305,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     resolversDir,
     workspace = workspaceDir(),
     coreSkillsDir = resolve(agentDir, "..", "skills", "core"),
+    team = () => [],
   } = config;
 
   /**
@@ -307,6 +314,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
   async function launch(input: AgentInput): Promise<AgentResult> {
     // 1. Load agent config and apply profile overrides
     const baseAgent = await loadAgentConfig(agentDir);
+    const roster = team();
 
     const profile = input.profile ? baseAgent.profiles?.[input.profile] : undefined;
     if (input.profile && !profile) {
@@ -442,7 +450,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     // the agent invites match the ones the auth gate trusts. Injected ONLY for
     // team-tier runs — a guest run must never receive these private addresses.
     if (input.identity.trustTier === "team") {
-      const directory = teamRoster()
+      const directory = roster
         .filter((m) => m.emails.length > 0)
         .map(({ name, emails }) => {
           const [primary, ...alts] = emails;
@@ -522,8 +530,10 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       : undefined;
 
     // Tell every capability server where the workspace is, for tools that hand
-    // it files, and the run's trust tier, for tools that narrow what they do on
-    // a guest run.
+    // it files, the run's trust tier, for tools that narrow what they do on a
+    // guest run, and who is on the team (ids and names only — guest runs get
+    // this too, so never addresses), for `email_team`'s recipient list.
+    const teamEnv = JSON.stringify(roster.map(({ id, name }) => ({ id, name })));
     const mcpServers = resolved && Object.keys(resolved.servers).length > 0
       ? Object.fromEntries(
           Object.entries(resolved.servers).map(([name, server]) => [
@@ -534,6 +544,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
                 ...server.env,
                 IGNIS_WORKSPACE: workingDirectory,
                 IGNIS_TRUST_TIER: trustTier,
+                IGNIS_TEAM: teamEnv,
               },
             },
           ])

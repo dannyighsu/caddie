@@ -9,6 +9,7 @@
  *
  * Actions:
  *   notify  — Send a message to Slack, Telegram, or email (immediately or scheduled)
+ *   email_team — Email team members by id (or "all"); addresses come from the roster
  *   run     — Execute the agent (immediately or scheduled)
  *   schedule — Create a recurring job
  *   list_slack_channels — List the workspace's Slack channels (id, name, whether the bot can post)
@@ -44,10 +45,12 @@ import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 import { purgeContent } from "@/lib/purge";
 import type { PurgeReason } from "@/lib/db";
 import { rebuildIndex, ragEnabled } from "@/lib/workspace-index";
+import { getTeamRoster } from "@/lib/team";
 
 interface ControlRequest {
   action:
     | "notify"
+    | "email_team"
     | "reply"
     | "run"
     | "schedule"
@@ -93,7 +96,8 @@ interface ControlRequest {
   blocks?: unknown;
   /**
    * Telegram chat ID (numeric string), or email recipient(s) — the email
-   * channel accepts a comma-separated list.
+   * channel accepts a comma-separated list. For `email_team`, a member id or
+   * "all".
    */
   to?: string;
   /** Additional email recipients, comma-separated (email channel only). */
@@ -181,6 +185,8 @@ async function executeAction(req: ControlRequest, portalOwner: UserId): Promise<
   switch (req.action) {
     case "notify":
       return executeNotify(req);
+    case "email_team":
+      return executeEmailTeam(req);
     case "reply":
       return executeReply(req);
     case "run":
@@ -377,6 +383,49 @@ async function executeListSlackChannels(req: ControlRequest): Promise<Record<str
   });
 
   return { success: true, count: channels.length, truncated, channels };
+}
+
+/**
+ * Email team members, chosen by id (or "all"), for the `email_team` tool. The
+ * address is looked up here from the roster, never supplied by the caller, so
+ * the tool can't be pointed at anyone outside the team — which is why it's safe
+ * at guest trust. One message per member, each its own thread, through the same
+ * path as `notify` so a reply comes back with context.
+ */
+async function executeEmailTeam(req: ControlRequest): Promise<Record<string, unknown>> {
+  const to = req.to ?? "all";
+  const roster = await getTeamRoster();
+  const selected = to === "all" ? roster : roster.filter((m) => m.id === to);
+  if (selected.length === 0) {
+    return { success: false, error: `No team member with id "${to}".` };
+  }
+
+  const sent: string[] = [];
+  const missing: string[] = [];
+  const failed: string[] = [];
+  for (const member of selected) {
+    const address = member.emails[0];
+    if (!address) {
+      missing.push(member.id);
+      continue;
+    }
+    try {
+      const result = await executeNotify({
+        action: "notify",
+        channel: "email",
+        to: address,
+        subject: req.subject,
+        message: req.message,
+        html: req.html,
+        threadContext: req.threadContext,
+      });
+      if (result.success) sent.push(member.id);
+      else failed.push(`${member.id} (${result.error ?? "unknown error"})`);
+    } catch (err) {
+      failed.push(`${member.id} (${(err as Error).message})`);
+    }
+  }
+  return { success: sent.length > 0, sent, missing, failed };
 }
 
 async function executeNotify(req: ControlRequest): Promise<Record<string, unknown>> {
@@ -690,7 +739,7 @@ export async function POST(request: NextRequest) {
 
   if (!req.action) {
     return NextResponse.json(
-      { success: false, error: "action is required (notify | reply | run | schedule | update_schedule | trigger | list_slack_channels | purge | rag_rebuild)" },
+      { success: false, error: "action is required (notify | email_team | reply | run | schedule | update_schedule | trigger | list_slack_channels | purge | rag_rebuild)" },
       { status: 400 }
     );
   }

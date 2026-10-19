@@ -16,6 +16,7 @@ import type { AgentResult } from "@ignis/harness";
 import { classifyRunFailure } from "./failure-classifier";
 import { sendEmail, isEmailConfigured } from "./email";
 import { teamOwner } from "@ignis/harness";
+import { getTeamRoster } from "./team";
 import { agentName } from "./agent-name";
 
 function transcriptUrl(sessionId: string): string {
@@ -39,10 +40,11 @@ export async function alertOwnerOnApiFailure(
   const { code, detail } = classified;
   const name = agentName();
 
-  const to = teamOwner()?.emails[0];
+  const to = teamOwner(await getTeamRoster().catch(() => []))?.emails[0];
   if (!to || !isEmailConfigured()) {
     console.error(
-      `[RunAlerts] API-layer failure (${code}) but email is not configured: ${detail}`
+      `[RunAlerts] API-layer failure (${code}) but ` +
+        `${to ? "email is not configured" : "the team has no owner with an email"}: ${detail}`
     );
     return;
   }

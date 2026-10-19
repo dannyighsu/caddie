@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Anonymizer, AGENT_ADDRESS } from "./team.ts";
+import { Anonymizer, AGENT_ADDRESS, realAddressAliases } from "./team.ts";
 import { parseInboundPrompt } from "../scripts/extract-case.ts";
 
 describe("Anonymizer", () => {
@@ -31,6 +31,20 @@ describe("Anonymizer", () => {
 
   it("replaces the agent's inbox name when used as a greeting", () => {
     expect(anon().text("Hola Myagent, write to myagent@gmail.com")).toBe("Hola Buri, write to buri@assistant.example");
+  });
+});
+
+describe("realAddressAliases", () => {
+  it("maps every real member, including one with no fake counterpart", () => {
+    const map = realAddressAliases([
+      { id: "danny", name: "D", emails: ["real.danny@gmail.com", "d@work.com"], isOwner: true },
+      { id: "betty", name: "B", emails: ["real.betty@gmail.com"], isOwner: false },
+      { id: "carol", name: "C", emails: ["carol@corp.com"], isOwner: false },
+    ]);
+    expect(map.get("real.danny@gmail.com")).toBe("danny@team.example");
+    expect(map.get("d@work.com")).toBe("danny@team.example");
+    expect(map.get("real.betty@gmail.com")).toBe("betty@team.example");
+    expect(map.get("carol@corp.com")).toBe("carol@team.example");
   });
 });
 

@@ -64,9 +64,9 @@ export type {
 } from "./resolver/types.js";
 export { runResolvers } from "./resolver/runner.js";
 
-// Team roster (who this instance serves — read from the environment)
+// Team roster (who this instance serves — owned by the portal, passed in)
 export {
-  teamRoster,
+  teamMemberId,
   teamOwner,
   teamMember,
   teamMemberLabel,
