@@ -98,6 +98,12 @@ secrets through `${VAR}` substitution in their JSON, not by inheritance, so
 they're unaffected. If something the agent runs needs another variable, add it
 to the allowlist. Don't add a secret the portal holds for itself.
 
+Secrets the agent itself uses, such as a bearer token for an API a job queries,
+go in `harness/agent/.env` (untracked). The launcher reads that file on every
+**team** run, merges it into the run's environment and lists the variable names
+(never the values) in the run context. Guest runs get none of it. Put a token
+there, not in the allowlist, when the agent's own commands need it.
+
 ## Related
 
 - [BACKEND.md](./BACKEND.md) — the API server's client classes and endpoint groups

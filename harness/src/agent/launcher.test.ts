@@ -679,6 +679,36 @@ describe("createLauncher", () => {
     expect(guestPrompt).not.toContain("veronica@example.com");
   });
 
+  it("puts the agent's secrets in a team run's env, by name only in the prompt, and never in a guest run", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("agent.json")) return JSON.stringify(baseAgentConfig);
+      if (/(PERSONA|SYSTEM)\.md$/.test(p)) return "persona";
+      if (p === "/agent/.env") return "# comment\nWEATHER_API_TOKEN=tok-123\nOTHER=\"quoted\"\n";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const runtime = mockRuntime();
+    const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });
+    await launcher.launch({ identity: ID, prompt: "go", additionalEnv: { OTHER: "caller" } });
+    const call = (runtime.execute as any).mock.calls[0][0];
+    // The caller's env wins over the file.
+    expect(call.additionalEnv).toEqual({ WEATHER_API_TOKEN: "tok-123", OTHER: "caller" });
+    expect(call.prompt).toContain("Secrets in your environment");
+    expect(call.prompt).toContain("OTHER, WEATHER_API_TOKEN");
+    expect(call.prompt).not.toContain("tok-123");
+
+    const guestRt = mockRuntime();
+    const guest = createLauncher(guestRt, { agentDir: "/agent", capabilitiesDir: "/caps" });
+    await guest.launch({
+      identity: { trustTier: "guest", senderIdentity: "stranger", originChannel: "email" },
+      prompt: "go",
+    });
+    const guestCall = (guestRt.execute as any).mock.calls[0][0];
+    expect(guestCall.additionalEnv).toEqual({});
+    expect(guestCall.prompt).not.toContain("WEATHER_API_TOKEN");
+  });
+
   it("omits the team directory when the roster is empty", async () => {
     const runtime = mockRuntime();
     const launcher = createLauncher(runtime, { agentDir: "/agent", capabilitiesDir: "/caps" });

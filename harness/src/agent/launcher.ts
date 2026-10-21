@@ -12,6 +12,7 @@
 
 import { readFile, mkdir, symlink, lstat, readdir, copyFile, unlink, rm, readlink } from "fs/promises";
 import { resolve, dirname } from "path";
+import { parseEnv } from "util";
 import type { AgentRuntime } from "../runtime/types.js";
 import { workspaceDir } from "../workspace.js";
 import { resolveCapabilities } from "../capability/mcp-resolver.js";
@@ -61,6 +62,23 @@ export interface LauncherConfig {
 async function loadAgentConfig(agentDir: string): Promise<AgentConfig> {
   const content = await readFile(resolve(agentDir, "agent.json"), "utf-8");
   return JSON.parse(content) as AgentConfig;
+}
+
+/**
+ * The agent's own secrets: API tokens its jobs use, as `NAME=value` lines.
+ * Not tracked (gitignored by `.env*`), and kept apart from the portal's
+ * `.env.local` so the agent's environment holds only what's put here on
+ * purpose. Read on every run, so a new token needs no restart.
+ */
+export const SECRETS_FILE = ".env";
+
+async function loadAgentSecrets(agentDir: string): Promise<Record<string, string>> {
+  try {
+    const content = await readFile(resolve(agentDir, SECRETS_FILE), "utf-8");
+    return parseEnv(content) as Record<string, string>;
+  } catch {
+    return {}; // No secrets file
+  }
 }
 
 /** Who this install's agent is. Not tracked: each install writes its own. */
@@ -490,6 +508,17 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
       if (driftNote) contextLines.push(driftNote);
     }
 
+    // The agent's secrets go into a team run's environment, never a guest's.
+    // The prompt carries only their names, so a value never enters the context.
+    const secrets = input.identity.trustTier === "team" ? await loadAgentSecrets(agentDir) : {};
+    const secretNames = Object.keys(secrets).sort();
+    if (secretNames.length > 0) {
+      contextLines.push(
+        `Secrets in your environment (use as $NAME in a command; never print, echo or ` +
+          `write out a value): ${secretNames.join(", ")}`
+      );
+    }
+
     // Profile/agent config files
     if (agent.configFiles) {
       for (const [key, relPath] of Object.entries(agent.configFiles)) {
@@ -592,7 +621,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
         disableBuiltinTools: !baseToolsAllowed,
         disallowedTools: resolved?.disallowedTools,
         harnessRoot,
-        additionalEnv: input.additionalEnv,
+        additionalEnv: { ...secrets, ...input.additionalEnv },
       });
     } finally {
       await stopWatching();

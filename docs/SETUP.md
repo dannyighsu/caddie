@@ -6,7 +6,7 @@ sign-in, an admin console — say so.
 
 An install is one machine running one agent. Everything that makes it *this*
 agent rather than another lives outside git: `portal/.env.local`,
-`harness/agent/PERSONA.md`, `harness/credentials/`, the workspace at
+`harness/agent/PERSONA.md`, `harness/agent/.env`, `harness/credentials/`, the workspace at
 `~/.ignis/`, and `harness/agent/.claude/skills/`. Two installs share the repo
 and nothing else.
 
@@ -121,6 +121,12 @@ A new install starts with the shared core skills, a blank
 `config/preferences.md` and no team profiles. Its own skills
 (`harness/agent/.claude/skills/`) start empty; the agent writes them there when
 a team member asks, and the directory is not tracked.
+
+**`harness/agent/.env`** (optional) — API tokens the agent's own jobs use, as
+`NAME=value` lines. Every team-tier run gets them as environment variables and
+sees their names, never their values, in its context; guest runs get none. It's
+read on each run, so adding a token needs no restart. Keep the portal's own
+secrets in `.env.local`. Only what's put here reaches the agent.
 
 ## 4. Google (Calendar and Gmail)
 
