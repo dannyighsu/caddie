@@ -26,7 +26,7 @@ import {
   type ListChannelsOptions,
   type SlackChannelSummary,
 } from "./slack-channels";
-import { teamLookup } from "@ignis/harness";
+import { teamLookup } from "@caddie/harness";
 import { teamRoster } from "./team";
 import type { SlackFile } from "./slack-files";
 import {

@@ -202,13 +202,13 @@ describe("resolveCapabilities", () => {
         server: {
           command: "node",
           args: ["srv.js"],
-          env: { DB_PATH: "${IGNIS_WORKSPACE}/.rag/db", HOST: "${TEST_HOST}" },
+          env: { DB_PATH: "${CADDIE_WORKSPACE}/.rag/db", HOST: "${TEST_HOST}" },
         },
       })
     );
 
     const result = await resolveCapabilities(["per-agent"], "/caps", {
-      IGNIS_WORKSPACE: "/ws/buri",
+      CADDIE_WORKSPACE: "/ws/buri",
     });
     expect(result.servers["per-agent"].env).toEqual({ DB_PATH: "/ws/buri/.rag/db", HOST: "from-env" });
     expect(result.skipped).toEqual([]);

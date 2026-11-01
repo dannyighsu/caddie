@@ -11,16 +11,16 @@
  * Granted at every trust tier, because phishing mostly arrives on guest runs.
  * What a run may purge is decided by values the harness injects, not by the
  * agent:
- *   - IGNIS_TRUST_TIER: on anything but `team`, only the current message.
- *   - IGNIS_CURRENT_MESSAGE: the inbound message this run is handling.
+ *   - CADDIE_TRUST_TIER: on anything but `team`, only the current message.
+ *   - CADDIE_CURRENT_MESSAGE: the inbound message this run is handling.
  * The control API enforces the same rule (portal/lib/purge.ts). This file
  * only rejects early with a clearer message.
  *
  * Env:
- *   PORTAL_URL             — Base URL for the portal control API (default: http://localhost:3000)
- *   IGNIS_TRUST_TIER       — The run's trust tier (injected by the launcher)
- *   IGNIS_CURRENT_MESSAGE  — JSON {conversationId, seq} of the inbound message, if any
- *   IGNIS_TRACE_ID         — Trace id, recorded with the purge
+ *   PORTAL_URL              — Base URL for the portal control API (default: http://localhost:3000)
+ *   CADDIE_TRUST_TIER       — The run's trust tier (injected by the launcher)
+ *   CADDIE_CURRENT_MESSAGE  — JSON {conversationId, seq} of the inbound message, if any
+ *   CADDIE_TRACE_ID         — Trace id, recorded with the purge
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -28,12 +28,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
-const TRUST_TIER = process.env.IGNIS_TRUST_TIER || "guest";
+const TRUST_TIER = process.env.CADDIE_TRUST_TIER || "guest";
 const isTeam = TRUST_TIER === "team";
 
 function currentMessage() {
   try {
-    return process.env.IGNIS_CURRENT_MESSAGE ? JSON.parse(process.env.IGNIS_CURRENT_MESSAGE) : undefined;
+    return process.env.CADDIE_CURRENT_MESSAGE ? JSON.parse(process.env.CADDIE_CURRENT_MESSAGE) : undefined;
   } catch {
     return undefined;
   }
@@ -109,7 +109,7 @@ async function handlePurge(args) {
       path,
       reason,
       note,
-      traceId: process.env.IGNIS_TRACE_ID,
+      traceId: process.env.CADDIE_TRACE_ID,
     }),
   });
   const data = await res.json().catch(() => ({}));

@@ -27,7 +27,7 @@
 import { chmod, cp, mkdir, readFile, readdir, symlink, writeFile, stat } from "fs/promises";
 import { existsSync } from "fs";
 import { resolve } from "path";
-import { workspaceDir } from "@ignis/harness";
+import { workspaceDir } from "@caddie/harness";
 import { Anonymizer, REPO_ROOT, readLiveRoster, realAddressAliases } from "./team.ts";
 
 const REAL_HARNESS = resolve(REPO_ROOT, "harness");

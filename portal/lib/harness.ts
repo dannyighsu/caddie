@@ -1,13 +1,13 @@
 /**
  * Harness Integration
  *
- * Creates and caches the runtime + launcher from @ignis/harness.
+ * Creates and caches the runtime + launcher from @caddie/harness.
  * All API routes use getLauncher() to access the shared instance.
  */
 
 import { resolve } from "path";
-import { createRuntime, createLauncher, workspaceDir } from "@ignis/harness";
-import type { AgentConfig, AgentInput, AgentResult } from "@ignis/harness";
+import { createRuntime, createLauncher, workspaceDir } from "@caddie/harness";
+import type { AgentConfig, AgentInput, AgentResult } from "@caddie/harness";
 import { mkdir, readFile } from "fs/promises";
 import { alertOwnerOnApiFailure } from "./run-alerts";
 import { teamRoster } from "./team";

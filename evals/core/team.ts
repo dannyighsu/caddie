@@ -11,7 +11,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import type { TeamMember } from "@ignis/harness";
+import type { TeamMember } from "@caddie/harness";
 
 export const REPO_ROOT = resolve(import.meta.dirname, "..", "..");
 

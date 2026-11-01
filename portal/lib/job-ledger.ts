@@ -362,7 +362,7 @@ export async function replayRun(id: string): Promise<ReplayResult> {
 /**
  * Rebuild a channel reply function from a stored reply target. For inbound runs
  * (all `deliveryMode: "tool"`) this is used only for the error-notice path —
- * the agent's own `reply` tool handles normal delivery via IGNIS_REPLY_TARGET,
+ * the agent's own `reply` tool handles normal delivery via CADDIE_REPLY_TARGET,
  * which handleInboundMessage re-injects from the same target.
  */
 async function reconstructReplyFn(

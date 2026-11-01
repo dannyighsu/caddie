@@ -13,7 +13,7 @@ config-history/state/news-digest.md.2026-09-25T14-05-12.004Z
 
 ## Why this exists
 
-`~/.ignis/config/` holds the **only** copy of everything the agent has
+`~/.caddie/config/` holds the **only** copy of everything the agent has
 been told to remember. It is unversioned, outside the repo, and written by both the
 agent and whoever is at the keyboard, with no locking. An editor or script
 saving a stale copy over it wins silently — which is how a standing instruction

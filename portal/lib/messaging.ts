@@ -44,7 +44,7 @@ import {
 
 /**
  * Where an agent's `reply()` tool should deliver, injected into the run as
- * `IGNIS_REPLY_TARGET` so the tool (and the control API behind it) can send
+ * `CADDIE_REPLY_TARGET` so the tool (and the control API behind it) can send
  * into the *current* conversation without the agent supplying — or being able to
  * change — the target. Channel-specific handles carry what each channel needs to
  * deliver and thread correctly.
@@ -241,17 +241,17 @@ export async function handleInboundMessage(
         ...context,
       },
       additionalEnv: {
-        IGNIS_TRACE_ID: traceId,
+        CADDIE_TRACE_ID: traceId,
         // In "tool" mode, tell the agent's reply() tool which conversation it's
         // in. Injected by the harness (not agent-supplied) so replies can only
         // land in the current thread.
         ...(deliveryMode === "tool" && replyTarget
-          ? { IGNIS_REPLY_TARGET: JSON.stringify(replyTarget) }
+          ? { CADDIE_REPLY_TARGET: JSON.stringify(replyTarget) }
           : {}),
         // The message this run is handling — the one thing a guest run's
         // `purge_content` may remove. Injected, never agent-supplied.
         ...(currentSeq !== null
-          ? { IGNIS_CURRENT_MESSAGE: JSON.stringify({ conversationId: conversation.id, seq: currentSeq }) }
+          ? { CADDIE_CURRENT_MESSAGE: JSON.stringify({ conversationId: conversation.id, seq: currentSeq }) }
           : {}),
       },
     };

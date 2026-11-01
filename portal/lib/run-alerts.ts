@@ -12,10 +12,10 @@
  * failures (the `isApiErrorMessage` class) alert the owner.
  */
 
-import type { AgentResult } from "@ignis/harness";
+import type { AgentResult } from "@caddie/harness";
 import { classifyRunFailure } from "./failure-classifier";
 import { sendEmail, isEmailConfigured } from "./email";
-import { teamOwner } from "@ignis/harness";
+import { teamOwner } from "@caddie/harness";
 import { getTeamRoster } from "./team";
 import { agentName } from "./agent-name";
 

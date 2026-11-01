@@ -59,7 +59,7 @@ rm -rf "mounts/$NAME" "mounts/.meta/$NAME.json"
 
 ## Contributing changes
 
-`git push` is blocked for the containing ignis repo. It **is** allowed inside a
+`git push` is blocked for the containing caddie repo. It **is** allowed inside a
 mount — `cd mounts/<name> && git push` or `git -C mounts/<name> push`.
 
 **Default to a pull request.** Push directly to the default branch only when the
@@ -86,11 +86,11 @@ gh pr create --title "<title>" --body "<what, why, how you verified it>"
 - Never force-push, never push to a branch you didn't create, never merge your
   own PR. Review is the point.
 
-## Working on ignis itself
+## Working on caddie itself
 
 This repo is the harness you run on, so two extra rules apply.
 
-**Mount it like any other repo.** `$HARNESS_ROOT` is inside the ignis checkout
+**Mount it like any other repo.** `$HARNESS_ROOT` is inside the caddie checkout
 you run from, so this clones that checkout's remote `main`:
 
 ```bash
@@ -129,5 +129,5 @@ Read the ticket from there and carry what you need into the checkout.
 
 ## Notes
 
-- Mounts are under `mounts/` in your workspace, which lives outside the ignis repo, so nothing leaks into it.
-- Nested git repos are fine: git walks up from cwd to find the nearest `.git/`, so git commands run inside a mount operate on that mount, not ignis.
+- Mounts are under `mounts/` in your workspace, which lives outside the caddie repo, so nothing leaks into it.
+- Nested git repos are fine: git walks up from cwd to find the nearest `.git/`, so git commands run inside a mount operate on that mount, not caddie.

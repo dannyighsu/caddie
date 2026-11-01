@@ -11,7 +11,7 @@
 import { mkdir } from "fs/promises";
 import { resolve } from "path";
 import { z } from "zod";
-import { createLauncher, createRuntime } from "@ignis/harness";
+import { createLauncher, createRuntime } from "@caddie/harness";
 import {
   assembleInboundPrompt,
   summarizeEnvelope,
@@ -171,8 +171,8 @@ export const inboundMessage: Driver = {
         additionalEnv: {
           PORTAL_URL: portal.url,
           PATH: `${sandbox.binDir}:${process.env.PATH ?? ""}`,
-          IGNIS_REPLY_TARGET: JSON.stringify({ channel: "email", externalId: `email:eval-${c.id}`, email: { messageId: `eval-${c.id}` } }),
-          IGNIS_CURRENT_MESSAGE: JSON.stringify({ conversationId: EVAL_CONVERSATION_ID, seq: kase.history.length }),
+          CADDIE_REPLY_TARGET: JSON.stringify({ channel: "email", externalId: `email:eval-${c.id}`, email: { messageId: `eval-${c.id}` } }),
+          CADDIE_CURRENT_MESSAGE: JSON.stringify({ conversationId: EVAL_CONVERSATION_ID, seq: kase.history.length }),
         },
       };
 

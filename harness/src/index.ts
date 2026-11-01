@@ -1,10 +1,10 @@
 /**
- * @ignis/harness — Modular Agent System
+ * @caddie/harness — Modular Agent System
  *
  * Public API:
  *   createLauncher() — create an agent launcher bound to a runtime and directories
  *   createRuntime()  — create an agent runtime from config
- *   workspaceDir() — the agent's working directory ($WORKSPACE_DIR or ~/.ignis)
+ *   workspaceDir() — the agent's working directory ($WORKSPACE_DIR or ~/.caddie)
  *
  * Types:
  *   AgentConfig, AgentInput, AgentResult

@@ -11,7 +11,7 @@
  */
 
 import type { ResolvedIdentity, UserId } from "./identity";
-import { teamLookup } from "@ignis/harness";
+import { teamLookup } from "@caddie/harness";
 import { teamRoster } from "./team";
 
 const API_BASE = "https://api.telegram.org";

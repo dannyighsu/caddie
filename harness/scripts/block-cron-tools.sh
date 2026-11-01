@@ -1,6 +1,6 @@
 #!/bin/bash
 # PreToolUse hook that blocks Claude Code's built-in cron/schedule tools
-# and redirects the agent to use the Ignis manage-schedules skill instead.
+# and redirects the agent to use the Caddie manage-schedules skill instead.
 
 INPUT=$(cat)
 

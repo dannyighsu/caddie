@@ -1,26 +1,26 @@
 .PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke team-add slack-app google-auth gog-auth expose unexpose keep-awake allow-sleep rag-setup rag-rebuild
 
 # Network exposure (see the "Network exposure" section in README.md).
-IGNIS_PORT ?= 3000
-TAILNET_PORT   ?= 8443
+CADDIE_PORT  ?= 3000
+TAILNET_PORT ?= 8443
 # Paths reachable from the PUBLIC internet via Tailscale Funnel. Everything else
 # is served to the tailnet + localhost only. Keep this list minimal — it is the
 # entire public attack surface.
 FUNNEL_PATHS := /api/telegram/webhook
 
-# Start the Ignis control plane in PRODUCTION mode (next build + next start).
+# Start the Caddie control plane in PRODUCTION mode (next build + next start).
 # Use this for the long-lived process: `next start` has no Turbopack dev
 # compiler, so memory stays flat/bounded. The dev server (`make dev`) leaks
 # compiled-module strings over long uptime — see portal/scripts/mem-logger.cjs.
-# Workspace defaults to ~/.ignis; override with make run WORKSPACE_DIR=/path
+# Workspace defaults to ~/.caddie; override with make run WORKSPACE_DIR=/path
 #
 # `make run` wraps `make serve` in a tmux session (TMUX_SESSION, default
-# "ignis") so the server outlives the terminal. Detach with C-b d, reattach
-# with `tmux attach -t ignis`. If the session already exists, its run is
+# "caddie") so the server outlives the terminal. Detach with C-b d, reattach
+# with `tmux attach -t caddie`. If the session already exists, its run is
 # stopped (C-c, wait for the port to free) and replaced with a fresh one — so
 # `make run` doubles as "restart". Runs in the foreground when tmux is
 # missing, when already inside tmux, or with `make run TMUX_SESSION=`.
-TMUX_SESSION ?= ignis
+TMUX_SESSION ?= caddie
 run:
 	@if [ -z "$(TMUX_SESSION)" ] || [ -n "$$TMUX" ] || ! command -v tmux >/dev/null 2>&1; then \
 		exec $(MAKE) --no-print-directory serve; \
@@ -29,7 +29,7 @@ run:
 		echo "[run] stopping existing run in tmux session '$(TMUX_SESSION)'…"; \
 		tmux send-keys -t "=$(TMUX_SESSION):" C-c; \
 		for i in 1 2 3 4 5 6 7 8 9 10; do \
-			lsof -ti tcp:$(IGNIS_PORT) -sTCP:LISTEN >/dev/null 2>&1 || break; \
+			lsof -ti tcp:$(CADDIE_PORT) -sTCP:LISTEN >/dev/null 2>&1 || break; \
 			sleep 1; \
 		done; \
 		tmux kill-session -t "=$(TMUX_SESSION)" 2>/dev/null || true; \
@@ -49,7 +49,7 @@ serve: build
 # request reaches Next:
 #   • PUBLIC internet → only FUNNEL_PATHS (ingress webhooks), Funnel on :443
 #   • TAILNET + local → the full control plane, Serve on :$(TAILNET_PORT)
-# localhost:$(IGNIS_PORT) is always reachable directly on this machine.
+# localhost:$(CADDIE_PORT) is always reachable directly on this machine.
 # Idempotent; config persists (Tailscale --bg) until `make unexpose`.
 expose:
 	@if ! command -v tailscale >/dev/null 2>&1; then \
@@ -59,11 +59,11 @@ expose:
 	@echo "[expose] Clearing previous serve/funnel config…"
 	@tailscale serve reset >/dev/null 2>&1 || true
 	@echo "[expose] Tailnet-only (private): full control plane on :$(TAILNET_PORT)"
-	@tailscale serve --bg --https=$(TAILNET_PORT) http://127.0.0.1:$(IGNIS_PORT) >/dev/null \
+	@tailscale serve --bg --https=$(TAILNET_PORT) http://127.0.0.1:$(CADDIE_PORT) >/dev/null \
 		|| echo "[expose] WARN: serve setup failed."
 	@for p in $(FUNNEL_PATHS); do \
 		echo "[expose] Public (Funnel :443): $$p"; \
-		tailscale funnel --bg --yes --https=443 --set-path=$$p http://127.0.0.1:$(IGNIS_PORT)$$p >/dev/null \
+		tailscale funnel --bg --yes --https=443 --set-path=$$p http://127.0.0.1:$(CADDIE_PORT)$$p >/dev/null \
 			|| echo "[expose] WARN: funnel failed for $$p — is Funnel enabled for this node? https://tailscale.com/kb/1223/funnel"; \
 	done
 	@echo "[expose] Public surface = $(FUNNEL_PATHS); everything else is tailnet-only."
@@ -89,7 +89,7 @@ allow-sleep:
 	sudo pmset -a disablesleep 0
 	@pmset -g | grep -i sleepdisabled || true
 
-# Start the Ignis control plane with the Next dev server (hot reload).
+# Start the Caddie control plane with the Next dev server (hot reload).
 # For active development only — do NOT leave running for hours; the Turbopack
 # dev compiler accumulates memory over uptime (use `make run` for long sessions).
 dev: build-harness
@@ -121,7 +121,7 @@ debug-snapshot:
 	kill -USR2 $$pid
 
 # Build the harness package (produces harness/dist, which the portal imports as
-# @ignis/harness). Needed by both `make dev` and `make run`.
+# @caddie/harness). Needed by both `make dev` and `make run`.
 build-harness:
 	cd harness && pnpm build
 
@@ -163,12 +163,12 @@ rag-setup:
 # so it can't race a sync; with the portal down, deletes the index and the next
 # start rebuilds it.
 rag-rebuild:
-	@if curl -sf -o /dev/null http://localhost:$(IGNIS_PORT)/api/control; then \
+	@if curl -sf -o /dev/null http://localhost:$(CADDIE_PORT)/api/control; then \
 		echo "[rag-rebuild] asking the portal to rebuild the index (this can take a while)…"; \
-		curl -sS -X POST http://localhost:$(IGNIS_PORT)/api/control \
+		curl -sS -X POST http://localhost:$(CADDIE_PORT)/api/control \
 			-H 'Content-Type: application/json' -d '{"action":"rag_rebuild"}'; echo; \
 	else \
-		ws="$${WORKSPACE_DIR:-$$HOME/.ignis}"; case "$$ws" in "~"*) ws="$$HOME$${ws#\~}";; esac; \
+		ws="$${WORKSPACE_DIR:-$$HOME/.caddie}"; case "$$ws" in "~"*) ws="$$HOME$${ws#\~}";; esac; \
 		rm -rf "$$ws/.rag/db" "$$ws/.rag/manifest.json"; \
 		echo "[rag-rebuild] portal not running — removed $$ws/.rag/db; the next start rebuilds it."; \
 	fi

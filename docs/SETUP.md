@@ -1,13 +1,13 @@
 # Setting up an install
 
-How to stand up an Ignis install on a fresh machine, in order. Written so that a
+How to stand up a Caddie install on a fresh machine, in order. Written so that a
 coding agent can follow it end to end; the steps that need a person — a browser
 sign-in, an admin console — say so.
 
 An install is one machine running one agent. Everything that makes it *this*
 agent rather than another lives outside git: `portal/.env.local`,
 `harness/agent/PERSONA.md`, `harness/agent/.env`, `harness/credentials/`, the workspace at
-`~/.ignis/`, and `harness/agent/.claude/skills/`. Two installs share the repo
+`~/.caddie/`, and `harness/agent/.claude/skills/`. Two installs share the repo
 and nothing else.
 
 The steps assume macOS with [Homebrew](https://brew.sh). Each one is
@@ -46,7 +46,7 @@ rather than a bundled browser, so without Chrome the agent has no browser.
 brew install --cask google-chrome
 ```
 
-The browser is headed: it opens a real window. So the macOS user running Ignis
+The browser is headed: it opens a real window. So the macOS user running Caddie
 has to stay logged in to the desktop. With the lid closed and the machine kept
 awake (step 7), the window still opens. Its profile lives in
 `harness/.browser-profile/` and keeps logins between runs. It starts empty on
@@ -66,14 +66,14 @@ login.
 brew install postgresql@17 redis
 brew services start postgresql@17
 brew services start redis
-createdb ignis
+createdb caddie
 ```
 
 Homebrew's Postgres trusts local connections from your macOS user, so the URLs
 need no password:
 
 ```bash
-POSTGRES_URL=postgresql://<your macOS username>@localhost:5432/ignis
+POSTGRES_URL=postgresql://<your macOS username>@localhost:5432/caddie
 REDIS_URL=redis://localhost:6379
 ```
 
@@ -165,7 +165,7 @@ and set `GOG_ACCOUNT` to the same address.
 
 ```bash
 make smoke      # one run through the harness; needs no server, Postgres or Redis
-make run        # portal on http://localhost:3000, inside tmux session "ignis"
+make run        # portal on http://localhost:3000, inside tmux session "caddie"
 ```
 
 `make smoke` reports any capability whose credentials are unset as skipped
@@ -280,7 +280,7 @@ make rag-setup        # clones and builds mcp-local-rag beside this repo; prints
 
 Add the printed `LOCAL_RAG_ENTRY=…` line to `.env.local` and restart. On
 startup the portal mirrors each conversation message into
-`~/.ignis/conversations/` and indexes the workspace into `~/.ignis/.rag/`, then
+`~/.caddie/conversations/` and indexes the workspace into `~/.caddie/.rag/`, then
 keeps both current as runs write files. The agent reaches the index through the
 `local-rag` capability (`query_documents`), and the `recall` skill says how to
 use it. The first sync downloads an embedding model of about 90 MB; index status
@@ -296,4 +296,4 @@ interactive session would. The harness keeps out the host's MCP servers
 Claude Code yourself, what you configure for yourself applies to the agent too.
 
 To keep the two apart, run the install under a macOS user of its own, or run
-Ignis in a container. The repo does not provide container scaffolding yet.
+Caddie in a container. The repo does not provide container scaffolding yet.

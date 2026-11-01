@@ -15,7 +15,7 @@
 
 import { mkdir, readdir, rename, rm, stat, writeFile } from "fs/promises";
 import { dirname, resolve } from "path";
-import { workspaceDir } from "@ignis/harness";
+import { workspaceDir } from "@caddie/harness";
 import { senderLabel } from "./conversation-history";
 import { getConversation, listAllConversations, type Conversation } from "./db";
 import { CONVERSATIONS_DIR, messageRelPath, renderMessageFile } from "./rag-files";

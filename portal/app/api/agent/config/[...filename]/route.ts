@@ -1,7 +1,7 @@
 import { readFile, writeFile, unlink, mkdir, rm, lstat } from "fs/promises";
 import { resolve, basename } from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { PERSONA_FILE, SYSTEM_FILE } from "@ignis/harness";
+import { PERSONA_FILE, SYSTEM_FILE } from "@caddie/harness";
 import { workspace, agentDir, coreSkillsDir } from "@/lib/harness";
 
 /**

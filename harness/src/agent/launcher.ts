@@ -554,7 +554,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     const resolved = trustFiltered.kept.length > 0
       ? await resolveCapabilities(trustFiltered.kept, capabilitiesDir, {
           HARNESS_ROOT: harnessRoot,
-          IGNIS_WORKSPACE: workingDirectory,
+          CADDIE_WORKSPACE: workingDirectory,
         })
       : undefined;
 
@@ -571,9 +571,9 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
               ...server,
               env: {
                 ...server.env,
-                IGNIS_WORKSPACE: workingDirectory,
-                IGNIS_TRUST_TIER: trustTier,
-                IGNIS_TEAM: teamEnv,
+                CADDIE_WORKSPACE: workingDirectory,
+                CADDIE_TRUST_TIER: trustTier,
+                CADDIE_TEAM: teamEnv,
               },
             },
           ])

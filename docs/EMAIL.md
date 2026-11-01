@@ -81,7 +81,7 @@ is their primary.
   arrives inline with a `cid:`, and is exactly what someone means by "see the
   image" — so size, not disposition, does the filtering.
 - Files land in the thread's run-artifacts directory
-  (`~/.ignis/runs/<month>/<day>/artifacts/email-<threadId>/`), named
+  (`~/.caddie/runs/<month>/<day>/artifacts/email-<threadId>/`), named
   `<messageId>-<sanitized name>` so two messages on one thread can't clobber each
   other. The agent gets each one as a path it reads to view the image — the same
   channel-agnostic `Attachment` path Telegram uses.

@@ -4,7 +4,7 @@
  * Egress MCP Server
  *
  * MCP server for outbound messaging — Slack, email, etc.
- * Proxies through the Ignis control API (/api/control).
+ * Proxies through the Caddie control API (/api/control).
  *
  * Env:
  *   PORTAL_URL — Base URL for the portal control API (default: http://localhost:3000)
@@ -20,7 +20,7 @@ const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 // The agent's working directory, injected by the launcher. File attachments
 // must resolve inside it, so the tool can't be used to post arbitrary files
 // off the host.
-const WORKSPACE = process.env.IGNIS_WORKSPACE || process.cwd();
+const WORKSPACE = process.env.CADDIE_WORKSPACE || process.cwd();
 // Upload bytes travel as base64 JSON through the control API; keep it sane.
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
@@ -349,11 +349,11 @@ async function handlePostToSlack(args) {
   }
 
   // If this run was created by one of the agent's own tasks, its source-task
-  // facts arrive via IGNIS_THREAD_CONTEXT (inherited from the run env, set
+  // facts arrive via CADDIE_THREAD_CONTEXT (inherited from the run env, set
   // only for scheduled/triggered runs). Forward them so a reply in the posted
   // Slack thread can be traced back to the task (mirrors the send_email path).
   let threadContext;
-  const rawCtx = process.env.IGNIS_THREAD_CONTEXT;
+  const rawCtx = process.env.CADDIE_THREAD_CONTEXT;
   if (rawCtx) {
     try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
   }

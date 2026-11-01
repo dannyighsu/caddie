@@ -29,7 +29,7 @@ The exit code is non-zero if any case fails.
 - **Trials.** A case passes only if **every** trial passes. Use `--trials 3`
   before trusting a persona or skill change.
 - **Standing instructions.** Cases are graded against the **current** config in
-  `~/.ignis/config/`, anonymized. When a standing instruction changes,
+  `~/.caddie/config/`, anonymized. When a standing instruction changes,
   the expectations that depend on it change too. Each such assertion's `why`
   names its instruction.
 
@@ -75,7 +75,7 @@ case.yaml ──▶ driver ──▶ sandbox (temp harness root + workspace) ─
 A case is one YAML file in `suites/<suite>/cases/`. To start from a real run:
 
 ```bash
-pnpm --filter @ignis/evals extract-case <sessionId> <case-id> --agent-address <agent's real inbox>
+pnpm --filter @caddie/evals extract-case <sessionId> <case-id> --agent-address <agent's real inbox>
 ```
 
 This pulls the envelope, history, current time and inbound message out of the

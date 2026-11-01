@@ -44,7 +44,7 @@ test("a group DM that mentions the bot is answered, without the mention in the t
 });
 
 test("the labelled mention form counts as a mention", () => {
-  const decision = decideDirectMessage(mpim({ text: `<@${BOT}|ignis> hi` }), BOT);
+  const decision = decideDirectMessage(mpim({ text: `<@${BOT}|caddie> hi` }), BOT);
   assert.deepEqual(decision, { action: "handle", text: "hi", files: [] });
 });
 
