@@ -15,6 +15,7 @@ caddie/
 │   ├── resolvers/        # Pre-run data fetchers (e.g., Google Calendar)
 │   └── scripts/run.ts    # CLI smoke test
 ├── portal/               # Control plane + API server (Next.js)
+├── artifacts/            # Password-gated artifact hosting on Cloudflare R2 + Workers
 ```
 
 ## Setup

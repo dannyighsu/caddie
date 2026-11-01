@@ -132,3 +132,7 @@ workspace/
 evals/.sandbox/
 evals/results/
 evals/.scrub.json
+
+# Cloudflare Worker local state for artifacts/ (.dev.vars holds real passwords).
+artifacts/.dev.vars
+artifacts/.wrangler/

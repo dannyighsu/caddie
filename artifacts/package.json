@@ -1,0 +1,22 @@
+{
+  "name": "@caddie/artifacts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "upload": "tsx scripts/upload.ts",
+    "guard": "tsx scripts/guard.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261023.1",
+    "@types/node": "^20.19.26",
+    "tsx": "^4.19.0",
+    "typescript": "^5",
+    "vitest": "^4.1.2",
+    "wrangler": "^4.42.0"
+  }
+}

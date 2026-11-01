@@ -1,0 +1,4 @@
+# Local `wrangler dev` only — real values go in Worker secrets, never in git.
+# .dev.vars itself is gitignored at the repo root.
+SESSION_SECRET="dev-only-not-a-real-secret"
+PW_DEMO="dev-demo-password"

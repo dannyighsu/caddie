@@ -1,0 +1,31 @@
+name: "Artifacts: Test"
+
+on:
+  pull_request:
+    paths:
+      - "artifacts/**"
+      - "pnpm-lock.yaml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @caddie/artifacts typecheck
+
+      - name: Test
+        run: pnpm --filter @caddie/artifacts test
+
+# The end-to-end guard runs against the deployed Worker, not this PR's code,
+# so it lives in artifacts-guard.yml (nightly + after merge to main).
