@@ -1,6 +1,6 @@
 import { getAgentConfig } from "@/lib/harness";
 import { agentName } from "@/lib/agent-name";
-import { DEFAULT_MAX_TURNS } from "@ignis/harness";
+import { DEFAULT_MAX_TURNS } from "@caddie/harness";
 import { NextResponse } from "next/server";
 
 export async function GET() {

@@ -62,7 +62,7 @@ interface ControlRequest {
 
   // --- reply fields ---
   /**
-   * Where to deliver the reply, injected into the run as IGNIS_REPLY_TARGET
+   * Where to deliver the reply, injected into the run as CADDIE_REPLY_TARGET
    * and forwarded verbatim by the reply MCP tool. Not agent-supplied, so a reply
    * can only land in the current conversation. Uses `message` for the body.
    */
@@ -121,7 +121,7 @@ interface ControlRequest {
   html?: string;
   /**
    * Source-task facts to attach to the email thread this send creates (email
-   * channel only). Forwarded by email-mcp from the run's IGNIS_THREAD_CONTEXT.
+   * channel only). Forwarded by email-mcp from the run's CADDIE_THREAD_CONTEXT.
    */
   threadContext?: ThreadContext;
 
@@ -213,7 +213,7 @@ async function executeAction(req: ControlRequest, portalOwner: UserId): Promise<
  *
  * Unlike `notify`/`send_email` (which start or address arbitrary threads), reply
  * targets the exact conversation the run is handling — the target is injected by
- * the harness (IGNIS_REPLY_TARGET), not chosen by the agent, so a reply can
+ * the harness (CADDIE_REPLY_TARGET), not chosen by the agent, so a reply can
  * only land where the inbound message came from. On success it records the sent
  * turn locally so replayed history mirrors the real thread.
  */
@@ -632,7 +632,7 @@ async function executeRun(req: ControlRequest, portalOwner: UserId): Promise<Rec
       currentTime: currentTimePST(),
       ...req.context,
     },
-    additionalEnv: { IGNIS_TRACE_ID: traceId },
+    additionalEnv: { CADDIE_TRACE_ID: traceId },
   });
 
   await completeTrace(traceId, {

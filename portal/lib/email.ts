@@ -21,7 +21,7 @@ import {
   type Message,
 } from "./db";
 import type { ThreadContext } from "./thread-context";
-import { teamLookup } from "@ignis/harness";
+import { teamLookup } from "@caddie/harness";
 import { teamRoster } from "./team";
 import { parseMessageRefs, normalizeMessageId, summarizeEnvelope } from "./email-threading";
 import { isGmailConfigured, getSelfAddress } from "./gmail/client";

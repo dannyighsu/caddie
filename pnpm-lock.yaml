@@ -18,7 +18,7 @@ importers:
 
   evals:
     dependencies:
-      '@ignis/harness':
+      '@caddie/harness':
         specifier: workspace:*
         version: link:../harness
       '@modelcontextprotocol/sdk':
@@ -80,7 +80,7 @@ importers:
 
   portal:
     dependencies:
-      '@ignis/harness':
+      '@caddie/harness':
         specifier: workspace:*
         version: link:../harness
       '@slack/socket-mode':

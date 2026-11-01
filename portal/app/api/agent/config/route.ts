@@ -1,7 +1,7 @@
 import { readdir, readFile, mkdir } from "fs/promises";
 import { resolve } from "path";
 import { NextResponse } from "next/server";
-import { PERSONA_FILE, SYSTEM_FILE } from "@ignis/harness";
+import { PERSONA_FILE, SYSTEM_FILE } from "@caddie/harness";
 import { workspace, agentDir, coreSkillsDir } from "@/lib/harness";
 
 interface AgentFile {

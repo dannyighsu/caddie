@@ -1,6 +1,6 @@
 {
   "name": "egress",
-  "description": "Outbound messaging (Slack, email, etc.) via the Ignis control API",
+  "description": "Outbound messaging (Slack, email, etc.) via the Caddie control API",
   "server": {
     "command": "node",
     "args": ["${HARNESS_ROOT}/tools/egress-mcp.mjs"]

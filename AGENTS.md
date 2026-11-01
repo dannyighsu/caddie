@@ -4,17 +4,19 @@ This project uses OpenSDD spec-driven development. Before implementing, modifyin
 
 ## Migrations: hard cutover
 
-This is a personal app with one install, so there are no uptime or
-backward-compatibility requirements. When you rename or move persisted state
-(Redis keys, env vars, file layouts, database schema), stop the server, migrate
-once, and restart. Don't carry dual-read/dual-write paths, fallbacks to old
-names, or compatibility shims. The old names go away completely.
+This is a personal app with a few independent installs. They share only the
+repo and nothing pulls automatically, so each one upgrades on its own schedule
+and there are no uptime or backward-compatibility requirements. When you rename
+or move persisted state (Redis keys, env vars, file layouts, database schema),
+stop the server, migrate once on each install, and restart. Don't carry
+dual-read/dual-write paths, fallbacks to old names, or compatibility shims. The
+old names go away completely.
 
 An install runs exactly one agent, defined in `harness/agent/`; variation
 between runs is a profile in its `agent.json`, never a second agent. Don't
 reintroduce an agent id.
 
-The agent's workspace lives outside the repo at `~/.ignis/` (override with
+The agent's workspace lives outside the repo at `~/.caddie/` (override with
 `WORKSPACE_DIR`; resolved by `workspaceDir()` in `harness/src/workspace.ts`).
 It's the agent's data, not app code. Don't reintroduce repo-relative workspace
 paths.
@@ -35,13 +37,13 @@ defect, a capability that isn't mounted, a run that went wrong for a reason no
 instruction explains. Each is one markdown file in the agent's workspace:
 
 ```
-~/.ignis/tickets/YYYY-MM-DD-<slug>.md
+~/.caddie/tickets/YYYY-MM-DD-<slug>.md
 ```
 
 Check them when you're working on the harness:
 
 ```bash
-ls ~/.ignis/tickets/
+ls ~/.caddie/tickets/
 ```
 
 ### How it works

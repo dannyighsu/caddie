@@ -30,7 +30,7 @@ function logTimestamp(now = new Date()): string {
 /** Console methods that carry a stream (stdout/stderr) worth timestamping. */
 const METHODS = ["log", "info", "warn", "error", "debug"] as const;
 
-const INSTALLED = Symbol.for("ignis.logTimestamps.installed");
+const INSTALLED = Symbol.for("caddie.logTimestamps.installed");
 
 /**
  * Wrap the console methods so each emitted line begins with a timestamp. Every

@@ -19,12 +19,12 @@
  * along the same path as `send_email`, so the outbound thread is recorded and
  * a team reply comes back with full context.
  *
- * The tool's `to` enum is generated at startup from IGNIS_TEAM, so each install
+ * The tool's `to` enum is generated at startup from CADDIE_TEAM, so each install
  * exposes its own people's ids.
  *
  * Env:
- *   PORTAL_URL       — Base URL for the portal control API (default: http://localhost:3000)
- *   IGNIS_TEAM       — JSON [{ id, name }] of the roster, set by the launcher
+ *   PORTAL_URL        — Base URL for the portal control API (default: http://localhost:3000)
+ *   CADDIE_TEAM       — JSON [{ id, name }] of the roster, set by the launcher
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -36,7 +36,7 @@ const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 /** The roster's ids and names, as the launcher passed them. No addresses. */
 function roster() {
   try {
-    const members = JSON.parse(process.env.IGNIS_TEAM ?? "[]");
+    const members = JSON.parse(process.env.CADDIE_TEAM ?? "[]");
     return Array.isArray(members) ? members : [];
   } catch {
     return [];
@@ -113,7 +113,7 @@ async function handleEmailTeam(args) {
   // Forward source-task facts (if this run came from a task) so the created
   // thread is linked for reply continuity — same as send_email.
   let threadContext;
-  const rawCtx = process.env.IGNIS_THREAD_CONTEXT;
+  const rawCtx = process.env.CADDIE_THREAD_CONTEXT;
   if (rawCtx) {
     try { threadContext = JSON.parse(rawCtx); } catch { /* ignore malformed */ }
   }

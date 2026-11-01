@@ -148,7 +148,7 @@ export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
   process.env.HARNESS_ROOT = harnessRoot;
   const results: HealthCheckResult[] = [];
 
-  runtimeVars = { IGNIS_WORKSPACE: workspace };
+  runtimeVars = { CADDIE_WORKSPACE: workspace };
 
   try {
     const entries = await readdir(capabilitiesDir);

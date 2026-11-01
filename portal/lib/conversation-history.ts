@@ -7,7 +7,7 @@
  * remembers about a thread.
  */
 
-import { teamMemberLabel } from "@ignis/harness";
+import { teamMemberLabel } from "@caddie/harness";
 import { teamRoster } from "./team.ts";
 import type { Message } from "./db";
 

@@ -22,7 +22,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm --filter @ignis/harness build
+        run: pnpm --filter @caddie/harness build
 
       - name: Test
-        run: pnpm --filter @ignis/harness test
+        run: pnpm --filter @caddie/harness test

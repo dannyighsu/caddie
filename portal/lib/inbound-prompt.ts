@@ -8,7 +8,7 @@
  * production does — an eval against a hand-copied prompt tests the copy.
  */
 
-import { teamMemberLabel } from "@ignis/harness";
+import { teamMemberLabel } from "@caddie/harness";
 import { teamRoster } from "./team";
 import type { Message } from "./db";
 import type { ResolvedIdentity } from "./identity";

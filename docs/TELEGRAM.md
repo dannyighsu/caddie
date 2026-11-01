@@ -22,7 +22,7 @@ TELEGRAM_WEBHOOK_SECRET=some-random-string  # optional, but recommended in produ
 
 ## 3. Register the webhook
 
-Telegram is webhook-based — you tell their servers where to POST updates. Make sure Ignis is reachable publicly (via Tailscale Funnel, ngrok, etc.), then register:
+Telegram is webhook-based — you tell their servers where to POST updates. Make sure Caddie is reachable publicly (via Tailscale Funnel, ngrok, etc.), then register:
 
 ```bash
 curl -F "url=https://your-domain.com/api/telegram/webhook" \

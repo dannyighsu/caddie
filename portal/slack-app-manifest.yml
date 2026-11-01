@@ -1,4 +1,4 @@
-# The Slack app an Ignis install needs, and the running list of its bot scopes.
+# The Slack app a Caddie install needs, and the running list of its bot scopes.
 # `make slack-app` prints a link that creates an app from this file.
 #
 # An existing install doesn't pick up changes here. Add the scope under
@@ -8,7 +8,7 @@
 # A manifest can't declare that one: generate it under Basic Information.
 
 display_information:
-  name: Ignis
+  name: Caddie
 features:
   # Without the Messages tab, people can't DM the bot.
   app_home:
@@ -16,7 +16,7 @@ features:
     messages_tab_enabled: true
     messages_tab_read_only_enabled: false
   bot_user:
-    display_name: Ignis
+    display_name: Caddie
 settings:
   socket_mode_enabled: true
   incoming_webhooks:

@@ -43,7 +43,7 @@ export interface TranscriptStep {
  */
 function getProjectDir(): string {
   // Claude Code maps every non-alphanumeric character to "-" — not just "/"
-  // (e.g. the "." in ~/.ignis).
+  // (e.g. the "." in ~/.caddie).
   const projectHash = workspace.replace(/[^a-zA-Z0-9]/g, "-");
   return resolve(homedir(), ".claude", "projects", projectHash);
 }

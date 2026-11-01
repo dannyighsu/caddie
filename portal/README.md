@@ -1,4 +1,4 @@
-# Ignis Portal
+# Caddie Portal
 
 Control plane for the install's agent. Built with Next.js.
 
@@ -20,7 +20,7 @@ Prefer the production server (`pnpm build && pnpm start`) for anything left
 running for hours: the Turbopack dev compiler accumulates memory over long
 uptime and will eventually OOM. From the repo root, `make run` (production) and
 `make dev` (dev server) wrap these, and `make debug` adds memory diagnostics.
-The dev server still needs the harness built (`@ignis/harness`) — the `make`
+The dev server still needs the harness built (`@caddie/harness`) — the `make`
 targets handle that for you.
 
 ## Ingress
@@ -51,7 +51,7 @@ curl -X POST localhost:3000/api/control -d '{"action":"run","prompt":"Draft a su
 # Send to Slack
 curl -X POST localhost:3000/api/control -d '{
   "action": "notify", "channel": "slack",
-  "message": "Nightly digest ready", "from": "Ignis"
+  "message": "Nightly digest ready", "from": "Caddie"
 }'
 
 # Schedule for later (works with both notify and run)
@@ -97,8 +97,8 @@ curl localhost:3000/api/control
 |----------|----------|-------------|
 | `POSTGRES_URL` | yes | Postgres connection string |
 | `REDIS_URL` | yes | Redis connection string |
-| `WORKSPACE_DIR` | no | The agent's working directory. Defaults to `~/.ignis` |
-| `AGENT_NAME` | no | What the portal and alerts call the agent. Defaults to `Ignis` |
+| `WORKSPACE_DIR` | no | The agent's working directory. Defaults to `~/.caddie` |
+| `AGENT_NAME` | no | What the portal and alerts call the agent. Defaults to `Caddie` |
 | `SLACK_BOT_TOKEN` | for Slack | Bot token for sending messages (xoxb-...) |
 | `SLACK_APP_TOKEN` | for Slack | App-level token for Socket Mode (xapp-...) |
 | `LANGFUSE_SECRET_KEY` | for tracing | Langfuse secret key |

@@ -32,7 +32,7 @@ export async function setActiveRun(
   ttlSeconds = 900
 ): Promise<void> {
   await getRedis().set(
-    `ignis:active:${key}`,
+    `caddie:active:${key}`,
     String(Date.now()),
     "EX",
     ttlSeconds
@@ -40,12 +40,12 @@ export async function setActiveRun(
 }
 
 export async function isRunActive(key: string): Promise<boolean> {
-  const val = await getRedis().get(`ignis:active:${key}`);
+  const val = await getRedis().get(`caddie:active:${key}`);
   return val !== null;
 }
 
 export async function clearActiveRun(key: string): Promise<void> {
-  await getRedis().del(`ignis:active:${key}`);
+  await getRedis().del(`caddie:active:${key}`);
 }
 
 /**
@@ -62,7 +62,7 @@ export async function acquireActiveRun(
   ttlSeconds = 900
 ): Promise<boolean> {
   const res = await getRedis().set(
-    `ignis:active:${key}`,
+    `caddie:active:${key}`,
     String(Date.now()),
     "EX",
     ttlSeconds,
@@ -91,7 +91,7 @@ const INBOUND_CLAIM_TTL_SECONDS = 180 * 24 * 60 * 60;
  */
 export async function claimInboundMessage(gmailId: string): Promise<boolean> {
   const res = await getRedis().set(
-    `ignis:inbound:gmail:${gmailId}`,
+    `caddie:inbound:gmail:${gmailId}`,
     String(Date.now()),
     "EX",
     INBOUND_CLAIM_TTL_SECONDS,
@@ -101,7 +101,7 @@ export async function claimInboundMessage(gmailId: string): Promise<boolean> {
 }
 
 export async function releaseInboundMessage(gmailId: string): Promise<void> {
-  await getRedis().del(`ignis:inbound:gmail:${gmailId}`);
+  await getRedis().del(`caddie:inbound:gmail:${gmailId}`);
 }
 
 // =============================================================================
@@ -157,8 +157,8 @@ export interface ScheduledJob {
   trustTier?: TrustTier;
 }
 
-const JOBS_HASH = "ignis:jobs";
-const JOBS_QUEUE = "ignis:jobs:queue";
+const JOBS_HASH = "caddie:jobs";
+const JOBS_QUEUE = "caddie:jobs:queue";
 
 /**
  * Serialize a job to JSON for Redis storage.

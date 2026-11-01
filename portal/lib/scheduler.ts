@@ -296,8 +296,8 @@ export async function executeJob(
         currentTime: currentTimePST(),
       },
       additionalEnv: {
-        IGNIS_TRACE_ID: traceId,
-        IGNIS_THREAD_CONTEXT: JSON.stringify(threadContext),
+        CADDIE_TRACE_ID: traceId,
+        CADDIE_THREAD_CONTEXT: JSON.stringify(threadContext),
       },
     });
 

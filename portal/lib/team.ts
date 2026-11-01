@@ -15,7 +15,7 @@
  */
 
 import type { PoolClient } from "pg";
-import { teamMemberId, teamOwner, type TeamMember } from "@ignis/harness";
+import { teamMemberId, teamOwner, type TeamMember } from "@caddie/harness";
 import { ensureSchema, getPool } from "./db.ts";
 
 /** A rejected roster edit, with a message fit to show the person making it. */
@@ -33,9 +33,9 @@ interface Cache {
 }
 
 function cache(): Cache {
-  const g = globalThis as { __ignisTeamRoster?: Cache };
-  g.__ignisTeamRoster ??= { members: null, loading: null };
-  return g.__ignisTeamRoster;
+  const g = globalThis as { __caddieTeamRoster?: Cache };
+  g.__caddieTeamRoster ??= { members: null, loading: null };
+  return g.__caddieTeamRoster;
 }
 
 /**

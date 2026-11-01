@@ -11,7 +11,7 @@
  * live outside the workspace (~/.claude/projects/...) and the run ledger lives in
  * Postgres, both off-limits to the agent's own file/DB access per its workspace
  * boundaries. So instead of reading either directly, this proxies through the
- * Ignis server, which already owns both:
+ * Caddie server, which already owns both:
  *   - list_runs → GET /api/runs        (the job_runs ledger — the "list of traces")
  *   - view_run  → GET /api/transcripts/<sessionId>  (one run's actual steps)
  *
@@ -205,7 +205,7 @@ async function handleListRuns(args) {
     }
   } else {
     return {
-      content: [{ type: "text", text: "Could not reach the run APIs to list runs. Is the Ignis server up?" }],
+      content: [{ type: "text", text: "Could not reach the run APIs to list runs. Is the Caddie server up?" }],
       isError: true,
     };
   }

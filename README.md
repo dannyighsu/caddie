@@ -1,12 +1,12 @@
-# Ignis
+# Caddie
 
 An agent that runs the business. An install is one machine running one agent: a declarative config (JSON + system prompt + persona + optional skills) that the Agent Harness executes via an underlying runtime (currently Claude Code CLI). Variation between runs is a profile of that agent, never a second agent.
 
 ## Repository Structure
 
 ```
-ignis/
-├── harness/              # Agent Harness library (@ignis/harness)
+caddie/
+├── harness/              # Agent Harness library (@caddie/harness)
 │   ├── src/              # Runtime, launcher, capability + resolver system
 │   ├── agent/            # The agent (agent.json + SYSTEM.md + PERSONA.md + skills)
 │   ├── skills/core/      # Shared skills, mounted on every run
@@ -38,9 +38,9 @@ make run              # portal on http://localhost:3000, inside tmux
 |---|---|---|
 | Who the agent is — name, role, whom it serves, voice | `harness/agent/PERSONA.md` | no — copy `PERSONA.example.md` |
 | How the agent works, the same for every install | `harness/agent/SYSTEM.md` | yes |
-| Shared standing instructions | `~/.ignis/config/preferences.md` | no — workspace |
-| Per-person profiles | `~/.ignis/config/team/<member>.md` | no — workspace |
-| Recurring job procedures | `~/.ignis/jobs/<job>.md` | no — workspace |
+| Shared standing instructions | `~/.caddie/config/preferences.md` | no — workspace |
+| Per-person profiles | `~/.caddie/config/team/<member>.md` | no — workspace |
+| Recurring job procedures | `~/.caddie/jobs/<job>.md` | no — workspace |
 | Skills only this install uses | `harness/agent/.claude/skills/<skill>/` | no |
 | Skills every install shares | `harness/skills/core/<skill>/` | yes |
 
@@ -143,7 +143,7 @@ curl -X POST localhost:3000/api/control -d '{"action":"run","prompt":"Do a check
 curl -X POST localhost:3000/api/control -d '{"action":"schedule","cron":"0,30 * * * *","prompt":"/feed-scan"}'
 ```
 
-All profiles share the workspace at `~/.ignis/`.
+All profiles share the workspace at `~/.caddie/`.
 
 ### The system prompt
 
@@ -219,7 +219,7 @@ Capabilities are MCP server configurations. Each is a JSON file in `harness/capa
 }
 ```
 
-`${ENV_VAR}` references are resolved from `process.env` at runtime. A capability with an unresolved reference is **skipped** — not mounted with a blank value — so a missing credential costs you that capability rather than giving the agent a tool that fails at first use. The run proceeds, and the launcher logs which variable was missing. `HARNESS_ROOT` and `IGNIS_WORKSPACE` (the workspace path, for state like a search index) are supplied by the launcher, not read from the environment.
+`${ENV_VAR}` references are resolved from `process.env` at runtime. A capability with an unresolved reference is **skipped** — not mounted with a blank value — so a missing credential costs you that capability rather than giving the agent a tool that fails at first use. The run proceeds, and the launcher logs which variable was missing. `HARNESS_ROOT` and `CADDIE_WORKSPACE` (the workspace path, for state like a search index) are supplied by the launcher, not read from the environment.
 
 A capability can also list `"disallowedTools"`: tools its server exposes that no run may call, by the server's own tool name. They're removed from the run with `--disallowedTools`. Use it when a third-party server bundles writes alongside the reads you want, as `local-rag` does.
 
@@ -288,7 +288,7 @@ starts, rather than giving the agent a tool.
 │  Slack Socket Mode    │  Scheduler                   │
 │  (inbound messages)   │  (Redis-backed, cron)        │
 └───────────────────────┼──────────────────────────────┘
-                        │ imports @ignis/harness
+                        │ imports @caddie/harness
 ┌───────────────────────┼──────────────────────────────┐
 │  Agent Harness        │                              │
 │                       ▼                              │
@@ -328,7 +328,7 @@ Session IDs enable multi-turn conversations. On resumption, resolvers and the sy
 
 ## Workspace
 
-The agent's workspace is `~/.ignis/` by default (override with `WORKSPACE_DIR`) — outside the repo, since a workspace is the agent's data, not app code. All profiles share it. It contains:
+The agent's workspace is `~/.caddie/` by default (override with `WORKSPACE_DIR`) — outside the repo, since a workspace is the agent's data, not app code. All profiles share it. It contains:
 
 - `config/` -- persistent config files (editable via the control plane)
 - `jobs/` -- recurring-job procedures, one `<job>.md` each (written by you)
@@ -427,7 +427,7 @@ run `make unexpose`. It requires the `tailscale` daemon and a tailnet with
 Funnel enabled — [docs/SETUP.md](docs/SETUP.md#6-tailscale) sets both up; if `tailscale` isn't
 installed, `make run` still starts the server localhost-only (webhooks just won't
 be reachable from the internet). Tune via make variables `FUNNEL_PATHS`,
-`TAILNET_PORT`, `IGNIS_PORT`. Verify the live config with
+`TAILNET_PORT`, `CADDIE_PORT`. Verify the live config with
 `tailscale serve status`.
 
 > To add a public endpoint, append its path to `FUNNEL_PATHS` in the `Makefile` —

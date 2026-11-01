@@ -1,5 +1,5 @@
 {
-  "name": "@ignis/portal",
+  "name": "@caddie/portal",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "node --test --experimental-strip-types \"lib/**/*.test.ts\""
   },
   "dependencies": {
-    "@ignis/harness": "workspace:*",
+    "@caddie/harness": "workspace:*",
     "@slack/socket-mode": "^2.0.6",
     "@slack/web-api": "^7.8.0",
     "cron-parser": "^5.5.0",

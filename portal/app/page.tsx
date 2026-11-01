@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getPortalStats, isStatsRange, type PortalStats, type StatsRange } from "@/lib/stats";
-import { DEFAULT_MAX_TURNS, type AgentConfig } from "@ignis/harness";
+import { DEFAULT_MAX_TURNS, type AgentConfig } from "@caddie/harness";
 import { agentName } from "@/lib/agent-name";
 import { FirstRunTeam } from "./settings/team-roster";
 

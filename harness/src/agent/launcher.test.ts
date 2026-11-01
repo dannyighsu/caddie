@@ -339,13 +339,13 @@ describe("createLauncher", () => {
 
     // Capability JSON can reference the workspace (a per-agent DB path).
     const provided = vi.mocked(resolveCapabilities).mock.calls.at(-1)![2];
-    expect(provided).toMatchObject({ IGNIS_WORKSPACE: "/ws" });
+    expect(provided).toMatchObject({ CADDIE_WORKSPACE: "/ws" });
 
     const call = (runtime.execute as any).mock.calls[0][0];
     expect(call.mcpServers["local-rag"].env).toMatchObject({
       DB_PATH: "/x",
-      IGNIS_WORKSPACE: "/ws",
-      IGNIS_TRUST_TIER: "guest",
+      CADDIE_WORKSPACE: "/ws",
+      CADDIE_TRUST_TIER: "guest",
     });
     expect(call.disallowedTools).toEqual(["mcp__local-rag__delete_file"]);
   });

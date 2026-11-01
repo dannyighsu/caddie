@@ -6,9 +6,9 @@
     "command": "node",
     "args": ["${LOCAL_RAG_ENTRY}"],
     "env": {
-      "DB_PATH": "${IGNIS_WORKSPACE}/.rag/db",
-      "CACHE_DIR": "${IGNIS_WORKSPACE}/.rag/models",
-      "BASE_DIRS": "[\"${IGNIS_WORKSPACE}\"]",
+      "DB_PATH": "${CADDIE_WORKSPACE}/.rag/db",
+      "CACHE_DIR": "${CADDIE_WORKSPACE}/.rag/models",
+      "BASE_DIRS": "[\"${CADDIE_WORKSPACE}\"]",
       "MODEL_NAME": "Xenova/all-MiniLM-L6-v2"
     }
   }

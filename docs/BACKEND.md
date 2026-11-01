@@ -52,7 +52,7 @@ Route handlers stay thin; the work is in `lib/`:
 | Outbound messaging | `notification-channels.ts`, `slack.ts`, `telegram.ts`, `email.ts` |
 | Inbound channels + identity | `messaging.ts`, `*-handler.ts`, `identity.ts` |
 | Inbound attachments | `gmail/parts.ts` + `gmail/attachments.ts`, `slack-files.ts` + `slack-attachments.ts`, `mime.ts` (shared) |
-| Agent runs | `harness.ts` (launches via `@ignis/harness`) |
+| Agent runs | `harness.ts` (launches via `@caddie/harness`) |
 | Persistence | `db.ts` (Postgres) |
 
 ## Related docs

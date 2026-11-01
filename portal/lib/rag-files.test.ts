@@ -25,7 +25,7 @@ import {
 import type { Message } from "./db.ts";
 
 const ID = "3f1c2b4a-5d6e-4f70-8a9b-0c1d2e3f4a5b";
-const WS = "/home/me/.ignis";
+const WS = "/home/me/.caddie";
 
 test("channelOf reads the external id's namespace; portal chats have none", () => {
   assert.equal(channelOf("email:18a2f"), "email");
@@ -64,7 +64,7 @@ test("renderMessageFile carries the thread title, sender and full text", () => {
 });
 
 test("excluded directories: mounts, repo links, dot-dirs and run artifacts", () => {
-  for (const d of ["mounts", "mounts/ignis/src", "jobs", "tickets", ".rag", ".claude/skills", "state/.cache", "runs/2026-09/29_tuesday/artifacts", "runs/2026-09/29_tuesday/artifacts/email-1", "node_modules"]) {
+  for (const d of ["mounts", "mounts/caddie/src", "jobs", "tickets", ".rag", ".claude/skills", "state/.cache", "runs/2026-09/29_tuesday/artifacts", "runs/2026-09/29_tuesday/artifacts/email-1", "node_modules"]) {
     assert.equal(isExcludedDir(d), true, d);
   }
   for (const d of ["conversations/email", "config", "state", "runs/2026-09/29_tuesday", "notes"]) {
@@ -128,7 +128,7 @@ test("purge: refuses escapes, protected areas and ambiguous requests", () => {
   assert.match(err(resolvePurgeTarget({ trustTier: "team", path: "../other/secret.md" }, WS)), /outside your workspace/);
   assert.match(err(resolvePurgeTarget({ trustTier: "team", path: "/etc/passwd" }, WS)), /outside your workspace/);
   assert.match(err(resolvePurgeTarget({ trustTier: "team", path: "config/preferences.md" }, WS)), /can't be purged/);
-  assert.match(err(resolvePurgeTarget({ trustTier: "team", path: "mounts/ignis/README.md" }, WS)), /can't be purged/);
+  assert.match(err(resolvePurgeTarget({ trustTier: "team", path: "mounts/caddie/README.md" }, WS)), /can't be purged/);
   assert.match(err(resolvePurgeTarget({ trustTier: "team", path: `conversations/email/${ID}/x.md` }, WS)), /isn't a message file/);
   assert.match(err(resolvePurgeTarget({ trustTier: "team" }, WS)), /exactly one/);
   assert.match(err(resolvePurgeTarget({ trustTier: "team", current: true }, WS)), /no current message/);

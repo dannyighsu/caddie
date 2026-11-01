@@ -10,15 +10,15 @@ describe("workspaceDir", () => {
     else process.env.WORKSPACE_DIR = saved;
   });
 
-  it("defaults to ~/.ignis, outside the repo", () => {
+  it("defaults to ~/.caddie, outside the repo", () => {
     delete process.env.WORKSPACE_DIR;
-    expect(workspaceDir()).toBe(resolve(homedir(), ".ignis"));
+    expect(workspaceDir()).toBe(resolve(homedir(), ".caddie"));
   });
 
   it("honors WORKSPACE_DIR, expanding a leading ~", () => {
     process.env.WORKSPACE_DIR = "~/elsewhere";
     expect(workspaceDir()).toBe(resolve(homedir(), "elsewhere"));
-    process.env.WORKSPACE_DIR = "/srv/ignis";
-    expect(workspaceDir()).toBe("/srv/ignis");
+    process.env.WORKSPACE_DIR = "/srv/caddie";
+    expect(workspaceDir()).toBe("/srv/caddie");
   });
 });

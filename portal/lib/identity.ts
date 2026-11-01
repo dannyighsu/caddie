@@ -10,7 +10,7 @@
  * table), so each instance names its own people. See lib/team.ts.
  */
 
-import { teamMember, teamMemberLabel, teamOwner } from "@ignis/harness";
+import { teamMember, teamMemberLabel, teamOwner } from "@caddie/harness";
 import { teamRoster } from "./team";
 
 /**

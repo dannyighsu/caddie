@@ -28,7 +28,7 @@ import { existsSync } from "fs";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "fs/promises";
 import { resolve } from "path";
 import { createInterface } from "readline";
-import { workspaceDir } from "@ignis/harness";
+import { workspaceDir } from "@caddie/harness";
 import {
   RAG_DIR,
   RAG_MODEL_NAME,
@@ -449,9 +449,9 @@ interface Registry {
 }
 
 function registry(): Registry {
-  const g = globalThis as { __ignisRagIndex?: Registry };
-  g.__ignisRagIndex ??= { index: null, started: false };
-  return g.__ignisRagIndex;
+  const g = globalThis as { __caddieRagIndex?: Registry };
+  g.__caddieRagIndex ??= { index: null, started: false };
+  return g.__caddieRagIndex;
 }
 
 function theIndex(): WorkspaceIndex {

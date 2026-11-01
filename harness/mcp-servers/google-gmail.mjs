@@ -335,7 +335,7 @@ server.tool(
       };
     }
 
-    const workspace = process.env.IGNIS_WORKSPACE || process.cwd();
+    const workspace = process.env.CADDIE_WORKSPACE || process.cwd();
     const dir = artifactsDir(workspace, msg.data.threadId);
     await mkdir(dir, { recursive: true });
     const filePath = resolve(dir, safeFileName(found.filename, messageId, partId));
