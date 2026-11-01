@@ -100,6 +100,33 @@ password; 404 for an unlisted key; no `cf-cache-status: HIT` on an authed
 response; and that the bucket's `r2.dev` URL does not serve the object. Env it
 needs is documented at the top of `scripts/guard.ts`.
 
+### Running it automatically
+
+Two workflows, split by what they can actually prove:
+
+| Workflow | Runs | Does |
+|---|---|---|
+| `.github/workflows/artifacts-test.yml` | PRs touching `artifacts/**` | typecheck + unit tests |
+| `.github/workflows/artifacts-guard.yml` | nightly, push to `main`, manual | `guard` against the deployed Worker |
+
+The guard is deliberately *not* a PR check: it hits the live Worker, which does
+not have the PR's code, so a PR-time run would only ever tell you about
+production. What it's for is drift after a merge — someone flips the bucket
+public to debug something, the custom domain moves off the Worker route,
+`r2.dev` gets re-enabled, a cache rule starts caching an authed response. None
+of that shows up in a diff, so it needs a clock.
+
+It stays inert until you point it at a deployment. Set these in repo settings:
+
+- **Variables** — `ARTIFACT_ORIGIN` (`https://artifacts.example.com`),
+  `GUARD_KEY`, and optionally `GUARD_OTHER_KEY`, `R2_PUBLIC_URL` (each enables
+  one more check).
+- **Secrets** — `GUARD_PASSWORD`, `GUARD_CANARY`.
+
+Until those exist the guard job warns and skips on a push, and **fails** on a
+scheduled or manual run — a nightly green tick has to mean "the gate held", not
+"there was nothing to check".
+
 ## Two things worth knowing
 
 **Put this on a separate registrable domain**, not a subdomain of a site that
