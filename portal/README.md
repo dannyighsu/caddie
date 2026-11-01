@@ -33,7 +33,9 @@ Open `http://localhost:3000`. The agent page shows conversations, config editing
 
 Connects via Socket Mode (outbound WebSocket -- no public URL or tunnel needed). New threads start a conversation on the default profile; replies in the same thread continue it with session resumption.
 
-Setup: Enable Socket Mode in your Slack app settings, generate an App-Level Token (`xapp-...`), subscribe to `message.im` and `app_mention` events. Connection starts automatically when the server boots.
+Setup: From the repo root, run `make slack-app` and open the printed link to create the app (rename it in the prefilled manifest if you like). Install it to the workspace and copy the Bot User OAuth Token (`xoxb-...`) into `SLACK_BOT_TOKEN`; the app asks you to choose a channel at install because the manifest includes incoming webhooks. Under Basic Information, generate an App-Level Token (`xapp-...`) with the `connections:write` scope and put it in `SLACK_APP_TOKEN`. Connection starts automatically when the server boots.
+
+The bot scope list lives in [slack-app-manifest.yml](slack-app-manifest.yml). An existing install picks up a new scope only after you add it under OAuth & Permissions and reinstall the app.
 
 ### Control API
 

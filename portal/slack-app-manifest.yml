@@ -1,0 +1,53 @@
+# The Slack app an Ignis install needs, and the running list of its bot scopes.
+# `make slack-app` prints a link that creates an app from this file.
+#
+# An existing install doesn't pick up changes here. Add the scope under
+# OAuth & Permissions in the app's settings too, then reinstall the app.
+#
+# Socket Mode also needs an app-level token (xapp-...) with `connections:write`.
+# A manifest can't declare that one: generate it under Basic Information.
+
+display_information:
+  name: Ignis
+features:
+  bot_user:
+    display_name: Ignis
+settings:
+  socket_mode_enabled: true
+  incoming_webhooks:
+    incoming_webhooks_enabled: true
+  event_subscriptions:
+    bot_events:
+      # The only event the portal handles (portal/lib/slack.ts).
+      - app_mention
+oauth_config:
+  scopes:
+    bot:
+      # Receiving @mentions.
+      - app_mentions:read
+      # Posting, including to public channels the bot hasn't joined.
+      - chat:write
+      - chat:write.public
+      # Opening files sent to the bot, and sharing files back.
+      - files:read
+      - files:write
+      # Listing channels, and joining a public one to share a file there.
+      - channels:join
+      - channels:read
+      - groups:read
+
+      # Recommended, but nothing in this repo uses these yet.
+      - channels:history
+      - chat:write.customize
+      - groups:history
+      - im:history
+      - im:read
+      - im:write
+      - im:write.topic
+      - incoming-webhook
+      - links:read
+      - links:write
+      - mpim:history
+      - mpim:read
+      - mpim:write
+      - users.profile:read

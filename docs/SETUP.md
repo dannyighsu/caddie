@@ -264,7 +264,8 @@ plus `HandleLidSwitch=ignore` in `/etc/systemd/logind.conf`.
 
 Each channel is optional and independent. Email works once step 4 is done. For
 Telegram, see [TELEGRAM.md](TELEGRAM.md); it needs step 6 to be reachable. For
-Slack, see the Slack section in [portal/README.md](../portal/README.md); Slack
+Slack, run `make slack-app` to get a link that creates the app, then see the
+Slack section in [portal/README.md](../portal/README.md) for the rest; Slack
 uses an outbound socket and needs no public URL.
 
 ## 9. Optional: workspace search

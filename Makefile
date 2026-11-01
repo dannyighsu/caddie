@@ -1,4 +1,4 @@
-.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke team-add google-auth gog-auth expose unexpose keep-awake allow-sleep rag-setup rag-rebuild
+.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke team-add slack-app google-auth gog-auth expose unexpose keep-awake allow-sleep rag-setup rag-rebuild
 
 # Network exposure (see the "Network exposure" section in README.md).
 IGNIS_PORT ?= 3000
@@ -181,6 +181,11 @@ team-add:
 	cd portal && node --no-warnings scripts/team-add.ts --name "$(NAME)" \
 		$(if $(EMAIL),--email "$(EMAIL)") $(if $(SLACK),--slack "$(SLACK)") \
 		$(if $(TELEGRAM),--telegram "$(TELEGRAM)") $(if $(ID),--id "$(ID)") $(if $(OWNER),--owner)
+
+# Print a link that creates the Slack app from portal/slack-app-manifest.yml.
+# Comment lines are stripped to keep the URL short.
+slack-app:
+	@node -e 'const yaml = require("fs").readFileSync("portal/slack-app-manifest.yml", "utf8").replace(/^\s*#.*\n/gm, ""); console.log("https://api.slack.com/apps?new_app=1&manifest_yaml=" + encodeURIComponent(yaml))'
 
 # Run a quick smoke test via the harness directly
 smoke:
