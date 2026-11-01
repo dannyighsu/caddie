@@ -29,6 +29,11 @@ import {
 import { teamLookup } from "@ignis/harness";
 import { teamRoster } from "./team";
 import type { SlackFile } from "./slack-files";
+import {
+  createMessageClaims,
+  decideDirectMessage,
+  type SlackMessageEvent,
+} from "./slack-inbound";
 
 
 // --- Web API (sending) ---
@@ -259,6 +264,17 @@ export type SlackMessageHandler = (event: {
 
 let socketClient: SocketModeClient | null = null;
 let socketStarted = false;
+let botUserId: string | null = null;
+
+/** The bot's own Slack user id, looked up once. A failed lookup is retried on the next event. */
+async function getBotUserId(): Promise<string> {
+  if (!botUserId) {
+    const { user_id } = await getWebClient().auth.test();
+    if (!user_id) throw new Error("Slack auth.test returned no user_id");
+    botUserId = user_id;
+  }
+  return botUserId;
+}
 
 /**
  * Start the Socket Mode client to receive Slack events.
@@ -278,7 +294,9 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
   socketStarted = true;
   socketClient = new SocketModeClient({ appToken });
 
-  // Handle @mentions only — all bot interactions require an @mention
+  const claimMessage = createMessageClaims();
+
+  // Channels require an @mention. DMs come in below, as `message` events.
   socketClient.on("app_mention", async ({ event, ack }) => {
     await ack();
 
@@ -300,6 +318,8 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
       return;
     }
 
+    if (!claimMessage(event.channel as string, event.ts as string)) return;
+
     try {
       await onMessage({
         text,
@@ -311,6 +331,35 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
       });
     } catch (err) {
       console.error("[Slack Socket] Mention handler error:", err);
+    }
+  });
+
+  // 1:1 DMs, and group DMs that mention the bot. See ./slack-inbound.
+  socketClient.on("message", async ({ event, ack }) => {
+    await ack();
+
+    const message = event as SlackMessageEvent;
+    try {
+      const decision = decideDirectMessage(message, await getBotUserId());
+      if (decision.action === "skip") {
+        console.log(
+          `[Slack Socket] Skipping message: ${decision.reason} user=${message.user} channel=${message.channel}`,
+        );
+        return;
+      }
+
+      if (!claimMessage(message.channel as string, message.ts as string)) return;
+
+      await onMessage({
+        text: decision.text,
+        channel: message.channel as string,
+        ts: message.ts as string,
+        threadTs: message.thread_ts,
+        user: message.user as string,
+        ...(decision.files.length > 0 && { files: decision.files }),
+      });
+    } catch (err) {
+      console.error("[Slack Socket] Message handler error:", err);
     }
   });
 

@@ -10,6 +10,11 @@
 display_information:
   name: Ignis
 features:
+  # Without the Messages tab, people can't DM the bot.
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
   bot_user:
     display_name: Ignis
 settings:
@@ -18,13 +23,18 @@ settings:
     incoming_webhooks_enabled: true
   event_subscriptions:
     bot_events:
-      # The only event the portal handles (portal/lib/slack.ts).
+      # The events the portal handles (portal/lib/slack.ts).
       - app_mention
+      - message.im
+      - message.mpim
 oauth_config:
   scopes:
     bot:
       # Receiving @mentions.
       - app_mentions:read
+      # Receiving 1:1 and group DMs.
+      - im:history
+      - mpim:history
       # Posting, including to public channels the bot hasn't joined.
       - chat:write
       - chat:write.public
@@ -40,14 +50,12 @@ oauth_config:
       - channels:history
       - chat:write.customize
       - groups:history
-      - im:history
       - im:read
       - im:write
       - im:write.topic
       - incoming-webhook
       - links:read
       - links:write
-      - mpim:history
       - mpim:read
       - mpim:write
       - users.profile:read
