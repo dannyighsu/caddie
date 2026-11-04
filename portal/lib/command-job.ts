@@ -166,7 +166,9 @@ export function buildEnv(
   spec: CommandSpec,
   source: NodeJS.ProcessEnv = process.env
 ): NodeJS.ProcessEnv {
-  const base: NodeJS.ProcessEnv = {
+  // A plain record, not NodeJS.ProcessEnv: Next.js types NODE_ENV as required
+  // there, and this env deliberately omits it unless the job names it.
+  const base: Record<string, string | undefined> = {
     PATH: source.PATH,
     HOME: source.HOME,
     LANG: source.LANG,
@@ -176,7 +178,7 @@ export function buildEnv(
     const value = source[name];
     if (value !== undefined) base[name] = value;
   }
-  return base;
+  return base as NodeJS.ProcessEnv;
 }
 
 /**
