@@ -117,8 +117,12 @@ export async function releaseInboundMessage(gmailId: string): Promise<void> {
 export interface ScheduledJob {
   /** Unique job identifier. */
   id: string;
-  /** Job action type: "run" (default) launches the agent, "notify" sends a notification. */
-  action?: "run" | "notify";
+  /**
+   * Job action type: "run" (default) launches the agent, "notify" sends a
+   * notification, "command" runs a shell command and only wakes the agent if
+   * that command produced output (see lib/command-job.ts).
+   */
+  action?: "run" | "notify" | "command";
   /** Profile to use (optional). */
   profile?: string;
   /** Cron expression for recurring jobs (e.g., "0 9 * * 2" = Tuesdays 9AM). Omit for one-shot. */
@@ -262,6 +266,8 @@ export async function scheduleRecurring(
   id: string,
   cronExpr: string,
   options?: {
+    /** Omit for an agent run ("run"); "command" for a scheduled shell command. */
+    action?: ScheduledJob["action"];
     profile?: string;
     params?: Record<string, unknown>;
     description?: string;
@@ -273,6 +279,7 @@ export async function scheduleRecurring(
   const nextRun = await computeNextRun(cronExpr);
   const job: ScheduledJob = {
     id,
+    action: options?.action,
     profile: options?.profile,
     cron: cronExpr,
     nextRun,

@@ -166,13 +166,51 @@ const tools = [
   {
     name: "schedule_recurring",
     description:
-      "Create a recurring scheduled job that runs you on a cron schedule. " +
+      "Create a recurring scheduled job on a cron schedule. " +
       "USE THIS for any recurring task request like 'every weekday at 9am', 'every hour', etc. " +
       "DO NOT use Claude Code's built-in CronCreate — that is blocked. " +
+      "Two kinds, chosen with `type`: an agent run (default — each tick is a full agent turn, driven by `prompt`), " +
+      "or a shell command (`type: \"command\"` — each tick runs `command`, and only a tick that PRINTS something " +
+      "costs anything further). Use `type: \"command\"` for frequent polling: a 5-minute poller written as an agent " +
+      "run is ~130 agent turns a day, while as a command job it is 130 cheap subprocesses and an agent turn only when " +
+      "there is actually something to handle. " +
       "Notifications/results are delivered to the configured notificationChannel (defaults to slack).",
     inputSchema: {
       type: "object",
       properties: {
+        type: {
+          type: "string",
+          enum: ["agent", "command"],
+          description:
+            "What each tick does. 'agent' (default) launches a full agent run with `prompt`. 'command' runs `command` in a shell and only escalates if it wrote to stdout — see `onOutput`.",
+        },
+        command: {
+          type: "string",
+          description:
+            "For type 'command': the shell command line to run each tick. A full command line, so pipes, && and redirection work (e.g. 'git pull -q && python3 scripts/poll.py'). Required for a command job.",
+        },
+        cwd: {
+          type: "string",
+          description:
+            "For type 'command': workspace-relative working directory (e.g. 'mounts/library'). Defaults to the workspace root. Must stay inside the workspace. Note that repo mounts expire and are swept, so a command job pointed at one will start failing once it is gone — prefer a directory that persists.",
+        },
+        onOutput: {
+          type: "string",
+          enum: ["run", "notify", "ignore"],
+          description:
+            "For type 'command': what a tick that printed to stdout does. 'run' (default) launches an agent run with the output appended to `prompt`; 'notify' sends the output to the notification channel; 'ignore' only logs it. Stdout that is empty ALWAYS does nothing. A non-zero exit is reported as a job failure either way.",
+        },
+        commandTimeoutMs: {
+          type: "number",
+          description:
+            "For type 'command': wall-clock limit per tick in milliseconds. Defaults to 60000, maximum 600000. The command (and anything it spawned) is killed if it overruns, and the tick is reported as a failure.",
+        },
+        commandEnv: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "For type 'command': NAMES of environment variables to forward to the command (e.g. ['GRANOLA_API_KEY']). Pass names, never values. Nothing beyond PATH/HOME/LANG/TZ is forwarded unless named here.",
+        },
         profile: {
           type: "string",
           description:
@@ -185,7 +223,8 @@ const tools = [
         },
         prompt: {
           type: "string",
-          description: "The prompt/instruction the agent receives each time the job fires.",
+          description:
+            "The prompt/instruction the agent receives each time the job fires. Required for type 'agent', and for type 'command' with onOutput 'run' (where the command's output is appended to it).",
         },
         description: {
           type: "string",
@@ -201,7 +240,7 @@ const tools = [
           description: "Optional channel-specific recipient override.",
         },
       },
-      required: ["cron", "prompt"],
+      required: ["cron"],
     },
   },
   {
@@ -270,6 +309,28 @@ const tools = [
         prompt: {
           type: "string",
           description: "New prompt/instruction. Omit to keep the current prompt.",
+        },
+        command: {
+          type: "string",
+          description: "Command-job only: new shell command line. Omit to keep the current one.",
+        },
+        cwd: {
+          type: "string",
+          description: "Command-job only: new workspace-relative working directory.",
+        },
+        onOutput: {
+          type: "string",
+          enum: ["run", "notify", "ignore"],
+          description: "Command-job only: new handling for a tick that printed output.",
+        },
+        commandTimeoutMs: {
+          type: "number",
+          description: "Command-job only: new per-tick wall-clock limit in milliseconds.",
+        },
+        commandEnv: {
+          type: "array",
+          items: { type: "string" },
+          description: "Command-job only: new list of environment variable NAMES to forward. Replaces the existing list.",
         },
         description: {
           type: "string",
@@ -499,6 +560,12 @@ async function handleScheduleRecurring(args) {
     action: "schedule",
     cron: args.cron,
     prompt: args.prompt,
+    ...(args.type && { type: args.type }),
+    ...(args.command && { command: args.command }),
+    ...(args.cwd && { cwd: args.cwd }),
+    ...(args.onOutput && { onOutput: args.onOutput }),
+    ...(args.commandTimeoutMs && { commandTimeoutMs: args.commandTimeoutMs }),
+    ...(args.commandEnv && { commandEnv: args.commandEnv }),
     ...(args.profile && { profile: args.profile }),
     ...(args.description && { description: args.description }),
     ...(args.notificationChannel && { notificationChannel: args.notificationChannel }),
@@ -539,6 +606,11 @@ async function handleUpdateSchedule(args) {
     jobId: args.jobId,
     ...(args.cron && { cron: args.cron }),
     ...(args.prompt && { prompt: args.prompt }),
+    ...(args.command && { command: args.command }),
+    ...(args.cwd && { cwd: args.cwd }),
+    ...(args.onOutput && { onOutput: args.onOutput }),
+    ...(args.commandTimeoutMs && { commandTimeoutMs: args.commandTimeoutMs }),
+    ...(args.commandEnv && { commandEnv: args.commandEnv }),
     ...(args.description && { description: args.description }),
     ...(args.profile && { profile: args.profile }),
     ...(args.notificationChannel && { notificationChannel: args.notificationChannel }),

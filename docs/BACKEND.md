@@ -42,13 +42,31 @@ The three client classes map onto the three network-exposure tiers (see
 - **Public** — `/api/public/*`. Password-gated data + auth for the `/public/*`
   dashboards.
 
+### Kinds of scheduled job
+
+A job's `action` decides what a tick does:
+
+| `action` | Tick behavior |
+|---|---|
+| `run` (default) | Launches a full agent run with the job's `prompt`. |
+| `notify` | Sends a message on the job's notification channel. No agent run. |
+| `command` | Runs a shell command (`lib/command-job.ts`). Stdout decides what happens next, per the job's `onOutput`: wake the agent, send a notification, or just log. **Empty stdout ends the tick** — which is the point: a frequent poller costs a subprocess per quiet tick instead of an agent turn. |
+
+A `command` tick runs **in the portal process**, not inside an agent run, so it
+is not subject to the Claude Code hooks that police an agent's `bash`. It is
+confined instead by construction: `cwd` must resolve inside the workspace, the
+environment is minimal unless variables are named on the job, and there is a
+bounded timeout. Only the portal UI and a `team`-trust agent run can create one
+— `/api/control` is localhost-only (see `middleware.ts`) and the `egress`
+capability that exposes the scheduling tools is denied at `guest` trust.
+
 ## Where the logic lives
 
 Route handlers stay thin; the work is in `lib/`:
 
 | Area | Modules |
 |---|---|
-| Scheduling + job execution | `scheduler.ts`, `redis.ts` |
+| Scheduling + job execution | `scheduler.ts`, `redis.ts`, `command-job.ts` |
 | Outbound messaging | `notification-channels.ts`, `slack.ts`, `telegram.ts`, `email.ts` |
 | Inbound channels + identity | `messaging.ts`, `*-handler.ts`, `identity.ts` |
 | Inbound attachments | `gmail/parts.ts` + `gmail/attachments.ts`, `slack-files.ts` + `slack-attachments.ts`, `mime.ts` (shared) |

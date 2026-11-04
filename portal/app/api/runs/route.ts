@@ -24,9 +24,19 @@ function describeDelivery(env: JobRun["envelope"]): string {
       return "console only (no external delivery)";
     case "scheduler":
     case "trigger":
-      return env.job.action === "notify"
-        ? `re-sends a ${env.job.notificationChannel ?? "slack"} notification`
-        : "may send email / notifications";
+      if (env.job.action === "notify") {
+        return `re-sends a ${env.job.notificationChannel ?? "slack"} notification`;
+      }
+      if (env.job.action === "command") {
+        // The command runs again either way; what varies is the escalation.
+        const onOutput = env.job.params?.onOutput ?? "run";
+        if (onOutput === "run") return "re-runs the command; may launch an agent run if it outputs";
+        if (onOutput === "notify") {
+          return `re-runs the command; may send a ${env.job.notificationChannel ?? "slack"} notification`;
+        }
+        return "re-runs the command (output is only logged)";
+      }
+      return "may send email / notifications";
   }
 }
 

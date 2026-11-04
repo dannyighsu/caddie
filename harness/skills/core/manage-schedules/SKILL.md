@@ -14,7 +14,7 @@ Use the **egress MCP scheduling tools** to create and manage scheduled jobs. The
 | Tool | When to use |
 |---|---|
 | `schedule_reminder` | User wants a one-time reminder/notification at a specific time ("remind me at 3pm", "ping me tomorrow") |
-| `schedule_recurring` | User wants something to run on a recurring schedule ("every weekday at 9am", "every 30 minutes") |
+| `schedule_recurring` | User wants something to run on a recurring schedule ("every weekday at 9am", "every 30 minutes") — an agent run **or** a plain shell command, see below |
 | `schedule_oneshot_run` | User wants the agent to actually do work at a future time (not just send a reminder) |
 | `list_schedules` | User asks "what's scheduled?" or you need to find a job ID |
 | `update_schedule` | User asks to change something about an existing schedule (cron, prompt, description, notification channel) |
@@ -26,6 +26,79 @@ Use the **egress MCP scheduling tools** to create and manage scheduled jobs. The
 - **`schedule_oneshot_run`** — launches a full agent run at a future time. Use this only when the user wants the agent to actually do work (e.g., "at 5pm, run the metrics check and tell me what you find").
 
 When in doubt for a reminder request, use `schedule_reminder`.
+
+## Agent runs vs. command jobs (`schedule_recurring`)
+
+A recurring job is one of two kinds, picked with `type`:
+
+- **`type: "agent"` (the default)** — every tick is a full agent turn driven by
+  `prompt`. Right when the work itself needs judgment each time: a morning
+  brief, a weekly digest, a check-in.
+- **`type: "command"`** — every tick runs one shell `command`, and a tick that
+  prints **nothing** ends there. Right for **polling**, where most ticks have
+  nothing to report.
+
+### Why the distinction matters
+
+A 5-minute poll written as an agent run is roughly 130 agent turns a workday to
+surface a handful of events. The same poll as a command job is 130 cheap
+subprocesses, and an agent turn only on the ticks that actually found something.
+**If a job's first step is "check whether anything changed", it wants to be a
+command job.** Don't reach for a coarser interval to control the cost of an
+agent-run poller — use a command job and keep the interval you actually want.
+
+### What happens to the output
+
+`onOutput` decides what a tick that *did* print something does:
+
+| `onOutput` | Effect |
+|---|---|
+| `"run"` (default) | Launch an agent run, with the command's stdout appended to `prompt`. The run starts with the lines that woke it already in context. |
+| `"notify"` | Send the stdout to the job's notification channel. Good for a check whose output is already the message. |
+| `"ignore"` | Log it only. Plain maintenance cron (a sync, a cleanup). |
+
+Empty stdout **always** means do nothing — no run, no notification. A non-zero
+exit, or a command that overruns `commandTimeoutMs`, is reported as a job
+failure on the notification channel like any other, regardless of what it
+printed.
+
+### Writing the command
+
+- `command` is a **full command line** run through a shell, so `&&`, pipes and
+  redirection work: `git pull -q && python3 scripts/poll.py`.
+- `cwd` is **workspace-relative** and must stay inside the workspace. A path
+  outside it is rejected.
+- The command gets a **minimal environment** — `PATH`, `HOME`, `LANG`, `TZ` and
+  nothing else. If it needs a token, name it in `commandEnv`
+  (`commandEnv: ["GRANOLA_API_KEY"]`) — pass the **name**, never the value. A
+  name that isn't set in the environment is simply not forwarded, so check that
+  the secret exists before relying on it.
+- `commandTimeoutMs` defaults to 60s and caps at 10 minutes. The command and
+  anything it spawned are killed on overrun.
+- **Repo mounts expire.** A command job pointed at `mounts/<repo>` will start
+  failing once that mount is swept. Say so when a job's design depends on a
+  checkout, rather than scheduling something that quietly breaks in a day.
+
+### Example
+
+A 5-minute poll that wakes the agent only when the script prints something:
+
+```
+schedule_recurring(
+  cron: "*/5 8-19 * * 1-5",
+  type: "command",
+  command: "git pull -q && python3 scripts/poll-followups.py",
+  cwd: "mounts/library",
+  onOutput: "run",
+  prompt: "/granola-followup",
+  commandEnv: ["GRANOLA_API_KEY"],
+  description: "Poll for ended calls needing a follow-up draft"
+)
+```
+
+Test it before trusting it: `list_schedules` to get the job id, then run it once
+from the portal's Runs view (or re-check on the next tick) and confirm a quiet
+tick stays quiet.
 
 ## Time handling
 
@@ -50,5 +123,7 @@ Examples:
 - `0 9-20 * * 1-5` — every hour 9AM-8PM weekdays
 - `0 9,12,15,18,21 * * 0,6` — every 3 hours 9AM-9PM weekends
 - `0,30 * * * *` — every 30 minutes
+- `*/5 * * * *` — every 5 minutes (steps work; pair a tight interval like this
+  with `type: "command"` so a quiet tick doesn't cost an agent run)
 - `0 9 * * 2` — Tuesdays at 9AM
 - `0 9 * * *` — every day at 9AM
