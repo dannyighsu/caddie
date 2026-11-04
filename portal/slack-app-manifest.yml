@@ -19,6 +19,10 @@ features:
     display_name: Caddie
 settings:
   socket_mode_enabled: true
+  # Block Kit clicks. With Socket Mode on they arrive over the socket, so no
+  # request_url: Slack ignores one until Socket Mode is turned off.
+  interactivity:
+    is_enabled: true
   incoming_webhooks:
     incoming_webhooks_enabled: true
   event_subscriptions:

@@ -43,8 +43,8 @@ async function startListeners() {
 
   // Start Slack Socket Mode
   const { startSocketMode } = await import("./lib/slack");
-  const { handleSlackMessage } = await import("./lib/slack-handler");
-  startSocketMode(handleSlackMessage);
+  const { handleSlackMessage, handleSlackInteraction } = await import("./lib/slack-handler");
+  startSocketMode(handleSlackMessage, handleSlackInteraction);
 
   // Start Gmail inbound poller (replaces the AgentMail webhook)
   const { startGmailPoller } = await import("./lib/gmail/poller");

@@ -16,11 +16,13 @@
  * tell the sender never arrived.
  */
 
-import { replyInThread, resolveSlackIdentity } from "./slack";
+import { replyInThread, resolveSlackIdentity, updateMessage } from "./slack";
 import { handleInboundMessage } from "./messaging";
 import type { SlackMessageHandler } from "./slack";
 import { selectInboundSlackFiles, unretrievedNotice } from "./slack-files";
 import { collectThreadSlackFiles, downloadSlackFiles } from "./slack-attachments";
+import { createMessageClaims } from "./slack-inbound";
+import { decideInteraction, type SlackInteractionPayload } from "./slack-interactions";
 
 export const handleSlackMessage: SlackMessageHandler = async ({
   text,
@@ -86,3 +88,36 @@ export const handleSlackMessage: SlackMessageHandler = async ({
     },
   });
 };
+
+/** A form takes one answer: a double click, or a second person, stands down. */
+const claimForm = createMessageClaims();
+
+/**
+ * A form response from either transport. It runs as an inbound message from the
+ * person who clicked, in the thread the form was posted in, so it gets that
+ * thread's history and their trust tier like anything else they'd say there.
+ *
+ * The form closes first: that's the person's confirmation it went through, and a
+ * run can take minutes. A failed close is logged and the answer still delivered.
+ */
+export async function handleSlackInteraction(payload: SlackInteractionPayload): Promise<void> {
+  const decision = decideInteraction(payload);
+  if (decision.action === "skip") {
+    console.log(`[Slack Handler] Skipping interaction: ${decision.reason}`);
+    return;
+  }
+
+  const { text, channel, ts, threadTs, user, closedBlocks, fallbackText } = decision;
+  if (!claimForm(channel, ts)) {
+    console.log(`[Slack Handler] Form already answered: channel=${channel} ts=${ts}`);
+    return;
+  }
+
+  try {
+    await updateMessage(channel, ts, fallbackText, closedBlocks);
+  } catch (err) {
+    console.error(`[Slack Handler] Failed to close form in ${channel} (${ts}):`, err);
+  }
+
+  await handleSlackMessage({ text, channel, ts, threadTs, user });
+}

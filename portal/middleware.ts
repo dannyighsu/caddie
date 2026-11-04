@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const ALLOWED_PUBLIC_API_PATHS = [
   "/api/telegram/webhook",
+  "/api/chat/plugins/slack/interactions",
   "/api/public/auth",
 ];
 

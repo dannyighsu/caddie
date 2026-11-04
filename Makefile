@@ -6,7 +6,7 @@ TAILNET_PORT ?= 8443
 # Paths reachable from the PUBLIC internet via Tailscale Funnel. Everything else
 # is served to the tailnet + localhost only. Keep this list minimal — it is the
 # entire public attack surface.
-FUNNEL_PATHS := /api/telegram/webhook
+FUNNEL_PATHS := /api/telegram/webhook /api/chat/plugins/slack/interactions
 
 # Start the Caddie control plane in PRODUCTION mode (next build + next start).
 # Use this for the long-lived process: `next start` has no Turbopack dev

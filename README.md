@@ -397,7 +397,7 @@ Memory.
 
 | Reachable from | How | What's exposed |
 |---|---|---|
-| **Public internet** | Tailscale **Funnel** on `:443` | Only the ingress webhook: `/api/telegram/webhook` |
+| **Public internet** | Tailscale **Funnel** on `:443` | Only the ingress webhooks: `/api/telegram/webhook`, `/api/chat/plugins/slack/interactions` |
 | **Your tailnet + this machine** | Tailscale **Serve** on `:8443` | The full control plane — dashboards, control API, all other endpoints |
 | **This machine only** | direct | `http://localhost:3000` |
 

@@ -43,6 +43,8 @@ const tools = [
       "For a rich layout (header, fields, a divider, context lines, a monospace table in a section), pass `blocks`: an array of Block Kit blocks. " +
       "`message` is still required and becomes the notification fallback text Slack shows in push notifications and anywhere blocks can't render, so write it as a readable plain-text version of the same content. " +
       "Blocks can't be combined with filePath. " +
+      "To ask for structured input, send a form, which is a legitimate use even in the conversation you're handling (pass its threadTs): `input` blocks for the fields, then an `actions` block with a submit button. Inputs in `input` blocks send nothing until the button is clicked, while anything interactive in an `actions` block submits the moment it's used, so a select there is only for a single-question form. " +
+      "Give blocks and elements stable block_id and action_id values. A submit closes the form, so it takes one answer, and the answer comes back to you later as a new message in that thread starting \"[Slack form response]\", from whoever clicked. Link buttons aren't responses. " +
       "To share a file (a PDF report, a CSV, an image), pass filePath: the file is uploaded into the channel and `message` becomes the text that introduces it. " +
       "Readers can't reach your workspace, so attach the file rather than linking to its path. " +
       "Sharing a file in a public channel the bot isn't in makes it join that channel first.",

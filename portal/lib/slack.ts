@@ -34,6 +34,7 @@ import {
   decideDirectMessage,
   type SlackMessageEvent,
 } from "./slack-inbound";
+import type { SlackInteractionPayload } from "./slack-interactions";
 
 
 // --- Web API (sending) ---
@@ -80,6 +81,21 @@ export async function replyInThread(
     text,
     thread_ts: threadTs,
     ...(options?.blocks && { blocks: options.blocks as unknown as KnownBlock[] }),
+  });
+}
+
+/** Rewrite a message the bot posted. */
+export async function updateMessage(
+  channel: string,
+  ts: string,
+  text: string,
+  blocks: SlackBlock[],
+): Promise<void> {
+  await getWebClient().chat.update({
+    channel,
+    ts,
+    text,
+    blocks: blocks as unknown as KnownBlock[],
   });
 }
 
@@ -262,6 +278,8 @@ export type SlackMessageHandler = (event: {
   files?: SlackFile[];
 }) => Promise<void>;
 
+export type SlackInteractionHandler = (payload: SlackInteractionPayload) => Promise<void>;
+
 let socketClient: SocketModeClient | null = null;
 let socketStarted = false;
 let botUserId: string | null = null;
@@ -280,7 +298,10 @@ async function getBotUserId(): Promise<string> {
  * Start the Socket Mode client to receive Slack events.
  * Safe to call multiple times — only starts once.
  */
-export function startSocketMode(onMessage: SlackMessageHandler): void {
+export function startSocketMode(
+  onMessage: SlackMessageHandler,
+  onInteraction: SlackInteractionHandler,
+): void {
   if (socketStarted) return;
 
   const appToken = process.env.SLACK_APP_TOKEN;
@@ -361,6 +382,16 @@ export function startSocketMode(onMessage: SlackMessageHandler): void {
     } catch (err) {
       console.error("[Slack Socket] Message handler error:", err);
     }
+  });
+
+  // Block Kit clicks. With Socket Mode on, Slack sends these here and never to
+  // the app's Request URL. Handled unawaited: a form response runs the agent.
+  socketClient.on("interactive", async ({ body, ack }) => {
+    await ack();
+
+    onInteraction(body as SlackInteractionPayload).catch((err) => {
+      console.error("[Slack Socket] Interaction handler error:", err);
+    });
   });
 
   socketClient.on("connected", () => {

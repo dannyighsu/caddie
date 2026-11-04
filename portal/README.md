@@ -37,6 +37,8 @@ Setup: From the repo root, run `make slack-app` and open the printed link to cre
 
 The bot scope list lives in [slack-app-manifest.yml](slack-app-manifest.yml). An existing install picks up a new scope only after you add it under OAuth & Permissions and reinstall the app. To answer DMs, an existing install also needs the `message.im` and `message.mpim` bot events under Event Subscriptions, the `im:history` and `mpim:history` scopes, and the Messages tab enabled under App Home and not read-only, then a reinstall.
 
+Block Kit forms (a message with `input` blocks and a submit button, sent through `post_to_slack`) need Interactivity switched on under Interactivity & Shortcuts; an existing install has to do that by hand. A submit closes the form and reaches the agent as a message from whoever clicked, in the form's thread. With Socket Mode on, which is what message events rely on, those clicks arrive over the socket and Slack doesn't take a Request URL. `POST /api/chat/plugins/slack/interactions` is the Request URL for an app with Socket Mode off (`https://<your-node>.ts.net/api/chat/plugins/slack/interactions`) and needs `SLACK_SIGNING_SECRET`.
+
 ### Control API
 
 The control-plane command surface for agent executions, notifications, and scheduling. Called by the portal UI and by the agent's own tools/skills — **not** by external senders (inbound channel traffic arrives at the `/api/*/webhook` routes instead). See [BACKEND.md](../docs/BACKEND.md) for the client classes.
@@ -101,6 +103,7 @@ curl localhost:3000/api/control
 | `AGENT_NAME` | no | What the portal and alerts call the agent. Defaults to `Caddie` |
 | `SLACK_BOT_TOKEN` | for Slack | Bot token for sending messages (xoxb-...) |
 | `SLACK_APP_TOKEN` | for Slack | App-level token for Socket Mode (xapp-...) |
+| `SLACK_SIGNING_SECRET` | for the HTTP Request URL | Verifies Slack interactions; unused with Socket Mode on |
 | `LANGFUSE_SECRET_KEY` | for tracing | Langfuse secret key |
 | `LANGFUSE_PUBLIC_KEY` | for tracing | Langfuse public key |
 | `LANGFUSE_BASE_URL` | for tracing | Defaults to `https://us.cloud.langfuse.com` |
