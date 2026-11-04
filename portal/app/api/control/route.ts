@@ -11,7 +11,7 @@
  *   notify  — Send a message to Slack, Telegram, or email (immediately or scheduled)
  *   email_team — Email team members by id (or "all"); addresses come from the roster
  *   run     — Execute the agent (immediately or scheduled)
- *   schedule — Create a recurring job
+ *   schedule — Create a recurring job (an agent run, or a shell command via type: "command")
  *   list_slack_channels — List the workspace's Slack channels (id, name, whether the bot can post)
  *
  * Supports `scheduledFor` for one-shot deferred execution,
@@ -24,6 +24,7 @@
  *   curl -X POST localhost:3000/api/control -d '{"action":"run","profile":"extended"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"run","scheduledFor":"2026-03-28T09:00:00Z"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"schedule","cron":"0,30 * * * *","description":"Feed scan every 30 min"}'
+ *   curl -X POST localhost:3000/api/control -d '{"action":"schedule","cron":"0,5,10,15,20,25 * * * *","type":"command","command":"./poll.sh","onOutput":"run","prompt":"/handle-poll"}'
  *   curl -X POST localhost:3000/api/control -d '{"action":"list_slack_channels","nameFilter":"eng"}'
  */
 
@@ -40,6 +41,8 @@ import { getLauncher } from "@/lib/harness";
 import { getSetting, appendAssistantReply } from "@/lib/db";
 import { currentTimePST } from "@/lib/helpers";
 import { scheduleOneShot, scheduleRecurring, scheduleNotification, listJobs, deleteJob, getJob, upsertJob } from "@/lib/redis";
+import { parseCommandSpec } from "@/lib/command-job";
+import { workspace } from "@/lib/harness";
 import { executeJob, isJobActive } from "@/lib/scheduler";
 import { createTraceId, createTrace, completeTrace } from "@/lib/tracing";
 import { purgeContent } from "@/lib/purge";
@@ -141,6 +144,34 @@ interface ControlRequest {
   cron?: string;            // Cron expression for recurring jobs
   jobId?: string;           // For deleting a job
   description?: string;
+  /**
+   * What a scheduled job does when it fires. "agent" (the default) launches an
+   * agent run with `prompt`. "command" runs `command` in a shell and only
+   * escalates if it printed something — see `onOutput` and lib/command-job.ts.
+   * Maps to the stored job's `action` ("run" / "command").
+   */
+  type?: "agent" | "command";
+
+  // --- command-job fields (type: "command") ---
+  /** The shell command line to run on each tick. Required for a command job. */
+  command?: string;
+  /** Workspace-relative working directory. Defaults to the workspace root. */
+  cwd?: string;
+  /**
+   * What to do when the command writes to stdout. "run" (default) launches the
+   * agent with the output appended to `prompt`; "notify" sends the output to the
+   * notification channel; "ignore" only logs it. Empty stdout always does
+   * nothing — that is the point of a command job.
+   */
+  onOutput?: "run" | "notify" | "ignore";
+  /** Per-tick wall-clock limit for the command. Defaults to 60s, capped at 10m. */
+  commandTimeoutMs?: number;
+  /**
+   * Names of environment variables to forward from the portal process to the
+   * command. Nothing is forwarded by default beyond PATH/HOME/LANG/TZ, so a
+   * command that needs a token has to name it here.
+   */
+  commandEnv?: string[];
   /**
    * For scheduled run/notify jobs: the channel to deliver the result/notification on.
    * Defaults to "slack". Set to "telegram" or "email" to override.
@@ -332,6 +363,24 @@ async function executeTrigger(req: ControlRequest): Promise<Record<string, unkno
   // at their scheduled time. Recurring jobs stay on their schedule — a manual
   // trigger is just an extra run.
   const consumed = !job.cron;
+
+  // A command job whose output doesn't wake the agent is bounded by its own
+  // timeout, so run it inline and hand the caller the command's output — that
+  // is what makes "run now" useful for testing a poller. One whose output does
+  // launch an agent falls through to the async path below.
+  // `onOutput` defaults to "run" when unset, so compare the effective value.
+  if (job.action === "command" && (job.params?.onOutput ?? "run") !== "run") {
+    const result = await executeJob(job, { source: "trigger" });
+    if (result.success && consumed) {
+      await deleteJob(job.id);
+    }
+    return {
+      success: result.success,
+      output: result.rawText ?? "",
+      error: result.error,
+      consumed: result.success && consumed,
+    };
+  }
 
   // Notify jobs are fast — run inline and report the result.
   if (job.action === "notify") {
@@ -659,11 +708,26 @@ async function executeSchedule(req: ControlRequest): Promise<Record<string, unkn
     return { success: false, error: "cron expression is required for schedule action" };
   }
 
+  const isCommand = req.type === "command";
+
+  // Validate a command spec up front rather than letting it fail on every tick.
+  // Throws with a message naming the offending field.
+  if (isCommand) {
+    try {
+      parseCommandSpec(commandParams(req), workspace);
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
   const jobId = req.jobId ?? `recurring:${req.profile ?? "default"}:${req.cron.replace(/\s+/g, "_")}`;
   try {
     const job = await scheduleRecurring(jobId, req.cron, {
+      action: isCommand ? "command" : undefined,
       profile: req.profile,
-      params: { prompt: req.prompt, ...req.context },
+      params: isCommand
+        ? { ...commandParams(req), ...req.context }
+        : { prompt: req.prompt, ...req.context },
       description: req.description,
       notificationChannel: req.notificationChannel,
       notificationRecipient: req.notificationRecipient,
@@ -672,6 +736,7 @@ async function executeSchedule(req: ControlRequest): Promise<Record<string, unkn
     return {
       success: true,
       jobId: job.id,
+      action: job.action ?? "run",
       cron: job.cron,
       nextRun: new Date(job.nextRun).toISOString(),
       description: job.description,
@@ -679,6 +744,18 @@ async function executeSchedule(req: ControlRequest): Promise<Record<string, unkn
   } catch (err) {
     return { success: false, error: `Invalid cron expression: ${err instanceof Error ? err.message : err}` };
   }
+}
+
+/** The command-job half of a control request, as stored in `job.params`. */
+function commandParams(req: ControlRequest): Record<string, unknown> {
+  return {
+    command: req.command,
+    prompt: req.prompt,
+    cwd: req.cwd,
+    onOutput: req.onOutput,
+    commandTimeoutMs: req.commandTimeoutMs,
+    commandEnv: req.commandEnv,
+  };
 }
 
 async function executeUpdateSchedule(req: ControlRequest): Promise<Record<string, unknown>> {
@@ -705,6 +782,26 @@ async function executeUpdateSchedule(req: ControlRequest): Promise<Record<string
   if (req.prompt !== undefined) {
     existing.params = { ...existing.params, prompt: req.prompt };
   }
+  // Command-job fields. Merged individually so a partial update leaves the rest
+  // of the spec alone, then revalidated as a whole — an edit that would break
+  // the job is rejected here rather than failing on every future tick.
+  if (existing.action === "command") {
+    for (const key of ["command", "cwd", "onOutput", "commandTimeoutMs", "commandEnv"] as const) {
+      if (req[key] !== undefined) {
+        existing.params = { ...existing.params, [key]: req[key] };
+      }
+    }
+    try {
+      parseCommandSpec(existing.params, workspace);
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  } else if (req.command !== undefined) {
+    return {
+      success: false,
+      error: `Job ${existing.id} is not a command job — its action is "${existing.action ?? "run"}"`,
+    };
+  }
   if (req.description !== undefined) {
     existing.description = req.description;
   }
@@ -726,6 +823,7 @@ async function executeUpdateSchedule(req: ControlRequest): Promise<Record<string
   return {
     success: true,
     jobId: existing.id,
+    action: existing.action ?? "run",
     cron: existing.cron,
     nextRun: new Date(existing.nextRun).toISOString(),
     description: existing.description,

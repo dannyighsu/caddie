@@ -43,6 +43,15 @@ import {
   type RunEnvelope,
 } from "./job-ledger";
 import type { ThreadContext } from "./thread-context";
+import { workspace } from "./harness";
+import {
+  parseCommandSpec,
+  runCommand,
+  buildFollowupPrompt,
+  describeResult,
+  type CommandSpec,
+  type CommandResult,
+} from "./command-job";
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 // Run eviction roughly hourly rather than every poll — it's a cheap DELETE but
@@ -140,13 +149,15 @@ function runLockKey(job: ScheduledJob): string {
 }
 
 /**
- * Whether an agent run for this job's profile is currently in flight. Notify jobs
- * take no lock, so they are never "active". Advisory (non-atomic) — the real
- * guard is the atomic acquire inside executeJob; this exists so callers can
+ * Whether an agent run for this job's profile is currently in flight. Notify and
+ * command jobs take no lock to do their own work, so they are never "active" —
+ * a command job only takes the lock if its output goes on to wake the agent,
+ * and that is decided after the command has run. Advisory (non-atomic) — the
+ * real guard is the atomic acquire inside executeJob; this exists so callers can
  * give immediate "already running" feedback before firing a long run.
  */
 export async function isJobActive(job: ScheduledJob): Promise<boolean> {
-  if (job.action === "notify") return false;
+  if (job.action === "notify" || job.action === "command") return false;
   return isRunActive(runLockKey(job));
 }
 
@@ -219,125 +230,11 @@ export async function executeJob(
       return { ...result, runId };
     }
 
-    const lockKey = runLockKey(job);
-    const acquired = await acquireActiveRun(lockKey);
-    if (!acquired) {
-      // A one-shot (no cron) occurrence is lost when skipped, so it's recorded
-      // as a replayable failure. A recurring one is deferred a couple of
-      // minutes so it still runs: the poller already called markJobFired, which
-      // advanced nextRun to the next natural occurrence, so leaving it alone
-      // would silently drop this occurrence rather than retry it. Only for
-      // scheduled fires — a manual trigger must not shift the schedule.
-      const deferredTo =
-        job.cron && opts.source === "scheduler"
-          ? await deferRecurringJob(job.id)
-          : null;
-      const busy = `A run is already in progress for ${lockKey}`;
-      if (deferredTo) {
-        console.log(
-          `[Scheduler] Job ${job.id} deferred to ${deferredTo.toISOString()} — ${busy}`
-        );
-      }
-      await finishSkipped(
-        runId,
-        !job.cron,
-        deferredTo
-          ? `${busy}; occurrence deferred to ${deferredTo.toISOString()}.`
-          : `${busy}; not deferred (next scheduled occurrence is already due).`
-      );
-      return {
-        success: false,
-        skipped: true,
-        error: deferredTo
-          ? `${busy} — deferred to ${deferredTo.toISOString()}`
-          : busy,
-        runId,
-      };
+    if (job.action === "command") {
+      return await executeCommandJob(job, opts, runId, traceId);
     }
 
-    try {
-      await createTrace(traceId, {
-        trigger: opts.source,
-        jobId: job.id,
-        profile: job.profile,
-      });
-
-    // Scheduled/triggered runs are the team's own automations (the
-    // initiator is the authenticated owner, not an external sender), so they
-    // run at team trust by default — otherwise every team-gated
-    // capability (email, gmail, notion, calendar) is filtered out. A job
-    // can pin itself to "guest" for least privilege.
-    const trustTier = job.trustTier ?? "team";
-
-    // Attached to any Slack or email thread the run creates (via env → egress/
-    // email MCP → control API), so a reply can be traced back to this task.
-    const threadContext = buildThreadContext(job, opts.source);
-
-    // Per-job key. An explicit params.stateKey wins; otherwise derive it from a
-    // leading slash-command in the prompt (e.g. "/golf-tee-times" ->
-    // "golf-tee-times"), so the launcher injects the job's instructions
-    // (jobs/<key>.md — the procedure) and state (state/<key>.md — carried
-    // directives/pauses), and the run starts with both already in context.
-    const promptStr = (job.params?.prompt as string) ?? "";
-    const slashMatch = promptStr.match(/^\/([a-z0-9][a-z0-9-]*)/i);
-    const stateKey = (job.params?.stateKey as string | undefined) ?? slashMatch?.[1];
-
-    const launcher = getLauncher();
-    const result = await launcher.launch({
-      profile: job.profile,
-      stateKey,
-      identity: {
-        trustTier,
-        senderIdentity: "Automated run (no external sender)",
-        originChannel: opts.source === "trigger" ? "manual-trigger" : "schedule",
-      },
-      prompt: (job.params?.prompt as string) ?? "Run.",
-      context: {
-        currentTime: currentTimePST(),
-      },
-      additionalEnv: {
-        CADDIE_TRACE_ID: traceId,
-        CADDIE_THREAD_CONTEXT: JSON.stringify(threadContext),
-      },
-    });
-
-    // Auto-reschedule: agent output can override the cron-computed next run.
-    // Only for scheduled runs — a manual trigger must not shift the schedule.
-    if (opts.source === "scheduler") {
-      const nextMinutes = result.output?.nextCheckInTime as number | undefined;
-      if (nextMinutes && job.cron) {
-        const nextTime = new Date(Date.now() + nextMinutes * 60 * 1000);
-        try {
-          await overrideNextRun(job.id, nextTime);
-          console.log(`[Scheduler] Agent requested next run in ${nextMinutes}m — overriding cron for job ${job.id}`);
-        } catch (err) {
-          console.error(`[Scheduler] Failed to override next run for ${job.id}:`, err);
-        }
-      }
-    }
-
-    await completeTrace(traceId, {
-      success: result.success,
-      error: result.error,
-    });
-
-    // Push failure to the job's channel only for scheduled runs; manual
-    // triggers report the error back through the return value.
-    if (!result.success && opts.source === "scheduler") {
-      await notifyFailure(job, result.error || "Unknown error");
-    }
-
-    await finishFromResult(runId, result);
-
-    return {
-      success: result.success,
-      rawText: result.rawText,
-      error: result.error,
-      runId,
-    };
-    } finally {
-      await clearActiveRun(lockKey);
-    }
+    return await runAgentJob(job, opts, runId, traceId);
   } catch (err) {
     // A throw around the launch (createTrace, launcher, DB) — record it as an
     // orchestration failure so the occurrence is still visible and replayable.
@@ -347,9 +244,254 @@ export async function executeJob(
   }
 }
 
+/**
+ * Launch the agent for a job, under the per-profile active-run lock.
+ *
+ * Split out of `executeJob` so a command job can reuse it: a command job that
+ * produced output needs exactly this path, with the output folded into the
+ * prompt (`promptOverride`), including the lock and the deferral behavior.
+ */
+async function runAgentJob(
+  job: ScheduledJob,
+  opts: { source: JobSource; replayOf?: string },
+  runId: string,
+  traceId: string,
+  promptOverride?: string
+): Promise<ExecuteJobResult> {
+  const lockKey = runLockKey(job);
+  const acquired = await acquireActiveRun(lockKey);
+  if (!acquired) {
+    // A one-shot (no cron) occurrence is lost when skipped, so it's recorded
+    // as a replayable failure. A recurring one is deferred a couple of
+    // minutes so it still runs: the poller already called markJobFired, which
+    // advanced nextRun to the next natural occurrence, so leaving it alone
+    // would silently drop this occurrence rather than retry it. Only for
+    // scheduled fires — a manual trigger must not shift the schedule.
+    const deferredTo =
+      job.cron && opts.source === "scheduler"
+        ? await deferRecurringJob(job.id)
+        : null;
+    const busy = `A run is already in progress for ${lockKey}`;
+    if (deferredTo) {
+      console.log(
+        `[Scheduler] Job ${job.id} deferred to ${deferredTo.toISOString()} — ${busy}`
+      );
+    }
+    await finishSkipped(
+      runId,
+      !job.cron,
+      deferredTo
+        ? `${busy}; occurrence deferred to ${deferredTo.toISOString()}.`
+        : `${busy}; not deferred (next scheduled occurrence is already due).`
+    );
+    return {
+      success: false,
+      skipped: true,
+      error: deferredTo
+        ? `${busy} — deferred to ${deferredTo.toISOString()}`
+        : busy,
+      runId,
+    };
+  }
+
+  try {
+    await createTrace(traceId, {
+      trigger: opts.source,
+      jobId: job.id,
+      profile: job.profile,
+    });
+
+  // Scheduled/triggered runs are the team's own automations (the
+  // initiator is the authenticated owner, not an external sender), so they
+  // run at team trust by default — otherwise every team-gated
+  // capability (email, gmail, notion, calendar) is filtered out. A job
+  // can pin itself to "guest" for least privilege.
+  const trustTier = job.trustTier ?? "team";
+
+  // Attached to any Slack or email thread the run creates (via env → egress/
+  // email MCP → control API), so a reply can be traced back to this task.
+  const threadContext = buildThreadContext(job, opts.source);
+
+  // Per-job key. An explicit params.stateKey wins; otherwise derive it from a
+  // leading slash-command in the prompt (e.g. "/golf-tee-times" ->
+  // "golf-tee-times"), so the launcher injects the job's instructions
+  // (jobs/<key>.md — the procedure) and state (state/<key>.md — carried
+  // directives/pauses), and the run starts with both already in context.
+  const promptStr = (job.params?.prompt as string) ?? "";
+  const slashMatch = promptStr.match(/^\/([a-z0-9][a-z0-9-]*)/i);
+  const stateKey = (job.params?.stateKey as string | undefined) ?? slashMatch?.[1];
+
+  const launcher = getLauncher();
+  const result = await launcher.launch({
+    profile: job.profile,
+    stateKey,
+    identity: {
+      trustTier,
+      senderIdentity: "Automated run (no external sender)",
+      originChannel: opts.source === "trigger" ? "manual-trigger" : "schedule",
+    },
+    prompt: promptOverride ?? (job.params?.prompt as string) ?? "Run.",
+    context: {
+      currentTime: currentTimePST(),
+    },
+    additionalEnv: {
+      CADDIE_TRACE_ID: traceId,
+      CADDIE_THREAD_CONTEXT: JSON.stringify(threadContext),
+    },
+  });
+
+  // Auto-reschedule: agent output can override the cron-computed next run.
+  // Only for scheduled runs — a manual trigger must not shift the schedule.
+  if (opts.source === "scheduler") {
+    const nextMinutes = result.output?.nextCheckInTime as number | undefined;
+    if (nextMinutes && job.cron) {
+      const nextTime = new Date(Date.now() + nextMinutes * 60 * 1000);
+      try {
+        await overrideNextRun(job.id, nextTime);
+        console.log(`[Scheduler] Agent requested next run in ${nextMinutes}m — overriding cron for job ${job.id}`);
+      } catch (err) {
+        console.error(`[Scheduler] Failed to override next run for ${job.id}:`, err);
+      }
+    }
+  }
+
+  await completeTrace(traceId, {
+    success: result.success,
+    error: result.error,
+  });
+
+  // Push failure to the job's channel only for scheduled runs; manual
+  // triggers report the error back through the return value.
+  if (!result.success && opts.source === "scheduler") {
+    await notifyFailure(job, result.error || "Unknown error");
+  }
+
+  await finishFromResult(runId, result);
+
+  return {
+    success: result.success,
+    rawText: result.rawText,
+    error: result.error,
+    runId,
+  };
+  } finally {
+    await clearActiveRun(lockKey);
+  }
+}
+
 /** One-liner label for the Runs list. */
 function jobLabel(job: ScheduledJob): string {
   return job.description ?? job.id;
+}
+
+/**
+ * Execute a command job — run one shell command, then decide from its output.
+ *
+ * This is the cheap-poll path: the common case is a command that prints nothing,
+ * which costs a subprocess and ends the occurrence right there. Only output
+ * escalates, per the job's `onOutput`:
+ *   - "run"    — hand the output to the agent via `runAgentJob` (takes the lock).
+ *   - "notify" — post the output to the job's notification channel.
+ *   - "ignore" — log it.
+ *
+ * A non-zero exit, a timeout or a spawn failure is a job failure and is reported
+ * like any other scheduled failure, regardless of what stdout held. Note the
+ * ordering: the command's own exit status is checked first, so a poller that
+ * prints lines *and* then fails is treated as a failure rather than quietly
+ * waking the agent with partial output.
+ */
+async function executeCommandJob(
+  job: ScheduledJob,
+  opts: { source: JobSource; replayOf?: string },
+  runId: string,
+  traceId: string
+): Promise<ExecuteJobResult> {
+  let spec: CommandSpec;
+  try {
+    spec = parseCommandSpec(job.params, workspace);
+  } catch (err) {
+    // A malformed spec is a permanent error — the job will fail identically on
+    // every tick, so make it loud rather than silently doing nothing.
+    const error = `Invalid command job: ${err instanceof Error ? err.message : String(err)}`;
+    console.error(`[Scheduler] ${error} (job ${job.id})`);
+    await finishRun(runId, { status: "failed", failureClass: "orchestration", error });
+    if (opts.source === "scheduler") await notifyFailure(job, error);
+    return { success: false, error, runId };
+  }
+
+  const result = await runCommand(spec);
+  console.log(
+    `[Scheduler] Command job ${job.id}: ${describeResult(result)} (onOutput: ${spec.onOutput})`
+  );
+
+  const failure = commandFailure(spec, result);
+  if (failure) {
+    await finishRun(runId, {
+      status: "failed",
+      failureClass: "orchestration",
+      error: failure,
+    });
+    if (opts.source === "scheduler") await notifyFailure(job, failure);
+    return { success: false, error: failure, rawText: result.stdout, runId };
+  }
+
+  const output = result.stdout.trim();
+  if (output === "") {
+    // The quiet tick. Nothing happened, and that is the whole point.
+    await finishRun(runId, { status: "succeeded" });
+    return { success: true, rawText: "", runId };
+  }
+
+  if (spec.onOutput === "run") {
+    const prompt = buildFollowupPrompt(
+      job.params?.prompt as string,
+      spec.command,
+      result.stdout
+    );
+    return await runAgentJob(job, opts, runId, traceId, prompt);
+  }
+
+  if (spec.onOutput === "notify") {
+    const channel = job.notificationChannel ?? DEFAULT_NOTIFICATION_CHANNEL;
+    try {
+      await sendNotification(channel, {
+        message: output,
+        recipient: job.notificationRecipient,
+        subject: job.description ?? `Scheduled command: ${job.id}`,
+        threadContext: buildThreadContext(job, opts.source),
+      });
+    } catch (err) {
+      const error = `Command succeeded but notification failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`;
+      console.error(`[Scheduler] ${error} (job ${job.id})`);
+      await finishRun(runId, { status: "failed", failureClass: "orchestration", error });
+      return { success: false, error, rawText: result.stdout, runId };
+    }
+  }
+
+  await finishRun(runId, { status: "succeeded" });
+  return { success: true, rawText: result.stdout, runId };
+}
+
+/**
+ * The failure message for a finished command, or null if it succeeded.
+ * stderr is folded in because a failing command's only explanation is usually
+ * there, and the notification is all anyone sees of a scheduled run.
+ */
+function commandFailure(spec: CommandSpec, result: CommandResult): string | null {
+  const detail = result.stderr.trim();
+  const suffix = detail ? `\n\`\`\`${detail.substring(0, 500)}\`\`\`` : "";
+  if (result.spawnError) {
+    return `Command failed to start: ${result.spawnError}`;
+  }
+  if (result.timedOut) {
+    return `Command timed out after ${spec.timeoutMs}ms: \`${spec.command}\`${suffix}`;
+  }
+  if (result.exitCode !== 0) {
+    return `Command exited ${result.exitCode ?? "on a signal"}: \`${spec.command}\`${suffix}`;
+  }
+  return null;
 }
 
 /**
