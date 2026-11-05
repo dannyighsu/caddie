@@ -9,33 +9,19 @@ import { readFile } from "fs/promises";
 import { resolve } from "path";
 import { homedir } from "os";
 import { workspace } from "./harness";
+import { parseTranscript } from "./transcript-parse";
+import type { TranscriptEntry, TranscriptStep } from "./transcript-parse";
 
-export interface TranscriptEntry {
-  type: "assistant" | "user" | "progress" | "file-history-snapshot" | "last-prompt" | string;
-  message?: {
-    role?: string;
-    model?: string;
-    content?: Array<{
-      type: string;
-      text?: string;
-      name?: string;
-      input?: Record<string, unknown>;
-      tool_use_id?: string;
-      content?: unknown;
-    }>;
-    usage?: Record<string, unknown>;
-    stop_reason?: string;
-  };
-  [key: string]: unknown;
-}
+export { parseTranscript, MAX_TOOL_RESULT_CHARS } from "./transcript-parse";
+export type { TranscriptEntry, TranscriptStep } from "./transcript-parse";
 
-export interface TranscriptStep {
-  role: "assistant" | "user" | "system";
-  type: "text" | "tool_use" | "tool_result" | "thinking" | "progress";
-  content: string;
-  toolName?: string;
-  toolInput?: Record<string, unknown>;
-  timestamp?: string;
+/**
+ * Read and parse a session transcript.
+ */
+export async function readTranscript(sessionId: string): Promise<TranscriptStep[]> {
+  const projectDir = getProjectDir();
+  const transcriptPath = resolve(projectDir, `${sessionId}.jsonl`);
+  return parseTranscript(await readFile(transcriptPath, "utf-8"));
 }
 
 /**
@@ -46,84 +32,6 @@ function getProjectDir(): string {
   // (e.g. the "." in ~/.caddie).
   const projectHash = workspace.replace(/[^a-zA-Z0-9]/g, "-");
   return resolve(homedir(), ".claude", "projects", projectHash);
-}
-
-/**
- * Read and parse a session transcript.
- */
-export async function readTranscript(sessionId: string): Promise<TranscriptStep[]> {
-  const projectDir = getProjectDir();
-  const transcriptPath = resolve(projectDir, `${sessionId}.jsonl`);
-
-  const content = await readFile(transcriptPath, "utf-8");
-  const lines = content.trim().split("\n").filter(Boolean);
-  const steps: TranscriptStep[] = [];
-
-  for (const line of lines) {
-    try {
-      const entry = JSON.parse(line) as TranscriptEntry;
-
-      if (entry.type === "assistant" && entry.message?.content) {
-        for (const block of entry.message.content) {
-          if (block.type === "text" && block.text) {
-            steps.push({
-              role: "assistant",
-              type: "text",
-              content: block.text,
-            });
-          } else if (block.type === "tool_use") {
-            steps.push({
-              role: "assistant",
-              type: "tool_use",
-              content: `${block.name}(${JSON.stringify(block.input ?? {}).substring(0, 200)})`,
-              toolName: block.name,
-              toolInput: block.input as Record<string, unknown>,
-            });
-          } else if (block.type === "thinking") {
-            const thinkingText = (block as Record<string, unknown>).thinking as string ?? block.text ?? "";
-            if (thinkingText) {
-              steps.push({
-                role: "assistant",
-                type: "thinking",
-                content: thinkingText,
-              });
-            }
-          }
-        }
-      } else if (entry.type === "user" && entry.message?.content) {
-        const userContent = entry.message.content;
-
-        // Content can be a string (the prompt) or an array of content blocks
-        if (typeof userContent === "string") {
-          steps.push({ role: "user", type: "text", content: userContent });
-        } else if (Array.isArray(userContent)) {
-        for (const block of userContent) {
-          if (typeof block === "string") {
-            steps.push({ role: "user", type: "text", content: block });
-          } else if (block.type === "tool_result") {
-            const resultText = typeof block.content === "string"
-              ? block.content
-              : Array.isArray(block.content)
-                ? block.content.map((c: { text?: string }) => c.text ?? "").join("\n")
-                : JSON.stringify(block.content);
-            steps.push({
-              role: "user",
-              type: "tool_result",
-              content: resultText.substring(0, 1000),
-              toolName: block.tool_use_id,
-            });
-          } else if (block.type === "text" && block.text) {
-            steps.push({ role: "user", type: "text", content: block.text });
-          }
-        }
-        } // end Array.isArray
-      }
-    } catch {
-      // Skip unparseable lines
-    }
-  }
-
-  return steps;
 }
 
 export interface ApiError {
@@ -165,10 +73,13 @@ export async function getApiError(sessionId: string): Promise<ApiError | null> {
         error?: string;
       };
       if (entry.isApiErrorMessage === true) {
-        const text = entry.message?.content
-          ?.map((b) => (b.type === "text" ? b.text ?? "" : ""))
-          .join("")
-          .trim();
+        const content = entry.message?.content;
+        const text = (typeof content === "string"
+          ? content
+          : Array.isArray(content)
+            ? content.map((b) => (b.type === "text" ? b.text ?? "" : "")).join("")
+            : ""
+        ).trim();
         found = {
           type: entry.error ?? "api_error",
           message: text || entry.error || "API-layer failure",

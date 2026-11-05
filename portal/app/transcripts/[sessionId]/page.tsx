@@ -8,6 +8,8 @@ interface TranscriptStep {
   type: "text" | "tool_use" | "tool_result" | "thinking" | "progress";
   content: string;
   toolName?: string;
+  /** True when the step came from a subagent conversation, not the parent run. */
+  sidechain?: boolean;
 }
 
 export default function TranscriptPage() {
@@ -72,6 +74,11 @@ export default function TranscriptPage() {
               )}
               {step.toolName && step.type === "tool_use" && (
                 <span className="text-xs font-mono text-primary">{step.toolName}</span>
+              )}
+              {step.sidechain && (
+                <span className="text-xs rounded bg-surface-muted px-1.5 py-0.5 text-ink-faint">
+                  subagent
+                </span>
               )}
             </div>
             <pre className="whitespace-pre-wrap font-sans text-sm max-h-64 overflow-y-auto">
