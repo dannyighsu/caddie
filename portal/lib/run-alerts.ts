@@ -14,9 +14,7 @@
 
 import type { AgentResult } from "@caddie/harness";
 import { classifyRunFailure } from "./failure-classifier";
-import { sendEmail, isEmailConfigured } from "./email";
-import { teamOwner } from "@caddie/harness";
-import { getTeamRoster } from "./team";
+import { emailOwner } from "./owner-alert";
 import { agentName } from "./agent-name";
 
 function transcriptUrl(sessionId: string): string {
@@ -40,15 +38,6 @@ export async function alertOwnerOnApiFailure(
   const { code, detail } = classified;
   const name = agentName();
 
-  const to = teamOwner(await getTeamRoster().catch(() => []))?.emails[0];
-  if (!to || !isEmailConfigured()) {
-    console.error(
-      `[RunAlerts] API-layer failure (${code}) but ` +
-        `${to ? "email is not configured" : "the team has no owner with an email"}: ${detail}`
-    );
-    return;
-  }
-
   const link = result.sessionId
     ? `\nTranscript: ${transcriptUrl(result.sessionId)}\n`
     : "";
@@ -61,12 +50,8 @@ export async function alertOwnerOnApiFailure(
     `error. It usually means the Claude Code OAuth session has expired and needs ` +
     `to be re-authenticated.`;
 
-  try {
-    await sendEmail(to, subject, body);
-    console.log(
-      `[RunAlerts] Emailed ${to} about API-layer failure (${code}).`
-    );
-  } catch (err) {
-    console.error(`[RunAlerts] Failed to deliver API-failure alert email:`, err);
+  const delivered = await emailOwner(subject, body);
+  if (!delivered) {
+    console.error(`[RunAlerts] API-layer failure (${code}) went unreported: ${detail}`);
   }
 }
