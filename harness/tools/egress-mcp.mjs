@@ -239,7 +239,7 @@ const tools = [
         },
         notificationRecipient: {
           type: "string",
-          description: "Optional channel-specific recipient override.",
+          description: "Optional channel-specific recipient override. Worth setting explicitly when the job's failures matter: without it, Slack delivery depends on a default channel being configured, and failure alerts fall back to the owner's email.",
         },
       },
       required: ["cron"],
@@ -278,7 +278,7 @@ const tools = [
         },
         notificationRecipient: {
           type: "string",
-          description: "Optional channel-specific recipient override.",
+          description: "Optional channel-specific recipient override. Worth setting explicitly when the job's failures matter: without it, Slack delivery depends on a default channel being configured, and failure alerts fall back to the owner's email.",
         },
       },
       required: ["prompt", "scheduledFor"],

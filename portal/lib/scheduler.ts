@@ -45,6 +45,10 @@ import {
 import type { ThreadContext } from "./thread-context";
 import { workspace } from "./harness";
 import {
+  notifyJobFailure,
+  noteJobSuccess,
+} from "./job-failure-alerts";
+import {
   parseCommandSpec,
   runCommand,
   buildFollowupPrompt,
@@ -115,7 +119,7 @@ export function startScheduler(): void {
           .catch(async (err) => {
             const error = err instanceof Error ? err.message : String(err);
             console.error(`[Scheduler] Job ${job.id} failed:`, error);
-            await notifyFailure(job, error);
+            await notifyJobFailure(job, error);
           });
       }
     } catch (err) {
@@ -216,25 +220,14 @@ export async function executeJob(
   });
 
   try {
-    if (job.action === "notify") {
-      const result = await executeNotifyJob(job, opts.source);
-      if (result.success) {
-        await finishRun(runId, { status: "succeeded" });
-      } else {
-        await finishRun(runId, {
-          status: "failed",
-          failureClass: "orchestration",
-          error: result.error,
-        });
-      }
-      return { ...result, runId };
+    const result = await runJobAction(job, opts, runId, traceId);
+    // A scheduled occurrence that came back clean closes any failure streak —
+    // and says so if alerts went out about it. Skipped occurrences are neither
+    // success nor failure, so they leave the streak alone.
+    if (opts.source === "scheduler" && result.success && !result.skipped) {
+      await noteJobSuccess(job);
     }
-
-    if (job.action === "command") {
-      return await executeCommandJob(job, opts, runId, traceId);
-    }
-
-    return await runAgentJob(job, opts, runId, traceId);
+    return result;
   } catch (err) {
     // A throw around the launch (createTrace, launcher, DB) — record it as an
     // orchestration failure so the occurrence is still visible and replayable.
@@ -242,6 +235,34 @@ export async function executeJob(
     await failOrchestration(runId, error);
     throw err;
   }
+}
+
+/** Dispatch a job to the executor for its action. */
+async function runJobAction(
+  job: ScheduledJob,
+  opts: { source: JobSource; replayOf?: string },
+  runId: string,
+  traceId: string
+): Promise<ExecuteJobResult> {
+  if (job.action === "notify") {
+    const result = await executeNotifyJob(job, opts.source);
+    if (result.success) {
+      await finishRun(runId, { status: "succeeded" });
+    } else {
+      await finishRun(runId, {
+        status: "failed",
+        failureClass: "orchestration",
+        error: result.error,
+      });
+    }
+    return { ...result, runId };
+  }
+
+  if (job.action === "command") {
+    return await executeCommandJob(job, opts, runId, traceId);
+  }
+
+  return await runAgentJob(job, opts, runId, traceId);
 }
 
 /**
@@ -363,7 +384,7 @@ async function runAgentJob(
   // Push failure to the job's channel only for scheduled runs; manual
   // triggers report the error back through the return value.
   if (!result.success && opts.source === "scheduler") {
-    await notifyFailure(job, result.error || "Unknown error");
+    await notifyJobFailure(job, result.error || "Unknown error");
   }
 
   await finishFromResult(runId, result);
@@ -415,7 +436,7 @@ async function executeCommandJob(
     const error = `Invalid command job: ${err instanceof Error ? err.message : String(err)}`;
     console.error(`[Scheduler] ${error} (job ${job.id})`);
     await finishRun(runId, { status: "failed", failureClass: "orchestration", error });
-    if (opts.source === "scheduler") await notifyFailure(job, error);
+    if (opts.source === "scheduler") await notifyJobFailure(job, error);
     return { success: false, error, runId };
   }
 
@@ -431,7 +452,7 @@ async function executeCommandJob(
       failureClass: "orchestration",
       error: failure,
     });
-    if (opts.source === "scheduler") await notifyFailure(job, failure);
+    if (opts.source === "scheduler") await notifyJobFailure(job, failure);
     return { success: false, error: failure, rawText: result.stdout, runId };
   }
 
@@ -466,6 +487,9 @@ async function executeCommandJob(
       }`;
       console.error(`[Scheduler] ${error} (job ${job.id})`);
       await finishRun(runId, { status: "failed", failureClass: "orchestration", error });
+      // Worth alerting even though the channel is what just failed: the alert
+      // path falls back to the owner's email, so this no longer disappears.
+      if (opts.source === "scheduler") await notifyJobFailure(job, error);
       return { success: false, error, rawText: result.stdout, runId };
     }
   }
@@ -521,24 +545,5 @@ async function executeNotifyJob(job: ScheduledJob, source: JobSource): Promise<E
     const error = err instanceof Error ? err.message : String(err);
     console.error(`[Scheduler] Failed to send notify job ${job.id} via ${channel}:`, error);
     return { success: false, error };
-  }
-}
-
-/**
- * Send a failure notification on the job's configured channel.
- */
-async function notifyFailure(job: ScheduledJob, error: string): Promise<void> {
-  const channel = job.notificationChannel ?? DEFAULT_NOTIFICATION_CHANNEL;
-  const label = job.description ?? job.id;
-  const message = `:warning: *Scheduled job failed:* ${label}\n\`\`\`${error.substring(0, 500)}\`\`\``;
-
-  try {
-    await sendNotification(channel, {
-      message,
-      recipient: job.notificationRecipient,
-      subject: `Job failed: ${label}`,
-    });
-  } catch (err) {
-    console.error(`[Scheduler] Failed to deliver failure notification for ${job.id} via ${channel}:`, err);
   }
 }

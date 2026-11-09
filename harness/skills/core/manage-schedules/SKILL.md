@@ -60,7 +60,7 @@ agent-run poller — use a command job and keep the interval you actually want.
 Empty stdout **always** means do nothing — no run, no notification. A non-zero
 exit, or a command that overruns `commandTimeoutMs`, is reported as a job
 failure on the notification channel like any other, regardless of what it
-printed.
+printed (see **When a job fails** below for the throttle).
 
 ### Writing the command
 
@@ -114,6 +114,34 @@ Examples:
 ## Notification channel
 
 When the user doesn't specify a channel, set `notificationChannel` to match the **`originChannel`** in your run context — reach them back on the channel they contacted you on (someone who emailed you gets reminded by email). Override only when they explicitly ask for a different channel (e.g., "remind me on Telegram", "email me the result").
+
+## When a job fails
+
+A scheduled job that fails — an agent run that errored, a command that exited
+non-zero, timed out or wouldn't start — pushes a failure alert, so a broken
+automation is never silent:
+
+- The **first** failure alerts immediately on the job's notification channel.
+- While the **same** error keeps repeating, further alerts are throttled to one
+  every ~6 hours (with a count of how long it has been failing). A five-minute
+  poller that is broken rather than flaky therefore produces a handful of
+  messages a day, not 130.
+- If the **error changes**, that alerts immediately — a different failure is
+  news.
+- When the job next runs clean, a one-line **recovery** notice closes it out.
+- If the job's channel can't take the alert (no Slack recipient and no default
+  channel configured, Slack down, email unconfigured), it falls back to the
+  **team owner's email**. Nothing is marked delivered unless some path took it.
+
+Two things follow for you when setting a job up:
+
+- Set `notificationRecipient` explicitly for anything whose failure matters.
+  Without one, Slack delivery depends on a default channel being configured in
+  the portal, and if it isn't, every alert for that job takes the email
+  fallback.
+- A failure alert is a push, not a log. The portal's Runs view is still the
+  record of every occurrence — check it when you want the history rather than
+  the headline.
 
 ## Cron expressions (for `schedule_recurring`)
 

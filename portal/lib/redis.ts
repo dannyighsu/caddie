@@ -9,6 +9,7 @@ import Redis from "ioredis";
 import type { NotificationChannel } from "./notification-channels";
 import type { TrustTier } from "./identity";
 import { computeDeferral } from "./defer";
+import type { FailureStreak } from "./job-failure-streak";
 
 let redis: Redis | null = null;
 
@@ -429,4 +430,49 @@ export async function setJobEnabled(id: string, enabled: boolean): Promise<void>
   const job = deserializeJob(data);
   job.enabled = enabled;
   await upsertJob(job);
+}
+
+// =============================================================================
+// Job Failure Streaks
+// =============================================================================
+
+/**
+ * How long a failure streak is remembered. Only needs to outlive the alert
+ * quiet period by a wide margin — a job that hasn't failed in a month starts
+ * its next streak fresh, which is the right behavior anyway.
+ */
+const FAILURE_STREAK_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+function failureStreakKey(jobId: string): string {
+  return `caddie:jobfail:${jobId}`;
+}
+
+/** The carried failure streak for a job, or null if it isn't currently failing. */
+export async function getJobFailureStreak(
+  jobId: string
+): Promise<FailureStreak | null> {
+  const data = await getRedis().get(failureStreakKey(jobId));
+  if (!data) return null;
+  try {
+    return JSON.parse(data) as FailureStreak;
+  } catch {
+    // A streak we can't read is a streak we don't have — alert as if new.
+    return null;
+  }
+}
+
+export async function setJobFailureStreak(
+  jobId: string,
+  streak: FailureStreak
+): Promise<void> {
+  await getRedis().set(
+    failureStreakKey(jobId),
+    JSON.stringify(streak),
+    "EX",
+    FAILURE_STREAK_TTL_SECONDS
+  );
+}
+
+export async function clearJobFailureStreak(jobId: string): Promise<void> {
+  await getRedis().del(failureStreakKey(jobId));
 }
