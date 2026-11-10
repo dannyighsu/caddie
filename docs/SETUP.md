@@ -7,7 +7,7 @@ sign-in, an admin console — say so.
 An install is one machine running one agent. Everything that makes it *this*
 agent rather than another lives outside git: `portal/.env.local`,
 `harness/agent/PERSONA.md`, `harness/agent/.env`, `harness/credentials/`, the workspace at
-`~/.caddie/`, and `harness/agent/.claude/skills/`. Two installs share the repo
+`~/.caddie/`, `harness/agent/.claude/skills/` and `harness/agent/pre-run`. Two installs share the repo
 and nothing else.
 
 The steps assume macOS with [Homebrew](https://brew.sh). Each one is
@@ -127,6 +127,11 @@ a team member asks, and the directory is not tracked.
 sees their names, never their values, in its context; guest runs get none. It's
 read on each run, so adding a token needs no restart. Keep the portal's own
 secrets in `.env.local`. Only what's put here reaches the agent.
+
+**`harness/agent/pre-run`** (optional) — an executable that `make run` and
+`make serve` run from the repo root before every start, for this install's own
+steps, such as syncing its skills from an agent-config profile. Start from
+`harness/agent/pre-run.example`. If it fails, the run warns and starts anyway.
 
 ## 4. Google (Calendar and Gmail)
 

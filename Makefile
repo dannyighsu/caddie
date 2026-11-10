@@ -1,4 +1,4 @@
-.PHONY: run serve dev debug debug-snapshot build build-harness install agent-tools smoke team-add slack-app google-auth gog-auth expose unexpose keep-awake allow-sleep rag-setup rag-rebuild
+.PHONY: run serve pre-run dev debug debug-snapshot build build-harness install agent-tools smoke team-add slack-app google-auth gog-auth expose unexpose keep-awake allow-sleep rag-setup rag-rebuild
 
 # Network exposure (see the "Network exposure" section in README.md).
 CADDIE_PORT  ?= 3000
@@ -41,9 +41,22 @@ run:
 	else echo "[run] no TTY — attach with: tmux attach -t $(TMUX_SESSION)"; fi
 
 # The actual production server (what `make run` runs inside tmux).
-serve: build
+serve: pre-run build
 	@$(MAKE) --no-print-directory expose
 	cd portal && pnpm start
+
+# This install's own steps before every run, such as syncing its skills: the
+# executable harness/agent/pre-run, untracked, run from the repo root. See
+# harness/agent/pre-run.example. A failing hook is reported and the run goes
+# ahead, so a broken step can't keep the agent down.
+PRE_RUN := harness/agent/pre-run
+pre-run:
+	@if [ -x $(PRE_RUN) ]; then \
+		echo "[pre-run] running $(PRE_RUN)…"; \
+		./$(PRE_RUN) || echo "[pre-run] WARN: $(PRE_RUN) exited $$?; starting anyway."; \
+	elif [ -e $(PRE_RUN) ]; then \
+		echo "[pre-run] WARN: $(PRE_RUN) is not executable; skipped (chmod +x it)."; \
+	fi
 
 # Configure the network surface via Tailscale, enforced at the proxy BEFORE any
 # request reaches Next:

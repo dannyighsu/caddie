@@ -126,6 +126,12 @@ harness/agent/PERSONA.md
 # The agent's own skills, which it also authors at a team member's request.
 # Shared ones live in harness/skills/core/.
 harness/agent/.claude/skills/
+# What agent-config's sync writes beside them: Codex's link to the same skills
+# and the lock it keeps.
+harness/agent/.agents/
+harness/agent/.agent-config.lock.json
+# This install's own steps before every run; pre-run.example is the template.
+harness/agent/pre-run
 workspace/
 
 # Eval runs: per-run sandboxes and results (transcripts quote real prompts).

@@ -44,6 +44,7 @@ make run              # portal on http://localhost:3000, inside tmux
 | Recurring job procedures | `~/.caddie/jobs/<job>.md` | no — workspace |
 | Skills only this install uses | `harness/agent/.claude/skills/<skill>/` | no |
 | Skills every install shares | `harness/skills/core/<skill>/` | yes |
+| Steps before every `make run`, such as a skill sync | `harness/agent/pre-run` | no — copy `pre-run.example` |
 
 All of these are also editable in the portal's **Config** tab. Changes take
 effect on the agent's next run, with nothing to rebuild or restart.
