@@ -50,6 +50,26 @@ function resolveEnvVars(value: string, missing?: Set<string>): string {
  * without immediately crashing. Does not do a full MCP handshake — that's
  * too slow/fragile for servers that open browsers or resolve dependencies.
  */
+/**
+ * Capability variables the portal fills from its own settings rather than the
+ * environment, and where they're set. Naming the variable for these would send
+ * someone to `.env.local` for a value that doesn't belong there.
+ */
+const PORTAL_MANAGED_VARS: Record<string, string> = {
+  LINEAR_ACCESS_TOKEN: "connect Linear in Settings → Linear",
+};
+
+function notConfiguredHint(missing: Set<string>): string {
+  const hints = new Set<string>();
+  const envVars: string[] = [];
+  for (const v of missing) {
+    if (PORTAL_MANAGED_VARS[v]) hints.add(PORTAL_MANAGED_VARS[v]);
+    else envVars.push(v);
+  }
+  if (envVars.length) hints.add(`unset: ${envVars.join(", ")}`);
+  return [...hints].join("; ");
+}
+
 async function checkMcpServer(def: CapabilityDef): Promise<HealthCheckResult> {
   if (!def.server) {
     return { name: def.name, type: "flag", status: "ok", message: "Flag-only" };
@@ -62,7 +82,7 @@ async function checkMcpServer(def: CapabilityDef): Promise<HealthCheckResult> {
     resolveEnvVars(v, missing);
   }
   if (missing.size > 0) {
-    return { name: def.name, type: "mcp", status: "skipped", message: `Not configured — unset: ${[...missing].join(", ")}` };
+    return { name: def.name, type: "mcp", status: "skipped", message: `Not configured — ${notConfiguredHint(missing)}` };
   }
 
   const command = resolveEnvVars(def.server.command);
