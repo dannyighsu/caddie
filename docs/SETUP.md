@@ -238,6 +238,14 @@ signed in to the right one.
 
 ### Expose and verify
 
+On Linux, `tailscaled` takes serve and Funnel changes only from root or its
+operator. Make the user that runs the portal the operator, once, or every
+`make expose` step fails with "Access denied: serve config denied":
+
+```bash
+sudo tailscale set --operator=$USER
+```
+
 ```bash
 make expose               # also runs on every `make run`
 tailscale serve status    # the Funnel paths on :443, the full portal on :8443 (tailnet only)

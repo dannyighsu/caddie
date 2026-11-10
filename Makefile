@@ -6,7 +6,8 @@ TAILNET_PORT ?= 8443
 # Paths reachable from the PUBLIC internet via Tailscale Funnel. Everything else
 # is served to the tailnet + localhost only. Keep this list minimal — it is the
 # entire public attack surface.
-FUNNEL_PATHS := /api/telegram/webhook /api/chat/plugins/slack/interactions
+FUNNEL_PATHS := /api/telegram/webhook /api/chat/plugins/slack/interactions \
+                /api/chat/plugins/linear/webhook /api/chat/plugins/linear/oauth_redirect
 
 # Start the Caddie control plane in PRODUCTION mode (next build + next start).
 # Use this for the long-lived process: `next start` has no Turbopack dev
@@ -41,7 +42,7 @@ run:
 	else echo "[run] no TTY — attach with: tmux attach -t $(TMUX_SESSION)"; fi
 
 # The actual production server (what `make run` runs inside tmux).
-serve: pre-run build
+serve: install pre-run build
 	@$(MAKE) --no-print-directory expose
 	cd portal && pnpm start
 
@@ -73,11 +74,11 @@ expose:
 	@tailscale serve reset >/dev/null 2>&1 || true
 	@echo "[expose] Tailnet-only (private): full control plane on :$(TAILNET_PORT)"
 	@tailscale serve --bg --https=$(TAILNET_PORT) http://127.0.0.1:$(CADDIE_PORT) >/dev/null \
-		|| echo "[expose] WARN: serve setup failed."
+		|| echo "[expose] WARN: serve setup failed. 'Access denied' on Linux means this user isn't tailscaled's operator: sudo tailscale set --operator=\$$USER, once."
 	@for p in $(FUNNEL_PATHS); do \
 		echo "[expose] Public (Funnel :443): $$p"; \
 		tailscale funnel --bg --yes --https=443 --set-path=$$p http://127.0.0.1:$(CADDIE_PORT)$$p >/dev/null \
-			|| echo "[expose] WARN: funnel failed for $$p — is Funnel enabled for this node? https://tailscale.com/kb/1223/funnel"; \
+			|| echo "[expose] WARN: funnel failed for $$p — 'Access denied' means this user isn't tailscaled's operator (see above); otherwise is Funnel enabled for this node? https://tailscale.com/kb/1223/funnel"; \
 	done
 	@echo "[expose] Public surface = $(FUNNEL_PATHS); everything else is tailnet-only."
 
@@ -105,7 +106,7 @@ allow-sleep:
 # Start the Caddie control plane with the Next dev server (hot reload).
 # For active development only — do NOT leave running for hours; the Turbopack
 # dev compiler accumulates memory over uptime (use `make run` for long sessions).
-dev: build-harness
+dev: install build-harness
 	cd portal && pnpm dev
 
 # Run the dev server with memory diagnostics (local only, no Funnel).
@@ -115,7 +116,7 @@ dev: build-harness
 #   --heapsnapshot-signal=SIGUSR2     dump a snapshot on demand: kill -USR2 <pid>
 # Snapshots land in portal/ — open them in Chrome DevTools -> Memory, sort by
 # retained size. Tune logging cadence with DEBUG_MEM_INTERVAL_MS (ms).
-debug: build-harness
+debug: install build-harness
 	cd portal && \
 		NODE_OPTIONS="--require $(CURDIR)/portal/scripts/mem-logger.cjs --heapsnapshot-near-heap-limit=2 --heapsnapshot-signal=SIGUSR2" \
 		pnpm dev
@@ -142,9 +143,11 @@ build-harness:
 build: build-harness
 	cd portal && pnpm build
 
-# Install all dependencies
+# Install all dependencies. A prerequisite of serve/dev/debug so a pull that
+# adds a package can't leave a run missing it; near no-op when up to date.
+# --frozen-lockfile fails the run if package.json and the lockfile disagree.
 install:
-	pnpm install
+	pnpm install --frozen-lockfile
 
 # Host tools the agent uses from Bash. Runs go straight onto this machine (no
 # container), so anything the agent needs has to be installed here:
