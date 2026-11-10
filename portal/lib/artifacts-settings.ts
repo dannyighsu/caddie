@@ -80,6 +80,20 @@ export function applyUpdate(
   if (next.accountId && !/^[0-9a-f]{32}$/.test(next.accountId)) {
     return { error: "The account ID is 32 hex characters (shown by `wrangler whoami`)." };
   }
+  // R2's S3 API takes the token's S3 credentials, not the Cloudflare API token
+  // itself (cfat_…); pasted there, every upload fails with a bare 400.
+  if (next.accessKeyId && !/^[0-9a-f]{32}$/.test(next.accessKeyId)) {
+    return {
+      error:
+        "The R2 access key ID is 32 hex characters. It's the S3 \"Access Key ID\" shown when you create an R2 API token, not the token value (cfat_…).",
+    };
+  }
+  if (next.secretAccessKey && !/^[0-9a-f]{64}$/.test(next.secretAccessKey)) {
+    return {
+      error:
+        "The R2 secret access key is 64 hex characters. It's the S3 \"Secret Access Key\" shown when you create an R2 API token, not the token value (cfat_…).",
+    };
+  }
 
   const missing = FIELDS.filter((f) => !next[f]);
   if (missing.length) return { error: `Missing: ${missing.join(", ")}.` };

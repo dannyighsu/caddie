@@ -14,8 +14,8 @@ const FULL: ArtifactsSettings = {
   origin: "https://artifacts.example.com",
   password: "pw-secret",
   accountId: "0123456789abcdef0123456789abcdef",
-  accessKeyId: "key-id",
-  secretAccessKey: "r2-secret",
+  accessKeyId: "fedcba9876543210fedcba9876543210",
+  secretAccessKey: "0123456789abcdef".repeat(4),
 };
 
 function ok(r: ReturnType<typeof applyUpdate>): ArtifactsSettings {
@@ -59,10 +59,10 @@ test("a first save needs all five values", () => {
 });
 
 test("blank secrets keep the stored ones, so the form saves without retyping them", () => {
-  const saved = ok(applyUpdate(FULL, { ...FULL, password: "", secretAccessKey: "  ", accessKeyId: "new-id" }));
+  const saved = ok(applyUpdate(FULL, { ...FULL, password: "", secretAccessKey: "  ", accessKeyId: "a".repeat(32) }));
   assert.equal(saved.password, "pw-secret");
-  assert.equal(saved.secretAccessKey, "r2-secret");
-  assert.equal(saved.accessKeyId, "new-id");
+  assert.equal(saved.secretAccessKey, FULL.secretAccessKey);
+  assert.equal(saved.accessKeyId, "a".repeat(32));
 });
 
 test("a new secret replaces the stored one", () => {
@@ -80,9 +80,15 @@ test("the account ID must look like one", () => {
   assert.match(err(applyUpdate(null, { ...FULL, accountId: "my-account" })), /32 hex/);
 });
 
+test("the R2 credentials must be the S3 pair, not the API token", () => {
+  const token = "cfat_" + "x".repeat(48);
+  assert.match(err(applyUpdate(null, { ...FULL, accessKeyId: token })), /access key ID is 32 hex/);
+  assert.match(err(applyUpdate(null, { ...FULL, secretAccessKey: token })), /secret access key is 64 hex/);
+});
+
 test("values are trimmed and non-strings ignored", () => {
-  const saved = ok(applyUpdate(FULL, { ...FULL, accessKeyId: "  spaced  ", password: 42 }));
-  assert.equal(saved.accessKeyId, "spaced");
+  const saved = ok(applyUpdate(FULL, { ...FULL, accessKeyId: `  ${FULL.accessKeyId}  `, password: 42 }));
+  assert.equal(saved.accessKeyId, FULL.accessKeyId);
   assert.equal(saved.password, "pw-secret");
 });
 

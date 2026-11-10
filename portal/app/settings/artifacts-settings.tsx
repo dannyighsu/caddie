@@ -191,7 +191,8 @@ export function ArtifactsSettings() {
 
             <p className="text-xs text-ink-faint">
               The password is the Worker&apos;s PW_SHARED secret. The R2 token needs Object Read &amp; Write
-              on the caddie-artifacts bucket.
+              on the caddie-artifacts bucket. Enter its S3 Access Key ID and Secret Access Key, not the
+              token value (cfat_…).
             </p>
 
             {error && (

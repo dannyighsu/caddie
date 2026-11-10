@@ -179,7 +179,15 @@ export async function publish(workspace, paths, config) {
       headers: { "content-type": file.contentType },
       body: await readFile(file.abs),
     });
-    if (!res.ok) throw new Error(`Upload of ${file.name} failed (${res.status}). Nothing was published.`);
+    if (!res.ok) {
+      // R2 answers with an S3 XML error; its Code and Message say which part of
+      // the request or the credentials it rejected.
+      const body = await res.text().catch(() => "");
+      const code = body.match(/<Code>([^<]*)<\/Code>/)?.[1];
+      const message = body.match(/<Message>([^<]*)<\/Message>/)?.[1];
+      const detail = code ? `: ${code}${message ? ` — ${message}` : ""}` : body ? `: ${body.slice(0, 300)}` : "";
+      throw new Error(`Upload of ${file.name} failed (${res.status}${detail}). Nothing was published.`);
+    }
   }
 
   const origin = config.origin.replace(/\/$/, "");

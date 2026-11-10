@@ -331,7 +331,10 @@ In the portal, open **Settings → Artifacts** and enter:
 - the origin the Worker serves, such as `https://artifacts.example.com`
 - the `PW_SHARED` password
 - the account ID from `wrangler whoami`
-- the token's access key ID and secret access key
+- the token's S3 credentials: the **Access Key ID** (32 hex characters) and
+  **Secret Access Key** (64 hex characters) shown once when the token is
+  created. Not the token value itself (`cfat_…`); R2's S3 API rejects that with
+  a 400, and the form refuses it.
 
 The launcher reads these at the start of every run, so saving needs no restart.
 The password and the secret are never shown again; leave their fields blank to
