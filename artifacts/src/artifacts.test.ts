@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolve, type Entry } from "./artifacts";
+import { ARTIFACTS, resolve, type Entry } from "./artifacts";
 
 const ACL: Record<string, Entry> = {
   "q3-deck.pdf": { password: "PW_Q3" },
@@ -11,6 +11,20 @@ const ACL: Record<string, Entry> = {
 };
 
 const r = (p: string) => resolve(p, ACL);
+
+/** The links `publish_artifact` (harness/tools/artifacts-publish.mjs) hands out. */
+describe("the shared/ entry", () => {
+  it("serves a published folder's index and its subresources", () => {
+    expect(resolve("/shared/abc123/")).toMatchObject({ key: "shared/abc123/index.html", scope: "k:shared/" });
+    expect(resolve("/shared/abc123/img/chart.png")).toMatchObject({ key: "shared/abc123/img/chart.png", scope: "k:shared/" });
+    expect(resolve("/shared/abc123/floor%20plan.pdf")).toMatchObject({ key: "shared/abc123/floor plan.pdf" });
+  });
+
+  it("is password-gated and doesn't share a scope with demo/", () => {
+    expect(resolve("/shared/abc123/")?.entry).toMatchObject({ password: "PW_SHARED" });
+    expect(resolve("/demo/")?.scope).not.toBe(resolve("/shared/abc123/")?.scope);
+  });
+});
 
 describe("resolve", () => {
   it("denies anything not listed", () => {

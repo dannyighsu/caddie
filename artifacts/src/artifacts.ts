@@ -25,9 +25,12 @@ export type Entry =
   | { public: true; index?: string };
 
 export const ARTIFACTS: Record<string, Entry> = {
+  "demo/": { password: "PW_DEMO", index: "index.html" },
+  // What the agent publishes (`publish_artifact`), one random folder per
+  // artifact. One password, so the folder ids are what keep them apart.
+  "shared/": { password: "PW_SHARED", index: "index.html" },
   // --- examples; replace with real artifacts ---------------------------------
   // "q3-deck.pdf": { password: "PW_Q3" },
-  // "demo/": { password: "PW_DEMO", index: "index.html" },
   // "wedding/menus/": { password: "PW_WEDDING", group: "wedding" },
   // "wedding/seating.pdf": { password: "PW_WEDDING", group: "wedding" },
   // "og-image.png": { public: true },

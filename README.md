@@ -263,6 +263,7 @@ see [PERMISSIONS.md](docs/PERMISSIONS.md).
 | `introspect` | — | Read the agent's own run transcripts for self-diagnosis. Read-only, self-scoped |
 | `purge` | — | Remove suspected phishing/prompt injection from history, workspace and search; emails the team. Guest runs can purge only the message being handled |
 | `local-rag` | `LOCAL_RAG_ENTRY` | Search past conversations and workspace files (read-only; the portal indexes) |
+| `artifacts` | `ARTIFACTS_*` plus an R2 token | Publish workspace files as a password-protected link that opens from any device. Team tier only |
 | `egress` | — | Outbound messaging and scheduling via the control API |
 | `browser` | — | Headed Playwright browser; persistent profile keeps logins |
 | `chrome` | — | Flag-only: enables Chrome automation on the runtime |

@@ -48,6 +48,7 @@ const CAPABILITIES: Record<string, (fixturesFile: string) => object> = {
   egress: () => realTool("egress", "egress-mcp.mjs"),
   introspect: () => realTool("introspect", "introspect-mcp.mjs"),
   purge: () => realTool("purge", "purge-mcp.mjs"),
+  artifacts: (f) => stub("artifacts", "artifacts", f),
   "local-rag": (f) => stub("local-rag", "rag", f),
   "google-calendar": (f) => stub("google-calendar", "calendar", f),
   "google-gmail": (f) => stub("google-gmail", "gmail", f),

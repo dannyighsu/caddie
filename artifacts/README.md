@@ -84,6 +84,34 @@ pnpm --filter @caddie/artifacts guard
 
 Until step 2 the key 404s, by design.
 
+## Publishing from the agent
+
+The agent's `publish_artifact` tool (the `artifacts` capability, team tier only)
+uploads files straight to R2 under `shared/<random id>/`, then logs in and
+fetches its own link before returning the link(s) and password. The `shared/`
+entry in `artifacts.ts` already covers those keys, so unlike the steps above,
+an upload there is live immediately, with no Worker deploy.
+
+- **One password, one entry.** `shared/` is a single ACL entry with a single
+  secret, `PW_SHARED`, so the random folder id is what keeps artifacts apart.
+  Anyone with the password and a link can open it.
+- **Only a run's `artifacts/` directory can be published**, meaning
+  `runs/<month>/<day>/artifacts/` in the workspace. Copy anything else in first.
+- **The capability holds an R2 token scoped to the bucket**, with no access to
+  the Worker or the ACL. The token reaches every object in the bucket; the tool
+  writes only under `shared/`.
+- **Limits:** 200 files and 100 MiB per publish.
+- **There is no unpublish tool.** Remove files by hand, one key per command,
+  from `artifacts/`:
+
+```bash
+pnpm exec wrangler r2 object delete caddie-artifacts/<key> --remote
+```
+
+`<key>` is the path in the link, such as `shared/<id>/report.pdf`. A link ending
+in `/` serves `shared/<id>/index.html`. Setup is in
+[docs/SETUP.md](../docs/SETUP.md#10-optional-publishing-artifacts).
+
 ## Checks
 
 ```bash

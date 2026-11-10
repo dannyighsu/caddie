@@ -10,11 +10,9 @@ binding = "BUCKET"
 bucket_name = "caddie-artifacts"
 
 # Attach the custom domain to the WORKER, not the bucket.
-#   artifacts.example.com → this Worker
-# Uncomment and set once the zone is on Cloudflare DNS.
-# [[routes]]
-# pattern = "artifacts.example.com"
-# custom_domain = true
+[[routes]]
+pattern = "burih.app"
+custom_domain = true
 
 # Secrets (never in this file — `wrangler secret put <NAME>`):
 #   SESSION_SECRET  32+ random bytes; signs session cookies. Rotating it logs

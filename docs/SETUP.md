@@ -287,6 +287,47 @@ use it. The first sync downloads an embedding model of about 90 MB; index status
 shows in portal health. After an embedding-model change or a workspace move,
 run `make rag-rebuild`.
 
+## 10. Optional: publishing artifacts
+
+The `artifacts` capability gives team-tier runs `publish_artifact`, which puts
+files from a run's `artifacts/` directory on a password-protected link that
+opens from any device. Until all its variables are set, the capability isn't
+mounted.
+
+It needs the Worker from [artifacts/README.md](../artifacts/README.md) deployed,
+with the `shared/` entry from `artifacts/src/artifacts.ts`. After that,
+publishing uploads straight to R2 and needs no Worker deploy.
+
+Generate a long random password and give it to the Worker. The same password
+opens everything the agent publishes.
+
+```bash
+cd artifacts
+openssl rand -base64 32                       # keep this for ARTIFACTS_PASSWORD
+pnpm exec wrangler secret put PW_SHARED       # paste it at the prompt
+pnpm --filter @caddie/artifacts run deploy    # only if `shared/` isn't live yet
+pnpm exec wrangler whoami                     # prints the account id
+```
+
+In the Cloudflare dashboard — a person has to do this — go to **R2** and create
+an API token with **Object Read & Write** permission, limited to the
+`caddie-artifacts` bucket.
+
+Add the values to `portal/.env.local`, then restart with `make run`:
+
+```bash
+ARTIFACTS_ORIGIN=https://artifacts.example.com
+ARTIFACTS_PASSWORD=<the PW_SHARED value>
+ARTIFACTS_R2_ACCOUNT_ID=<the Cloudflare account id>
+ARTIFACTS_R2_ACCESS_KEY_ID=<the token's access key id>
+ARTIFACTS_R2_SECRET_ACCESS_KEY=<the token's secret access key>
+```
+
+If a variable didn't land, each run logs `Capability "artifacts" unavailable`
+with the names of the unset ones. The tool logs in and fetches each new link
+before returning it, so a password that disagrees with `PW_SHARED` comes back as
+an error, not a dead link.
+
 ## The host's own Claude configuration
 
 Agent runs are `claude` processes running as your macOS user, so they read

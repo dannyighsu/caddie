@@ -1,5 +1,5 @@
 {
-  "capabilities": ["notion", "egress", "browser", "google-calendar", "google-gmail", "email", "email-team", "reply", "introspect", "local-rag", "purge"],
+  "capabilities": ["notion", "egress", "browser", "google-calendar", "google-gmail", "email", "email-team", "reply", "introspect", "local-rag", "purge", "artifacts"],
   "profiles": {
     "extended": {
       "maxTurns": 300

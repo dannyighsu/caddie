@@ -10,8 +10,10 @@
  * production mounts it: a keyword search over the case's seeded documents,
  * which the sandbox also writes into the workspace.
  *
+ * `artifacts` stands in for `publish_artifact`: a fake link, uploading nothing.
+ *
  * Env:
- *   EVAL_STUB_KIND      — "calendar" | "gmail" | "rag"
+ *   EVAL_STUB_KIND      — "calendar" | "gmail" | "rag" | "artifacts"
  *   EVAL_FIXTURES_FILE  — JSON: { calendar?: Event[], gmail?: Email[], rag?: {path, text}[], workspace }
  */
 
@@ -146,6 +148,23 @@ if (kind === "gmail") {
     "Save one attachment of an email into your workspace so you can open it.",
     { messageId: z.string(), partId: z.string() },
     async () => text("Attachment not available in this environment.")
+  );
+}
+
+if (kind === "artifacts") {
+  server.tool(
+    "publish_artifact",
+    "Publish files as a password-protected web link that opens from any device: a web page, a PDF, or a set of files meant for someone else. Files must be in a run's artifacts/ directory, so write or copy them there first. Everything you pass becomes one artifact, with its folder structure kept. Returns the link(s) and the password. Anyone with both can read the content, and a published artifact stays up after this run.",
+    { paths: z.array(z.string()) },
+    async ({ paths }) => {
+      // Same rule as harness/tools/artifacts-publish.mjs, so a case fails the
+      // way production would if the agent skips the artifacts/ step.
+      const bad = paths.find((p) => !/^runs\/[^/]+\/[^/]+\/artifacts\/.+/.test(p));
+      if (bad) return { ...text(`Error: ${bad} can't be published: copy it into today's run artifacts/ directory first, and publish it from there.`), isError: true };
+      return text(
+        `Published ${paths.length} file(s).\n\nhttps://artifacts.example/shared/0123456789abcdef/\n\nPassword: eval-artifact-password\nThe same password opens everything you've published, so send it only to the people this is for.`
+      );
+    }
   );
 }
 

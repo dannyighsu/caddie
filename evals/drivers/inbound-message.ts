@@ -104,6 +104,7 @@ const FAKED_TOOLS = new Set([
   "search_emails", "get_email", "download_attachment",
   "purge_content",
   "query_documents", "read_chunk_neighbors", "list_files",
+  "publish_artifact",
 ]);
 
 /** The inbound message's identity in a case: what `purge_content` with `current: true` targets. */
