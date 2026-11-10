@@ -50,7 +50,7 @@ import {
  * deliver and thread correctly.
  */
 export interface ReplyTarget {
-  channel: "email" | "slack" | "telegram";
+  channel: "email" | "slack" | "telegram" | "linear";
   /** Conversation key, e.g. `email:<threadId>` — where the assistant turn is recorded. */
   externalId: string;
   /** Email: the inbound message to reply to (preserves In-Reply-To threading). */
@@ -59,6 +59,8 @@ export interface ReplyTarget {
   slack?: { channel: string; threadTs: string };
   /** Telegram: the chat and (optionally) the message to reply to. */
   telegram?: { chatId: string; replyToMessageId?: number };
+  /** Linear: the agent session to post the response into. */
+  linear?: { agentSessionId: string };
 }
 
 export type { Attachment } from "./inbound-prompt";

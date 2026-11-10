@@ -11,6 +11,9 @@ import type { AgentConfig, AgentInput, AgentResult } from "@caddie/harness";
 import { mkdir, readFile } from "fs/promises";
 import { alertOwnerOnApiFailure } from "./run-alerts";
 import { teamRoster } from "./team";
+import { getSetting } from "./db";
+import { ARTIFACTS_SETTING_KEY, capabilityVarsOf, type ArtifactsSettings } from "./artifacts-settings";
+import { linearAccessToken } from "./linear";
 
 // The harness package lives alongside the portal in the monorepo
 const repoRoot = resolve(process.cwd(), "..");
@@ -59,6 +62,23 @@ export async function runArtifactsDir(scope: string): Promise<string> {
   return dir;
 }
 
+/**
+ * Capability `${VAR}` values kept in the portal's settings instead of the
+ * environment: the `artifacts` capability's (Settings → Artifacts) and the
+ * `linear` capability's app token (Settings → Linear), refreshed if it's near
+ * expiry. A Linear token that can't be had leaves `linear` unmounted.
+ */
+export async function capabilityVars(): Promise<Record<string, string>> {
+  const linearToken = await linearAccessToken().catch((err) => {
+    console.error("[Linear] No access token for this run:", err);
+    return null;
+  });
+  return {
+    ...capabilityVarsOf(await getSetting<ArtifactsSettings>(ARTIFACTS_SETTING_KEY)),
+    ...(linearToken ? { LINEAR_ACCESS_TOKEN: linearToken } : {}),
+  };
+}
+
 let launcherInstance: ReturnType<typeof createLauncher> | null = null;
 
 function getRawLauncher() {
@@ -78,6 +98,7 @@ function getRawLauncher() {
       resolversDir,
       workspace,
       team: teamRoster,
+      capabilityVars,
     });
   }
   return launcherInstance;

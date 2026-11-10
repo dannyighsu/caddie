@@ -14,6 +14,8 @@ import { NextRequest, NextResponse } from "next/server";
 const ALLOWED_PUBLIC_API_PATHS = [
   "/api/telegram/webhook",
   "/api/chat/plugins/slack/interactions",
+  "/api/chat/plugins/linear/webhook",
+  "/api/chat/plugins/linear/oauth_redirect",
   "/api/public/auth",
 ];
 

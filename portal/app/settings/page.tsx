@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { TeamRoster } from "./team-roster";
+import { ArtifactsSettings } from "./artifacts-settings";
+import { LinearSettings } from "./linear-settings";
 
 interface SlackChannel {
   channelId: string;
@@ -119,6 +121,12 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {/* Artifacts */}
+      <ArtifactsSettings />
+
+      {/* Linear */}
+      <LinearSettings />
 
       {/* Schedules */}
       <Schedules />

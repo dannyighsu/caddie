@@ -51,4 +51,9 @@ async function startListeners() {
   startGmailPoller();
 
   // Telegram is webhook-based — no startup needed
+
+  // Linear is webhook-based too, but its app token expires daily and its
+  // refresh token lapses after 30 unused days, so keep it fresh between runs.
+  const { startLinearTokenKeepalive } = await import("./lib/linear");
+  startLinearTokenKeepalive();
 }

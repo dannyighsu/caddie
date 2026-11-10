@@ -1,0 +1,8 @@
+{
+  "name": "linear",
+  "description": "Linear workspace access through Linear's hosted MCP, acting as the agent's own app user. The token is the app-actor OAuth token from Settings → Linear, refreshed by the portal before each run; without a connection the capability is left unmounted.",
+  "server": {
+    "command": "bunx",
+    "args": ["mcp-remote", "https://mcp.linear.app/mcp", "--header", "Authorization:Bearer ${LINEAR_ACCESS_TOKEN}"]
+  }
+}

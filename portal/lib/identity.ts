@@ -20,7 +20,7 @@ import { teamRoster } from "./team";
  */
 export type UserId = string;
 
-export type Channel = "email" | "slack" | "telegram" | "portal";
+export type Channel = "email" | "slack" | "telegram" | "linear" | "portal";
 
 export type ResolvedIdentity =
   | {
@@ -47,6 +47,7 @@ const CHANNEL_LABELS: Record<Channel, string> = {
   email: "email",
   slack: "Slack",
   telegram: "Telegram",
+  linear: "Linear",
   portal: "the control portal",
 };
 

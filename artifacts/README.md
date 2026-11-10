@@ -99,7 +99,8 @@ an upload there is live immediately, with no Worker deploy.
   `runs/<month>/<day>/artifacts/` in the workspace. Copy anything else in first.
 - **The capability holds an R2 token scoped to the bucket**, with no access to
   the Worker or the ACL. The token reaches every object in the bucket; the tool
-  writes only under `shared/`.
+  writes only under `shared/`. The token, the password and the origin go in
+  the portal's Settings → Artifacts, not the environment.
 - **Limits:** 200 files and 100 MiB per publish.
 - **There is no unpublish tool.** Remove files by hand, one key per command,
   from `artifacts/`:

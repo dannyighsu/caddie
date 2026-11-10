@@ -8,7 +8,7 @@
 import { spawn } from "child_process";
 import { resolve } from "path";
 import { readdir, readFile, access } from "fs/promises";
-import { workspace } from "./harness";
+import { capabilityVars, workspace } from "./harness";
 import { indexStatus } from "./workspace-index";
 
 interface CapabilityDef {
@@ -148,7 +148,10 @@ export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
   process.env.HARNESS_ROOT = harnessRoot;
   const results: HealthCheckResult[] = [];
 
-  runtimeVars = { CADDIE_WORKSPACE: workspace };
+  runtimeVars = {
+    ...(await capabilityVars().catch(() => ({}))),
+    CADDIE_WORKSPACE: workspace,
+  };
 
   try {
     const entries = await readdir(capabilitiesDir);

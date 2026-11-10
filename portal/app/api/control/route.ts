@@ -32,6 +32,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, replyInThread, uploadFile, recordOutboundSlackThread, isSlackConfigured, listChannels } from "@/lib/slack";
 import { normalizeBlocks, withAttribution } from "@/lib/slack-blocks";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
+import { createAgentActivity } from "@/lib/linear";
 import { sendEmail, replyToEmail, recordEmailReply, isEmailConfigured, htmlToText } from "@/lib/email";
 import type { NotificationChannel } from "@/lib/notification-channels";
 import type { ReplyTarget } from "@/lib/messaging";
@@ -293,6 +294,12 @@ async function executeReply(req: ControlRequest): Promise<Record<string, unknown
           ? { replyToMessageId: target.telegram.replyToMessageId }
           : undefined,
       );
+      await record(() => appendAssistantReply(target.externalId, message));
+      return { success: true };
+    }
+    case "linear": {
+      if (!target.linear) return { success: false, error: "reply target is missing linear handle" };
+      await createAgentActivity(target.linear.agentSessionId, { type: "response", body: message });
       await record(() => appendAssistantReply(target.externalId, message));
       return { success: true };
     }

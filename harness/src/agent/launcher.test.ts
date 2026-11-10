@@ -350,6 +350,53 @@ describe("createLauncher", () => {
     expect(call.disallowedTools).toEqual(["mcp__local-rag__delete_file"]);
   });
 
+  it("resolves capability references from the portal's settings", async () => {
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({ ...baseAgentConfig, capabilities: ["artifacts"] });
+      }
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) return "persona";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const launcher = createLauncher(mockRuntime(), {
+      agentDir: "/agent",
+      capabilitiesDir: "/caps",
+      workspace: "/ws",
+      capabilityVars: async () => ({ ARTIFACTS_PASSWORD: "pw", CADDIE_WORKSPACE: "/elsewhere" }),
+    });
+    await launcher.launch({ identity: ID, prompt: "go" });
+
+    const provided = vi.mocked(resolveCapabilities).mock.calls.at(-1)![2];
+    // Settings can't override what the harness computes.
+    expect(provided).toMatchObject({ ARTIFACTS_PASSWORD: "pw", CADDIE_WORKSPACE: "/ws" });
+  });
+
+  it("still runs when the capability settings can't be read", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockFs.readFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("agent.json")) {
+        return JSON.stringify({ ...baseAgentConfig, capabilities: ["artifacts"] });
+      }
+      if (/(PERSONA|SYSTEM)\.md$/.test(String(path))) return "persona";
+      throw new Error(`Unmocked: ${path}`);
+    });
+
+    const launcher = createLauncher(mockRuntime(), {
+      agentDir: "/agent",
+      capabilitiesDir: "/caps",
+      workspace: "/ws",
+      capabilityVars: async () => {
+        throw new Error("database down");
+      },
+    });
+    const result = await launcher.launch({ identity: ID, prompt: "go" });
+
+    expect(result.success).toBe(true);
+    const provided = vi.mocked(resolveCapabilities).mock.calls.at(-1)![2];
+    expect(provided).not.toHaveProperty("ARTIFACTS_PASSWORD");
+  });
+
   it("warns and falls back to base config when the profile name is unknown", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockFs.readFile.mockImplementation(async (path: any) => {

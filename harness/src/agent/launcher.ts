@@ -57,6 +57,13 @@ export interface LauncherConfig {
    * to an empty team.
    */
   team?: () => TeamMember[];
+  /**
+   * Values for capability `${VAR}` references that the portal keeps in its
+   * settings instead of the environment (the `artifacts` capability's R2 token
+   * and password), read at the start of every run. If reading them fails, the
+   * capabilities that need them sit the run out.
+   */
+  capabilityVars?: () => Promise<Record<string, string>>;
 }
 
 async function loadAgentConfig(agentDir: string): Promise<AgentConfig> {
@@ -324,6 +331,7 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
     workspace = workspaceDir(),
     coreSkillsDir = resolve(agentDir, "..", "skills", "core"),
     team = () => [],
+    capabilityVars = async () => ({}),
   } = config;
 
   /**
@@ -553,6 +561,10 @@ export function createLauncher(runtime: AgentRuntime, config: LauncherConfig) {
 
     const resolved = trustFiltered.kept.length > 0
       ? await resolveCapabilities(trustFiltered.kept, capabilitiesDir, {
+          ...(await capabilityVars().catch((err) => {
+            console.warn(`[Launcher] Couldn't read capability settings: ${err instanceof Error ? err.message : err}`);
+            return {};
+          })),
           HARNESS_ROOT: harnessRoot,
           CADDIE_WORKSPACE: workingDirectory,
         })

@@ -388,6 +388,14 @@ async function reconstructReplyFn(
         }
       };
     }
+    case "linear": {
+      const { createAgentActivity } = await import("./linear");
+      return async (text) => {
+        if (target.linear) {
+          await createAgentActivity(target.linear.agentSessionId, { type: "error", body: text });
+        }
+      };
+    }
     case "email": {
       const { replyToEmail } = await import("./email");
       return async (text) => {

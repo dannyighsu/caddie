@@ -291,8 +291,8 @@ run `make rag-rebuild`.
 
 The `artifacts` capability gives team-tier runs `publish_artifact`, which puts
 files from a run's `artifacts/` directory on a password-protected link that
-opens from any device. Until all its variables are set, the capability isn't
-mounted.
+opens from any device. Until all five of its settings are saved, the capability
+isn't mounted.
 
 It needs the Worker from [artifacts/README.md](../artifacts/README.md) deployed,
 with the `shared/` entry from `artifacts/src/artifacts.ts`. After that,
@@ -303,7 +303,7 @@ opens everything the agent publishes.
 
 ```bash
 cd artifacts
-openssl rand -base64 32                       # keep this for ARTIFACTS_PASSWORD
+openssl rand -base64 32                       # keep this for the settings below
 pnpm exec wrangler secret put PW_SHARED       # paste it at the prompt
 pnpm --filter @caddie/artifacts run deploy    # only if `shared/` isn't live yet
 pnpm exec wrangler whoami                     # prints the account id
@@ -313,20 +313,20 @@ In the Cloudflare dashboard — a person has to do this — go to **R2** and cre
 an API token with **Object Read & Write** permission, limited to the
 `caddie-artifacts` bucket.
 
-Add the values to `portal/.env.local`, then restart with `make run`:
+In the portal, open **Settings → Artifacts** and enter:
 
-```bash
-ARTIFACTS_ORIGIN=https://artifacts.example.com
-ARTIFACTS_PASSWORD=<the PW_SHARED value>
-ARTIFACTS_R2_ACCOUNT_ID=<the Cloudflare account id>
-ARTIFACTS_R2_ACCESS_KEY_ID=<the token's access key id>
-ARTIFACTS_R2_SECRET_ACCESS_KEY=<the token's secret access key>
-```
+- the origin the Worker serves, such as `https://artifacts.example.com`
+- the `PW_SHARED` password
+- the account ID from `wrangler whoami`
+- the token's access key ID and secret access key
 
-If a variable didn't land, each run logs `Capability "artifacts" unavailable`
-with the names of the unset ones. The tool logs in and fetches each new link
-before returning it, so a password that disagrees with `PW_SHARED` comes back as
-an error, not a dead link.
+The launcher reads these at the start of every run, so saving needs no restart.
+The password and the secret are never shown again; leave their fields blank to
+keep the saved values. Until all five are saved, each run logs
+`Capability "artifacts" unavailable this run — unset: …` with the `ARTIFACTS_*`
+names it had no value for. The tool logs in and fetches each new link before
+returning it, so a password that disagrees with `PW_SHARED` comes back as an
+error, not a dead link.
 
 ## The host's own Claude configuration
 

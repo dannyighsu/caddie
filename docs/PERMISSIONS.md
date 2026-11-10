@@ -95,8 +95,11 @@ bot tokens and API keys stay with the portal, so a team run with Bash can't
 reach the database. That matters most for the team roster: being on it is what
 grants the team tier, and it lives in Postgres. Capability servers get their
 secrets through `${VAR}` substitution in their JSON, not by inheritance, so
-they're unaffected. If something the agent runs needs another variable, add it
-to the allowlist. Don't add a secret the portal holds for itself.
+they're unaffected. Some of those values come from the portal's settings rather
+than the environment (today, the `artifacts` capability's, from Settings →
+Artifacts). The settings API never returns a secret, only whether it's set,
+because a team run's Bash can reach the portal. If something the agent runs
+needs another variable, add it to the allowlist. Don't add a secret the portal holds for itself.
 
 Secrets the agent itself uses, such as a bearer token for an API a job queries,
 go in `harness/agent/.env` (untracked). The launcher reads that file on every

@@ -40,17 +40,17 @@ export const MAX_INDEXED_FILE_SIZE = 10 * 1024 * 1024;
  */
 const EXCLUDED_TOP_LEVEL = new Set(["mounts", "jobs", "tickets"]);
 
-export type ConversationChannel = "email" | "slack" | "telegram" | "portal" | "other";
+export type ConversationChannel = "email" | "slack" | "telegram" | "linear" | "portal" | "other";
 
 /**
  * The channel a conversation came in on, from its `external_id` namespace
- * (`email:<thread>`, `slack:<channel>:<ts>`, `telegram:<chat>`). Portal chats
+ * (`email:<thread>`, `slack:<channel>:<ts>`, `telegram:<chat>`, `linear:<session>`). Portal chats
  * have no external id.
  */
 export function channelOf(externalId: string | null): ConversationChannel {
   if (!externalId) return "portal";
   const prefix = externalId.split(":", 1)[0];
-  return prefix === "email" || prefix === "slack" || prefix === "telegram" ? prefix : "other";
+  return prefix === "email" || prefix === "slack" || prefix === "telegram" || prefix === "linear" ? prefix : "other";
 }
 
 /**
