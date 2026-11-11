@@ -48,7 +48,7 @@ case.yaml ──▶ driver ──▶ sandbox (temp harness root + workspace) ─
 
 - **Sandbox** (`core/sandbox.ts`):
   - Runs from a *copy* of the agent definition and a throwaway workspace, so
-    ticket writes and config journaling stay out of the repo and the live
+    config journaling and workspace writes stay out of the repo and the live
     install.
   - Uses the real `permissions.json`, so guest and team tiers behave as they
     do in production.

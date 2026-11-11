@@ -30,57 +30,61 @@ skills in `harness/agent/.claude/skills/` are untracked. The seeds in
 `harness/agent/config/` are generic templates. Setting up an install is
 [docs/SETUP.md](docs/SETUP.md).
 
-## Agent tickets
+## Reporting the harness's own defects
 
-Agents file bug reports about **their own machinery** — a tool that fails like a
-defect, a capability that isn't mounted, a run that went wrong for a reason no
-instruction explains. Each is one markdown file in the agent's workspace:
+When an agent hits something that looks like a defect in its own machinery — a
+tool that fails like a bug, a capability that isn't mounted, a run that went
+wrong for a reason no instruction explains — it does **not** write a file in its
+workspace. There is no `tickets/` directory and no `ticketing` skill any more.
+Two routes, and the agent picks by whether the fix is in this repo:
 
-```
-~/.caddie/tickets/YYYY-MM-DD-<slug>.md
-```
+| Situation | What the agent does |
+|---|---|
+| The fix is in its own code (prompt, skill, harness, portal) | Mounts this repo and opens a pull request — `harness/skills/core/repo-mount/SKILL.md` |
+| It isn't the agent's to fix, or needs a decision first | Raises it with the team in the reply or by `email_team`, and files it in the team's own tracker if the install has one |
 
-Check them when you're working on the harness:
+Either way the report has to carry the `sessionId` and the error text, because
+traces are evicted after about a week.
 
-```bash
-ls ~/.caddie/tickets/
-```
+### Why the local tickets went away
 
-### How it works
+A ticket in the workspace was invisible to everyone who wasn't reading that
+install's disk, had no status and no owner, and — the reason it was dropped —
+"create a ticket" is what a team member says when they mean *an issue in our
+tracker*. The generic phrase captured the harness-defect skill, so a request
+that should have gone to the team's issue tracker silently became a markdown
+file nobody would see. A PR is the better artifact anyway: it is reviewable,
+revertable, and already the proposal.
 
-Tickets are plain files in the workspace, with no link or harness step behind
-them. The workspace is outside the repo and never swept, so a ticket persists
-there. It never reaches git: a ticket quotes real runs (session ids, error
-strings, the shape of someone's request), so it belongs to the install, not a
-clone.
-
-### Changing how tickets work
+### Changing how this works
 
 | What | Where |
 |---|---|
-| When to file, the file format, investigation steps, guardrails | `harness/skills/core/ticketing/SKILL.md` |
-| What the agent is told it has | `tickets/` bullet and the Self-diagnosis capability in `harness/agent/SYSTEM.md` |
+| What the agent is told to do with a defect | the Self-diagnosis capability in `harness/agent/SYSTEM.md` |
+| What "create a ticket" from a team member means | the Task tracking capability in `harness/agent/SYSTEM.md` |
+| How a PR against this repo is made, and what the agent must not change | `harness/skills/core/repo-mount/SKILL.md` |
 
 Behavior changes belong in the **skill**, not the persona — the persona only
 points at it. Keep the two in sync when you rename or move anything.
 
 ### Conventions worth preserving
 
-- Tickets have **no status field** — a ticket that exists is open, and the agent
-  **never closes one on its own**. Whoever implements the fix closes it by
-  deleting the file as the last step of that work — don't leave it for someone
-  else to clean up.
-- A repeat of a known problem is appended under that ticket's `## Occurrences`
-  rather than filed again — the occurrence list is the signal for how live a bug
-  is, so a flood of near-duplicates destroys it.
-- Tickets are team-turn only, and reference `sessionId` instead of quoting
-  private content. Both are deliberate: the first keeps guest-supplied text from
-  reaching the repo, the second keeps tickets readable a month later.
-- Filing never substitutes for answering the person.
+- **Never a substitute for answering the person.** A report, a PR and a reply
+  are not interchangeable; the reply always ships.
+- **Team turns only.** A guest's run never produces a defect report or a PR.
+  Reference a `sessionId` rather than quoting private content, so guest-supplied
+  text never reaches the repo.
+- **A repeat of a known problem joins the existing report** — a comment on the
+  issue or the open PR — rather than starting a second one. The occurrence count
+  is the signal for how live a bug is, and near-duplicates destroy it.
+- **`tickets/` stays in the exclusion lists.** `portal/lib/rag-files.ts` and
+  `harness/tools/artifacts-publish.mjs` still exclude and protect the path.
+  Installs that ran the old behavior have real files there; keep them out of RAG
+  and out of published artifacts rather than re-exposing them.
 
-A ticket is a report about the system, not a to-do list. Standing preferences go
-in `config/`, skill changes go through `manage-skills`, and one-off steering for
-a recurring job goes in `state/<job>.md`.
+A defect report is a report about the system, not a to-do list. Standing
+preferences go in `config/`, skill changes go through `manage-skills`, and
+one-off steering for a recurring job goes in `state/<job>.md`.
 
 ## Evals
 

@@ -76,7 +76,7 @@ gh pr create --title "<title>" --body "<what, why, how you verified it>"
 
 - **Stage specific paths.** `git add -A` sweeps up unrelated work already in the
   tree — build artifacts, someone's half-finished edit — and puts it in the PR.
-- **Say in the PR body that you opened it**, and what prompted it (a ticket, a
+- **Say in the PR body that you opened it**, and what prompted it (an issue, a
   request). `gh` is authenticated as the team member who owns this machine, so
   the PR is authored under *their* GitHub account: a reviewer has no other way
   to tell a human didn't write it.
@@ -116,7 +116,7 @@ force.
 | `harness/.claude/settings.json`, `harness/scripts/` | the hooks that enforce all of the above |
 
 If a fix genuinely seems to need one of these, **stop and say so** — in your
-reply, or in the ticket. Proposing it to a person is the whole job; making the
+reply, or in the issue you file. Proposing it to a person is the whole job; making the
 change yourself is not.
 
 Everything else — `portal/`, `harness/src/`, docs, tests — is fair game.
@@ -124,8 +124,9 @@ Changes to compiled TypeScript (`harness/src/`, `portal/`) need a rebuild and
 a restart before they take effect, so they cannot break the running install
 mid-PR.
 
-**Tickets aren't in the repo.** They live only in your workspace's `tickets/`.
-Read the ticket from there and carry what you need into the checkout.
+**Carry the context in with you.** A mount is a fresh clone of `main` and knows
+nothing about the run that prompted the work. Quote the error, the `sessionId`
+or the issue into the commit message and PR body, so the PR stands on its own.
 
 ## Notes
 

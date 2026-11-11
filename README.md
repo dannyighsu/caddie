@@ -335,7 +335,6 @@ The agent's workspace is `~/.caddie/` by default (override with `WORKSPACE_DIR`)
 
 - `config/` -- persistent config files (editable via the control plane)
 - `jobs/` -- recurring-job procedures, one `<job>.md` each (written by you)
-- `tickets/` -- bug reports the agent files about its own machinery (see `AGENTS.md`)
 - `.claude/` -- symlinked skills and hooks from the agent definition
 - `conversations/` -- one markdown file per conversation message, mirrored from Postgres for search (derived; rebuilt on startup)
 - `.rag/` -- the search index, its embedding-model cache and sync manifest (derived; `make rag-rebuild`)
