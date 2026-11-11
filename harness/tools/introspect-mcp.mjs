@@ -39,6 +39,16 @@ import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprot
 
 const PORTAL_URL = process.env.PORTAL_URL || "http://localhost:3000";
 
+/**
+ * Per-step display budget when rendering a transcript.
+ *
+ * Steps keep much more than this (a subagent hand-back report is long, and the
+ * whole point of keeping it is that `search` can reach into it). Searching
+ * matches the full stored text; only the rendering is clipped, so a whole-run
+ * view of a fan-out run stays readable instead of flooding the context.
+ */
+const MAX_STEP_RENDER_CHARS = 4000;
+
 const server = new Server(
   { name: "introspect", version: "0.1.0" },
   { capabilities: { tools: {} } }
@@ -75,8 +85,10 @@ const tools = [
     description:
       "Read the full step-by-step transcript of one of your runs — every assistant message, thinking block, tool call, and tool result, in order. " +
       "This is how you inspect what actually happened inside a run to debug it. " +
+      "Steps that came from a subagent rather than the parent run are tagged `sidechain`, so a delegated run can be audited too — including the report a subagent handed back. " +
       "Get the `sessionId` from `list_runs` (it's the `session_id` field on a run). " +
-      "For a long run, use `tail` to get just the last N steps — failures and their causes almost always live at the end.",
+      "For a long run, use `tail` to get just the last N steps — failures and their causes almost always live at the end. " +
+      "`search` matches each step's full stored content, so it finds a figure buried deep in a long tool result even though the rendered step is clipped.",
     inputSchema: {
       type: "object",
       properties: {
@@ -280,8 +292,8 @@ async function handleViewRun(args) {
   const rendered = steps
     .map((s, i) => {
       const idx = String(i + 1).padStart(3, " ");
-      const tag = `[${s.role}/${s.type}${s.toolName ? `:${s.toolName}` : ""}]`;
-      return `${idx} ${tag} ${s.content}`;
+      const tag = `[${s.role}/${s.type}${s.toolName ? `:${s.toolName}` : ""}${s.sidechain ? "/sidechain" : ""}]`;
+      return `${idx} ${tag} ${truncate(s.content, MAX_STEP_RENDER_CHARS)}`;
     })
     .join("\n\n");
 
