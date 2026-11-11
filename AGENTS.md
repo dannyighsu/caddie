@@ -35,12 +35,13 @@ skills in `harness/agent/.claude/skills/` are untracked. The seeds in
 When an agent hits something that looks like a defect in its own machinery — a
 tool that fails like a bug, a capability that isn't mounted, a run that went
 wrong for a reason no instruction explains — it does **not** write a file in its
-workspace. There is no `tickets/` directory and no `ticketing` skill any more.
+workspace. There is no `tickets/` directory and no `ticketing` skill any more;
+the `self-modification` skill took its place.
 Two routes, and the agent picks by whether the fix is in this repo:
 
 | Situation | What the agent does |
 |---|---|
-| The fix is in its own code (prompt, skill, harness, portal) | Mounts this repo and opens a pull request — `harness/skills/core/repo-mount/SKILL.md` |
+| The fix is in its own code (prompt, skill, harness, portal) | Mounts this repo and opens a pull request — `harness/skills/core/self-modification/SKILL.md`, which points at `repo-mount` for the mechanics |
 | It isn't the agent's to fix, or needs a decision first | Raises it with the team in the reply or by `email_team`, and files it in the team's own tracker if the install has one |
 
 Either way the report has to carry the `sessionId` and the error text, because
@@ -61,6 +62,7 @@ revertable, and already the proposal.
 | What | Where |
 |---|---|
 | What the agent is told to do with a defect | the Self-diagnosis capability in `harness/agent/SYSTEM.md` |
+| When a change to the agent's own code becomes a PR, and when it asks first | `harness/skills/core/self-modification/SKILL.md` |
 | What "create a ticket" from a team member means | the Task tracking capability in `harness/agent/SYSTEM.md` |
 | How a PR against this repo is made, and what the agent must not change | `harness/skills/core/repo-mount/SKILL.md` |
 
