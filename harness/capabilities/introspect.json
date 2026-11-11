@@ -1,0 +1,8 @@
+{
+  "name": "introspect",
+  "description": "Read the agent's own execution traces for self-diagnosis — list recent runs (times, status, errors, token cost) and view any run's step-by-step transcript. Read-only and self-scoped, proxied through the Caddie API.",
+  "server": {
+    "command": "node",
+    "args": ["${HARNESS_ROOT}/tools/introspect-mcp.mjs"]
+  }
+}

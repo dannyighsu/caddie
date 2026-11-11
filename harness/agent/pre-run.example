@@ -1,0 +1,10 @@
+#!/bin/sh
+# This install's steps before every `make run` (and `make serve`). Copy to
+# harness/agent/pre-run, make it executable and edit it; that copy is untracked.
+# It runs from the repo root. If it fails, the run is reported and goes ahead.
+set -e
+
+# Install this agent's skills from its agent-config profile into
+# harness/agent/.claude/skills. Skills the profile doesn't name are left alone.
+# The first sync over skills already there needs --adopt, once, by hand.
+npx -y github:MatildaAI/agent-config sync <profile> --repo harness/agent

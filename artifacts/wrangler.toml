@@ -1,0 +1,20 @@
+name = "caddie-artifacts"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+# The bucket is reachable ONLY through this binding. Do not give the bucket a
+# custom domain and do not enable its r2.dev subdomain — either one routes
+# around the auth gate. scripts/guard.ts asserts r2.dev is off.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "caddie-artifacts"
+
+# Attach the custom domain to the WORKER, not the bucket.
+[[routes]]
+pattern = "burih.app"
+custom_domain = true
+
+# Secrets (never in this file — `wrangler secret put <NAME>`):
+#   SESSION_SECRET  32+ random bytes; signs session cookies. Rotating it logs
+#                   everyone out, which is the intended panic button.
+#   PW_*            one per artifact/group, named by artifacts.ts.

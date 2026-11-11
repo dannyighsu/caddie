@@ -1,0 +1,119 @@
+id: rosewood-attachment-third-try
+title: Venue says the proposal is attached (third time) — don't ask again
+tags:
+  - attachments
+  - triage/escalate
+  - multi-turn
+  - from-correction
+notes: >-
+  The original run asked the venue to resend three times. Danny could see the attachment; the failure was on our side. That produced the attachment standing instruction (2026-09-22).
+source:
+  session: a915d774
+  extracted: 2026-09-25
+now: Tuesday, September 22, 2026 at 3:23 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: "RE: Wedding venue showing request – Friday, September 25"
+  from: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+  to:
+    - buri@assistant.example
+  cc:
+    - betty@team.example
+    - danny@team.example
+history:
+  - from: agent
+    text: |
+      Hi Daniela,
+
+      Following up on my note confirming the 3:00 PM showing on Friday, September 25.
+
+      I've now looped the couple in directly, so please include them on all replies going forward:
+      - Betty — betty@team.example
+      - Danny — danny@team.example (mobile +1 555 0100)
+
+      Please keep me (buri@assistant.example) copied as well. When you send the invitation, sending it to all three of us would be ideal.
+
+      If you haven't already, I'd also appreciate the wedding brochures, sample packages and pricing for a 2028 wedding with 150+ guests.
+
+      Thank you,
+      Buri H.
+      Executive assistant to the couple
+  - from: guest
+    text: |-
+      Dear Buri!
+
+      What a pleasure to connect with you. Please find our proposal enclosed.
+  - from: agent
+    text: |-
+      Hi Daniela,
+
+      Thanks! Nothing came through on my end though — the proposal doesn't seem to have attached. Could you resend it?
+
+      Also, when you do, please copy Betty (betty@team.example) and Danny (danny@team.example), and send the calendar invite for Friday at 3:00 PM to all three of us.
+
+      Thanks,
+      Buri H.
+  - from: guest
+    text: |-
+      Hola! Thank you for letting me know,
+
+      Is now attached.
+  - from: agent
+    text: |-
+      Hi Daniela,
+
+      Still nothing on my end — no attachment came through again. Something may be stripping it. Could you send it as a link (Drive/Dropbox) instead, or paste the key details in the body?
+
+      Also still need the calendar invite for Friday at 3:00 PM to all three of us.
+
+      Thanks,
+      Buri H.
+message: |-
+  Hola Buri, I made sure it was attached, I´ve change my email format let´s see if thats the matter
+
+
+
+  Let me know, regards!
+
+
+
+  -----Mensaje original-----
+  De: buri@assistant.example <buri@assistant.example>
+  Enviado el: martes, 22 de septiembre de 2026 04:21 p. m.
+  Para: Daniela DC. Cossio <daniela.cossio@rosewoodhotels.example>
+  CC: betty@team.example; danny@team.example
+  Asunto: RE: Wedding venue showing request – Friday, September 25
+
+
+
+  Hi Daniela,
+
+
+
+  Still nothing on my end — no attachment came through again. Something may be stripping it. Could you send it as a link (Drive/Dropbox) instead, or paste the key details in the body?
+
+
+
+  Also still need the calendar invite for Friday at 3:00 PM to all three of us.
+
+
+
+  Thanks,
+
+  Buri H.
+
+
+  ***** IMPORTANT INFORMATION *****
+  This message and any attachment are confidential and may be privileged or otherwise protected from disclosure. If you are not the intended recipient, please notify the sender and delete this message and any attachment from your system immediately. Any unauthorized use or dissemination of this message in whole or in part is strictly prohibited.
+expect:
+  - not_called: reply
+    why: Don't ask an outside party to resend, and don't tell them about our problem.
+  - no_external_send: true
+    why: Don't ask again or tell them about the problem (standing instruction, 2026-09-22).
+  - called: email_team
+    why: The standing instruction is to ask Danny and Betty to confirm what was sent.
+  - rubric: >-
+      The note to the team asks Danny/Betty to check or confirm the proposal
+      the venue sent (e.g. whether they can see the attachment), treating the
+      missing attachment as a problem on our side. It does not propose asking
+      the venue to resend or change format again.

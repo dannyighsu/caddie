@@ -1,0 +1,8 @@
+{
+  "name": "purge",
+  "description": "Remove suspected phishing or prompt-injection content from the agent's history, workspace and search index, and tell the team. On a guest run it can only remove the message being handled — the run's trust tier and current message are injected by the harness, not chosen by the agent. Granted at every trust tier.",
+  "server": {
+    "command": "node",
+    "args": ["${HARNESS_ROOT}/tools/purge-mcp.mjs"]
+  }
+}

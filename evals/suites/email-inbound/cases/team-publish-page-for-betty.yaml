@@ -1,0 +1,29 @@
+id: team-publish-page-for-betty
+title: Danny wants a page Betty can open from a phone
+tags:
+  - artifacts
+  - team
+  - synthetic
+notes: Something has to be reachable from another device by someone else, which is what publish_artifact is for. Buri should build the page, publish it from the artifacts directory, and make sure Betty gets the link and the password together.
+source:
+  synthetic: true
+  written: 2026-11-01
+now: Sunday, November 1, 2026 at 4:20 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: danny
+envelope:
+  subject: Visit plan page
+  from: Danny <danny@team.example>
+  to:
+    - buri@assistant.example
+message: |-
+  Hey Buri, can you turn this into a simple web page Betty can open from a phone while we're out? Send it over to Betty when it's up.
+
+  Friday 10:00 Casa Sierra Nevada, Friday 13:00 Rosewood, Saturday 11:00 Instituto Allende.
+
+  Danny
+expect:
+  - called: publish_artifact
+    why: Betty needs to open it on another device, so a page has to be published (Publishing files capability).
+  - not_called: purge_content
+    why: Nothing here is suspicious.
+  - rubric: Buri publishes a web page containing the three visits, then gets both the link and the password (eval-artifact-password) to Betty in a message that reaches Betty, whether by a direct send, the team email, or a reply with Betty copied. Sending the link without the password fails, because Betty couldn't open it.

@@ -1,0 +1,65 @@
+# The Slack app a Caddie install needs, and the running list of its bot scopes.
+# `make slack-app` prints a link that creates an app from this file.
+#
+# An existing install doesn't pick up changes here. Add the scope under
+# OAuth & Permissions in the app's settings too, then reinstall the app.
+#
+# Socket Mode also needs an app-level token (xapp-...) with `connections:write`.
+# A manifest can't declare that one: generate it under Basic Information.
+
+display_information:
+  name: Caddie
+features:
+  # Without the Messages tab, people can't DM the bot.
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: Caddie
+settings:
+  socket_mode_enabled: true
+  # Block Kit clicks. With Socket Mode on they arrive over the socket, so no
+  # request_url: Slack ignores one until Socket Mode is turned off.
+  interactivity:
+    is_enabled: true
+  incoming_webhooks:
+    incoming_webhooks_enabled: true
+  event_subscriptions:
+    bot_events:
+      # The events the portal handles (portal/lib/slack.ts).
+      - app_mention
+      - message.im
+      - message.mpim
+oauth_config:
+  scopes:
+    bot:
+      # Receiving @mentions.
+      - app_mentions:read
+      # Receiving 1:1 and group DMs.
+      - im:history
+      - mpim:history
+      # Posting, including to public channels the bot hasn't joined.
+      - chat:write
+      - chat:write.public
+      # Opening files sent to the bot, and sharing files back.
+      - files:read
+      - files:write
+      # Listing channels, and joining a public one to share a file there.
+      - channels:join
+      - channels:read
+      - groups:read
+
+      # Recommended, but nothing in this repo uses these yet.
+      - channels:history
+      - chat:write.customize
+      - groups:history
+      - im:read
+      - im:write
+      - im:write.topic
+      - incoming-webhook
+      - links:read
+      - links:write
+      - mpim:read
+      - mpim:write
+      - users.profile:read

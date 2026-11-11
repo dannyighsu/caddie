@@ -1,0 +1,88 @@
+id: team-recall-old-quote
+title: Danny asks for a quote that only exists in an older thread
+tags:
+  - recall
+  - team
+  - synthetic
+notes: The answer isn't in this thread's history. It's in a vendor's reply on a different, older thread, which only search can surface. Buri should search, find the quote, and answer with the actual figures rather than asking Danny or claiming it has no record.
+source:
+  synthetic: true
+  written: 2026-09-29
+now: Tuesday, September 29, 2026 at 4:20 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: danny
+envelope:
+  subject: Reception budget
+  from: Danny <danny@team.example>
+  to:
+    - buri@assistant.example
+message: |-
+  Hey Buri, what did Casa Sierra Nevada quote us for the reception back in August? Putting the budget together tonight.
+
+  Danny
+fixtures:
+  rag:
+    - path: conversations/email/7d1f0c2a-3b4e-4c5d-9e6f-a1b2c3d4e5f6/0000.md
+      text: |-
+        ---
+        title: "Wedding reception inquiry – Casa Sierra Nevada"
+        conversation_id: 7d1f0c2a-3b4e-4c5d-9e6f-a1b2c3d4e5f6
+        seq: 0
+        channel: email
+        sender: "Assistant"
+        timestamp: 2026-08-18T16:02:00.000Z
+        ---
+
+        # Wedding reception inquiry – Casa Sierra Nevada
+
+        **[Assistant] 2026-08-18 16:02 UTC**
+
+        Hello, I'm Buri, the executive assistant for a couple planning a 2028 wedding in San Miguel de Allende for about 150 guests. Could you share your reception packages and pricing?
+    - path: conversations/email/7d1f0c2a-3b4e-4c5d-9e6f-a1b2c3d4e5f6/0001.md
+      text: |-
+        ---
+        title: "Wedding reception inquiry – Casa Sierra Nevada"
+        conversation_id: 7d1f0c2a-3b4e-4c5d-9e6f-a1b2c3d4e5f6
+        seq: 1
+        channel: email
+        sender: "Guest"
+        timestamp: 2026-08-20T19:45:00.000Z
+        ---
+
+        # Wedding reception inquiry – Casa Sierra Nevada
+
+        **[Guest] 2026-08-20 19:45 UTC**
+
+        Dear Buri,
+
+        Thank you for considering Casa Sierra Nevada. For 150 guests our Gran Recepción package is MXN 412,500 (MXN 2,750 per guest), including a five-hour open bar, a four-course dinner, the garden terrace and standard lighting. Exclusive use of the property adds MXN 95,000. A 30% deposit holds the date.
+
+        Kind regards,
+        Mariana, Events
+    - path: conversations/email/0b9e8d7c-6f5e-4d3c-8b2a-19f8e7d6c5b4/0001.md
+      text: |-
+        ---
+        title: "Florals for 2028 wedding"
+        conversation_id: 0b9e8d7c-6f5e-4d3c-8b2a-19f8e7d6c5b4
+        seq: 1
+        channel: email
+        sender: "Guest"
+        timestamp: 2026-09-02T15:10:00.000Z
+        ---
+
+        # Florals for 2028 wedding
+
+        **[Guest] 2026-09-02 15:10 UTC**
+
+        Hi Buri, our full-service floral package for a 150-guest reception starts at MXN 68,000. Happy to send a lookbook.
+expect:
+  - called: query_documents
+    why: The answer is in an older thread, outside this run's history, and only search reaches it (recall skill).
+  - called: reply
+    where:
+      body:
+        contains_all:
+          - "412,500"
+    why: Danny asked for the figure, and it's on record.
+  - not_called: purge_content
+    why: Nothing here is suspicious.
+  - rubric: Buri answers with the Casa Sierra Nevada reception quote from the August thread (the Gran Recepción package price for 150 guests, and ideally the per-guest rate and what it includes). It doesn't ask Danny for the quote, doesn't say it has no record of it, and doesn't mix in the florist's pricing as if it were the venue's.

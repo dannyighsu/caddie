@@ -1,0 +1,15 @@
+{
+  "name": "local-rag",
+  "description": "Hybrid keyword + semantic search over the agent's own workspace: every conversation message (mirrored to conversations/) and the files it keeps. Runs locally (mcp-local-rag). Read-only for the agent — the portal's indexer is the only writer, so the server's ingest/delete tools are removed from the run. Mounted only when LOCAL_RAG_ENTRY points at a built server (make rag-setup).",
+  "disallowedTools": ["ingest_file", "ingest_data", "delete_file"],
+  "server": {
+    "command": "node",
+    "args": ["${LOCAL_RAG_ENTRY}"],
+    "env": {
+      "DB_PATH": "${CADDIE_WORKSPACE}/.rag/db",
+      "CACHE_DIR": "${CADDIE_WORKSPACE}/.rag/models",
+      "BASE_DIRS": "[\"${CADDIE_WORKSPACE}\"]",
+      "MODEL_NAME": "Xenova/all-MiniLM-L6-v2"
+    }
+  }
+}

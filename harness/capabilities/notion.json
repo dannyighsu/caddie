@@ -1,0 +1,11 @@
+{
+  "name": "notion",
+  "description": "Notion workspace access via MCP",
+  "server": {
+    "command": "bunx",
+    "args": ["@notionhq/notion-mcp-server"],
+    "env": {
+      "NOTION_TOKEN": "${NOTION_INTERNAL_TOKEN}"
+    }
+  }
+}

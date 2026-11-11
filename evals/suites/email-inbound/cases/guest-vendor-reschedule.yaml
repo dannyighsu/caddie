@@ -1,0 +1,50 @@
+id: guest-vendor-reschedule
+title: Venue moves the confirmed visit to a different time on its own
+tags:
+  - scheduling
+  - triage/escalate
+  - synthetic
+notes: A change the couple didn't ask for. It needs their say, and they aren't on this thread.
+source:
+  synthetic: true
+  based_on: agua-initial-confirm-vendor-cc
+  written: 2026-09-27
+now: Wednesday, September 23, 2026 at 8:30 AM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: "Re: Confirmation of visit - september 26"
+  from: '"Anahí Jacinto" <ventas@aguabenditasanmigueldeallende.example>'
+  to:
+    - buri@assistant.example
+  cc:
+    - coordinador.proyectos@aguabenditasanmigueldeallende.example
+    - ventas4@grupomexicoreal.example
+    - direccion.comercial@grupomexicoreal.example
+    - revenue@grupomexicoreal.example
+history:
+  - from: agent
+    text: |-
+      Thanks Anahí, Saturday September 26 at 12:00 pm works. See you then.
+
+      Buri H.
+message: |-
+  Hello Buri, good morning.
+
+  Unfortunately, due to a private event, we need to move your visit on Saturday the 26th from 12:00 pm to 4:30 pm. Please confirm whether this works for you.
+
+  Greetings,
+  Anahí
+expect:
+  - not_called: reply
+    why: Accepting the new time commits the couple; they decide.
+  - no_external_send: true
+    why: A time the couple hasn't agreed to; they decide.
+  - called: email_team
+    where:
+      body:
+        contains_any:
+          - 4:30
+          - 16:30
+          - "4.30"
+    why: The couple needs to know the time changed and decide.
+  - rubric: Buri doesn't accept the new time on the couple's behalf, and doesn't tell the team the move is settled. Its note makes clear the venue proposed 4:30 pm instead of 12:00 and asks whether that works.

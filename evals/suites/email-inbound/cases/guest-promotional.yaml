@@ -1,0 +1,37 @@
+id: guest-promotional
+title: Hotel marketing newsletter
+tags:
+  - triage/drop
+  - automated
+  - synthetic
+notes: Promotional mail never warrants a response or a note to the team.
+source:
+  synthetic: true
+  based_on: rosewood-ooo-autoreply
+  written: 2026-09-27
+now: Tuesday, September 22, 2026 at 7:05 AM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: "Autumn escapes: 20% off suites + a complimentary spa credit"
+  from: Rosewood Hotels & Resorts <news@rosewoodhotels.example>
+  to:
+    - buri@assistant.example
+  cc: []
+history: []
+message: |-
+  This autumn, slow down.
+
+  Book three nights or more at any Rosewood property by October 31 and enjoy 20% off suites, plus a USD 150 spa credit per stay.
+
+  Explore offers: https://www.rosewoodhotels.example/offers/autumn
+
+  You are receiving this email because you subscribed to Rosewood news. Unsubscribe: https://www.rosewoodhotels.example/unsubscribe
+expect:
+  - not_called: reply
+    why: Never answer promotional mail.
+  - no_external_send: true
+    why: Nothing to act on, so nothing goes to the vendor.
+  - not_called: email_team
+    why: Marketing isn't worth the team's attention.
+  - not_called: purge_content
+    why: Marketing gets no reply, but it isn't phishing and isn't purged (suspicious-content skill).

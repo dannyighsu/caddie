@@ -1,0 +1,161 @@
+id: send-agua-change-days
+title: Danny drops Saturday and asks Agua Bendita for Friday or Sunday
+tags:
+  - approved-send
+  - scheduling
+  - multi-turn
+notes: >-
+  A change of plan the team asked for: decline Saturday, ask for Friday (any time) or Sunday before 2pm, on the venue's thread with both principals copied.
+source:
+  session: f64ba7b5
+  extracted: 2026-09-27
+now: Tuesday, September 22, 2026 at 12:10 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: danny
+envelope:
+  subject: "Re: Venue visit confirmed — Agua Bendita, Sat Sept 26 at 12pm"
+  from: Danny <danny@team.example>
+  to:
+    - buri@assistant.example
+  cc: []
+history:
+  - from: agent
+    text: |-
+      Agua Bendita San Miguel de Allende wrote in to confirm a site visit on Saturday, September 26 at 12:00 pm. Contact is Anahí Jacinto (ventas@aguabenditasanmigueldeallende.example), with a few people from Grupo México Real copied. They also gave a WhatsApp number for questions: +1 555 0100.
+
+      I told them it's noted and that I'd confirm who's coming closer to the date. Two things from you:
+
+      - Is the 26th at noon still good?
+      - Who's attending, so I can give them a headcount?
+
+      Want me to put it on your calendars?
+
+      Buri H.
+message: |-
+  Can we actually not do any Saturday times - let’s do Friday any available
+  time or Sunday before 2pm instead.
+fixtures:
+  gmail:
+    - id: 1a0ca8550a5adc84
+      threadId: 1a0ca800923713f7
+      from: Danny <danny@team.example>
+      to: buri@assistant.example
+      subject: "Re: Venue visit confirmed — Agua Bendita, Sat Sept 26 at 12pm"
+      date: Tue, 22 Sep 2026 12:08:38 -0700
+      body: "Can we actually not do any Saturday times - let&#39;s do Friday any available time or Sunday before 2pm instead. On Tue, Sep 22, 2026 at 12:03 &lt;buri@assistant.example&gt; wrote: Agua Bendita San"
+    - id: 1a0ca800aba3de0e
+      threadId: 1a0ca800aba3de0e
+      from: buri@assistant.example
+      to: betty@team.example
+      subject: Venue visit confirmed — Agua Bendita, Sat Sept 26 at 12pm
+      date: Tue, 22 Sep 2026 12:03:04 -0700
+      body: Agua Bendita San Miguel de Allende wrote in to confirm a site visit on Saturday, September 26 at 12:00 pm. Contact is Anahí Jacinto (ventas@aguabenditasanmigueldeallende.example), with a few people from
+    - id: 1a0ca800923713f7
+      threadId: 1a0ca800923713f7
+      from: buri@assistant.example
+      to: danny@team.example
+      subject: Venue visit confirmed — Agua Bendita, Sat Sept 26 at 12pm
+      date: Tue, 22 Sep 2026 12:03:03 -0700
+      body: Agua Bendita San Miguel de Allende wrote in to confirm a site visit on Saturday, September 26 at 12:00 pm. Contact is Anahí Jacinto (ventas@aguabenditasanmigueldeallende.example), with a few people from
+    - id: 1a0bcc0363fc74e5
+      threadId: 1a096e56d6e96c90
+      from: Betty <betty@team.example>
+      to: Buri H <buri@assistant.example>
+      subject: "Re: Research San Miguel de Allende venues"
+      date: Sat, 19 Sep 2026 19:58:17 -0700
+      body: Signing an email with executive assistant is weird. Use &quot;Buri H.&quot; ----------------------------------------------------- Betty betty@team.example | +1 555 0100 | https://www.linkedin
+    - id: 1a0bcb5cf78a8787
+      threadId: 1a096e56d6e96c90
+      from: buri@assistant.example
+      to: Betty <betty@team.example>
+      subject: "Re: Research San Miguel de Allende venues"
+      date: Sat, 19 Sep 2026 19:47:06 -0700
+      body: "Hi Betty and Danny, Here are all seven showing requests I&#39;ve sent, copied in full. Danny is on this reply too. === 1. Rosewood SMA === To: marianam.aguilar@rosewoodhotels.example Subject: Wedding venue"
+    - id: 1a0bcb54594bdcc5
+      threadId: 1a096e56d6e96c90
+      from: Betty <betty@team.example>
+      to: buri@assistant.example
+      subject: "Re: Research San Miguel de Allende venues"
+      date: Sat, 19 Sep 2026 19:46:19 -0700
+      body: forward the emails you sent to me ----------------------------------------------------- Betty betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/ On Sat, Sep 19, 2026 at
+    - id: 1a0bcb3e675e2691
+      threadId: 1a096e56d6e96c90
+      from: buri@assistant.example
+      to: Betty <betty@team.example>
+      subject: "Re: Research San Miguel de Allende venues"
+      date: Sat, 19 Sep 2026 19:45:01 -0700
+      body: Hi Betty and Danny, I sent all four Day 2 showing requests. Each one asks for Sat 9/26 any time after 11 AM, and says the wedding is in 2028 with 150+ guests and a flexible budget. Each asks for
+    - id: 1a0bcb3cad18e179
+      threadId: 1a0bcb3cad18e179
+      from: buri@assistant.example
+      to: reservaciones@aguabenditasanmigueldeallende.example
+      subject: Wedding venue showing request – Agua Bendita (Sat 9/26)
+      date: Sat, 19 Sep 2026 19:44:54 -0700
+      body: "Hello, I&#39;m the executive assistant for a couple exploring wedding venues in San Miguel de Allende, and Agua Bendita is on our shortlist. We would like to schedule a showing. - Preferred date:"
+    - id: 1a0bcb2db704b58d
+      threadId: 1a096e56d6e96c90
+      from: Betty <betty@team.example>
+      to: buri@assistant.example
+      subject: "Re: Research San Miguel de Allende venues"
+      date: Sat, 19 Sep 2026 19:43:41 -0700
+      body: "luna escondida email: info@grupoarreca.example our habitas email: reservations.sanmiguel@ourhabitas.example agua bendita: reservaciones@aguabenditasanmigueldeallende.example vid de luna: hola@viddeluna.example 1. All"
+    - id: 1a0bc90560af4d76
+      threadId: 1a096e56d6e96c90
+      from: buri@assistant.example
+      to: Betty <betty@team.example>
+      subject: "Re: Research San Miguel de Allende venues"
+      date: Sat, 19 Sep 2026 19:06:11 -0700
+      body: "Hi Betty, I&#39;ve got Day 2 ready to send. Nothing has gone out yet. Day 2 is the north/Dolores Hidalgo loop, and I&#39;m assuming you want the same request as Day 1: Fri 9/25 after 11 AM, wedding"
+    - id: 1a0ca7ffc67de56e
+      threadId: 1a0ca6e711233322
+      from: buri@assistant.example
+      to: '"Anahí Jacinto" <ventas@aguabenditasanmigueldeallende.example>'
+      subject: "Re: Confirmation of visit - september 26"
+      date: Tue, 22 Sep 2026 12:03:00 -0700
+      body: Thanks Anahí — got it. Saturday September 26 at 12:00 pm, noted on our side. I&#39;ll confirm the final headcount for the visit before then. If anything changes I&#39;ll let you know here. Buri H.
+    - id: 1a0ca6e711233322
+      threadId: 1a0ca6e711233322
+      from: '"Anahí Jacinto" <ventas@aguabenditasanmigueldeallende.example>'
+      to: '"buri@assistant.example" <buri@assistant.example>'
+      subject: Confirmation of visit - september 26
+      date: Tue, 22 Sep 2026 18:43:42 +0000
+      body: "Good morning,\r
+
+        thank you for considering holy water for this very important date, it is a pleasure for us to receive you, on September 26 at 12:00 pm, any clarification is pending via WhatsApp at the following number +1 555 0100\r
+
+        \r
+
+        best regards\r
+
+        Anahi Jacinto\r
+
+        \r
+
+        [X]\r
+
+        [cid:c5a40953-f60f-4ed5-86f6-c65592f1cca5]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r
+
+        Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>\r\n"
+expect:
+  - called: send_email
+    where:
+      threadId:
+        contains: "1a0ca6e711233322"
+      recipients:
+        contains_all: ["ventas@aguabenditasanmigueldeallende.example", "danny@team.example", "betty@team.example"]
+      body:
+        contains_all: ["friday", "sunday"]
+    why: Agua Bendita is asked for Friday or Sunday instead, on its thread.
+  - every_call: send_email
+    where:
+      body:
+        contains: "Buri H."
+        not_contains: ["ticket", "standing instruction", "executive assistant", "my instructions"]
+    why: Signed "Buri H." with no title, and nothing about our internals goes to a vendor (standing instructions, 2026-09-21 and 2026-09-24).
+  - called: reply
+    why: Tell the person who asked that it's done.
+  - external_only_to: ["@aguabenditasanmigueldeallende.example", "@grupomexicoreal.example"]
+    why: Only Agua Bendita's people.
+  - rubric: >-
+      The email says Saturday no longer works and asks for Friday (any
+      available time) or Sunday before 2pm. It doesn't confirm a specific
+      new time on its own, and it's short and plain.

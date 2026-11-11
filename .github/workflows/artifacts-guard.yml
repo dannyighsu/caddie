@@ -1,0 +1,63 @@
+name: "Artifacts: Guard"
+
+# The guard runs against the DEPLOYED Worker, so unlike the unit tests it is not
+# a PR check — it catches drift that happens *after* a merge: someone flips the
+# bucket public to debug something, the custom domain gets moved off the Worker
+# route, r2.dev gets re-enabled, a cache rule starts caching an authed response.
+# Hence: nightly, after every push to main, and on demand.
+on:
+  schedule:
+    - cron: "17 9 * * *" # 01:17 PT / 02:17 PDT, daily
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/**"
+  workflow_dispatch:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # A green run must mean "the gate held", never "we had nothing to check".
+      # Before the Worker is deployed there is nothing to point at, so skip
+      # loudly on push; once ARTIFACT_ORIGIN is set this never trips again.
+      - name: Check guard is configured
+        id: cfg
+        env:
+          ARTIFACT_ORIGIN: ${{ vars.ARTIFACT_ORIGIN }}
+          GUARD_KEY: ${{ vars.GUARD_KEY }}
+          GUARD_PASSWORD: ${{ secrets.GUARD_PASSWORD }}
+          GUARD_CANARY: ${{ secrets.GUARD_CANARY }}
+        run: |
+          missing=""
+          for v in ARTIFACT_ORIGIN GUARD_KEY GUARD_PASSWORD GUARD_CANARY; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning title=Guard not configured::missing:$missing (see artifacts/README.md)"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            # A scheduled or manual run exists only to run the guard. If it
+            # cannot, that is a failure, not a pass.
+            [ "${{ github.event_name }}" = "push" ] || exit 1
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Guard (deployed Worker)
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          ARTIFACT_ORIGIN: ${{ vars.ARTIFACT_ORIGIN }}
+          GUARD_KEY: ${{ vars.GUARD_KEY }}
+          GUARD_OTHER_KEY: ${{ vars.GUARD_OTHER_KEY }}
+          R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+          GUARD_PASSWORD: ${{ secrets.GUARD_PASSWORD }}
+          GUARD_CANARY: ${{ secrets.GUARD_CANARY }}
+        run: pnpm --filter @caddie/artifacts guard

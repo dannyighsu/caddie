@@ -1,0 +1,8 @@
+{
+  "name": "reply",
+  "description": "Reply to the current conversation (the thread the run is handling). Minimal-privilege and channel-agnostic — the destination is injected by the harness, so it can only answer whoever wrote in, never reach anyone new. Granted at every trust tier.",
+  "server": {
+    "command": "node",
+    "args": ["${HARNESS_ROOT}/tools/reply-mcp.mjs"]
+  }
+}

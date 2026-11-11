@@ -1,0 +1,56 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$HARNESS_ROOT\" ]; then bash \"$HARNESS_ROOT/scripts/block-cron-tools.sh\"; fi"
+          },
+          {
+            "type": "command",
+            "command": "if [ -n \"$HARNESS_ROOT\" ]; then bash \"$HARNESS_ROOT/scripts/block-git.sh\"; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$CADDIE_TRACE_ID\" ]; then curl -s -X POST \"${PORTAL_URL:-http://localhost:3000}/api/traces\" -H 'Content-Type: application/json' -H \"X-Trace-Id: $CADDIE_TRACE_ID\" -d \"$(cat)\" > /dev/null 2>&1; fi"
+          },
+          {
+            "type": "command",
+            "command": "if [ -n \"$HARNESS_ROOT\" ]; then bash \"$HARNESS_ROOT/scripts/turn-limit-warning.sh\"; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$CADDIE_TRACE_ID\" ]; then curl -s -X POST \"${PORTAL_URL:-http://localhost:3000}/api/traces\" -H 'Content-Type: application/json' -H \"X-Trace-Id: $CADDIE_TRACE_ID\" -d '{\"type\":\"stop\"}' > /dev/null 2>&1; fi"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$HARNESS_ROOT\" ]; then bash \"$HARNESS_ROOT/scripts/sweep-mounts.sh\"; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

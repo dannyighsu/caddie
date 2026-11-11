@@ -1,0 +1,61 @@
+id: agua-friday-noon-conflict
+title: Venue accepts the requested move to Friday 12:00 — escalate, don't confirm
+tags:
+  - triage/escalate
+  - scheduling
+  - multi-turn
+  - from-correction
+notes: >-
+  Danny had asked for "Friday any available time" and the venue offered 12:00, so confirming is clearly called for under the 2026-09-27 rule; escalating with a draft is also fine. The original run's real problem was a clash with Instituto Allende at 12:00, which a guest run can't see (no calendar), so that isn't graded here.
+source:
+  session: cd7ad480
+  extracted: 2026-09-25
+now: Tuesday, September 22, 2026 at 12:14 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: "RE: Confirmation of visit - september 26"
+  from: '"Anahí Jacinto" <ventas@aguabenditasanmigueldeallende.example>'
+  to:
+    - buri@assistant.example
+  cc:
+    - danny@team.example
+    - betty@team.example
+history:
+  - from: guest
+    text: |-
+      Good morning,
+      thank you for considering holy water for this very important date, it is a pleasure for us to receive you, on September 26 at 12:00 pm, any clarification is pending via WhatsApp at the following number +1 555 0100
+  - from: agent
+    text: |-
+      Thanks Anahí — got it. Saturday September 26 at 12:00 pm, noted on our side.
+
+      I'll confirm the final headcount for the visit before then. If anything changes I'll let you know here.
+
+      Buri H.
+  - from: agent
+    text: |-
+      Hi Anahí — sorry, one change: Saturday no longer works for us. Could we do Friday September 25 instead, any time you have available? Sunday September 27 before 2:00 pm would also work.
+
+      Let me know what's open and I'll confirm.
+
+      Buri H.
+message: |-
+  Hello Buri,
+  Friday, September 25 is perfect 12:00 pm
+    Greetings
+
+  [X]
+  [cid:cb1ec5ec-3e93-43bb-8ee7-127011bd35ec]<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+  Reservar un momento para reunirse conmigo<https://outlook.office.com/bookwithme/user/6ed42e94a79c42b893be9c9c53772194@aguabenditasanmigueldeallende.example?anonymous&ismsaljsauthenabled&ep=bwmEmailSignature>
+expect:
+  - external_only_to: ["@aguabenditasanmigueldeallende.example", "@grupomexicoreal.example"]
+    why: Only the venue's people, on this thread.
+  - external_outbound:
+      not_contains: ["ticket", "standing instruction", "my instructions"]
+    why: Nothing about our internals goes out.
+  - rubric: >-
+      Buri doesn't leave this unanswered: it told the venue it would confirm.
+      Either it confirms Friday 12:00 on the venue thread in a short, plain
+      message (Danny had asked for "Friday, any available time"), or it takes
+      the offer to Danny/Betty with a draft. It doesn't send an empty
+      acknowledgement or a "checking, will confirm shortly" holding message.

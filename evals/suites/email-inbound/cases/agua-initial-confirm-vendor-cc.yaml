@@ -1,0 +1,41 @@
+id: agua-initial-confirm-vendor-cc
+title: Venue confirms a visit, copying its own staff but not the couple
+tags:
+  - recipients
+  - judgment
+  - scheduling
+notes: >-
+  First reply from the venue. Danny and Betty aren't on the thread, and wedding threads must include both. The original run sent an acknowledgement plus "I'll confirm headcount".
+source:
+  session: 18ef17d6
+  extracted: 2026-09-25
+now: Tuesday, September 22, 2026 at 12:02 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: guest
+envelope:
+  subject: Confirmation of visit - september 26
+  from: '"Anahí Jacinto" <ventas@aguabenditasanmigueldeallende.example>'
+  to:
+    - buri@assistant.example
+  cc:
+    - coordinador.proyectos@aguabenditasanmigueldeallende.example
+    - ventas4@grupomexicoreal.example
+    - direccion.comercial@grupomexicoreal.example
+    - revenue@grupomexicoreal.example
+history: []
+message: |-
+  Good morning,
+  thank you for considering holy water for this very important date, it is a pleasure for us to receive you, on September 26 at 12:00 pm, any clarification is pending via WhatsApp at the following number +1 555 0100
+expect:
+  - not_called: reply
+    why: An acknowledgement adds nothing, and the couple isn't on this thread.
+  - no_external_send: true
+    why: The only thing to send back would be an acknowledgement, and the couple isn't on this thread; loop them in instead.
+  - called: email_team
+    where:
+      body:
+        contains_any: ["saturday", "sat", "26"]
+    why: The couple isn't on this thread, so this is how they learn the visit is set.
+  - rubric: >-
+      If the note to the team proposes a reply to the venue, that reply puts
+      Betty and Danny on the thread (or says it will) and carries real content
+      — no empty acknowledgement like "noted, I'll confirm the headcount".

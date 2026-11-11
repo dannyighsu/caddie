@@ -1,0 +1,12 @@
+{
+  "name": "google-gmail",
+  "description": "Gmail read-only access via MCP (search and read emails)",
+  "server": {
+    "command": "node",
+    "args": ["../mcp-servers/google-gmail.mjs"],
+    "env": {
+      "GOOGLE_CLIENT_ID": "${GOOGLE_CLIENT_ID}",
+      "GOOGLE_CLIENT_SECRET": "${GOOGLE_CLIENT_SECRET}"
+    }
+  }
+}

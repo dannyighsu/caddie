@@ -1,0 +1,346 @@
+id: send-running-late-and-reschedule
+title: Danny asks to tell two venues we're running late and try to move Rosewood
+tags:
+  - approved-send
+  - multi-vendor
+  - scheduling
+notes: >-
+  A team member's explicit request is the approval, so Buri sends without asking again. Each message goes on that venue's existing thread with both principals copied (wedding standing instruction). Rosewood gets the conditional ask: Saturday before 10am or after 5pm, else ~30-40 min late.
+source:
+  session: fe90599b
+  extracted: 2026-09-27
+now: Friday, September 25, 2026 at 1:21 PM PDT (America/Los_Angeles, UTC-07:00)
+sender: danny
+envelope:
+  subject: Updates
+  from: Danny <danny@team.example>
+  to:
+    - buri@assistant.example
+  cc: []
+history: []
+message: |-
+  Can you update Agua Bendita that will be about 40 minutes late, and then
+  Rosewood will also be similarly late. Can you actually see if we can cancel
+  rosewood and do Saturday morning before 10am or after 5pm instead, if not
+  we’ll try to make it 30-40 mins late
+fixtures:
+  gmail:
+    - id: 1a0da3a1cb146a59
+      threadId: 1a0da3a1cb146a59
+      from: Danny <danny@team.example>
+      to: buri@assistant.example
+      subject: Updates
+      date: Fri, 25 Sep 2026 14:20:24 -0600
+      body: Can you update Agua Bendita that will be about 40 minutes late, and then Rosewood will also be similarly late. Can you actually see if we can cancel rosewood and do Saturday morning before 10am or
+    - id: 1a0d9b3c22704ebf
+      threadId: 1a0d9b3c22704ebf
+      from: buri@assistant.example
+      to: betty@team.example
+      subject: Agua Bendita confirmed you for today — no reply sent
+      date: Fri, 25 Sep 2026 10:53:52 -0700
+      body: "Ayerim Aranda (Grupo Mexico Real) wrote in on the Agua Bendita thread just now: &quot;Just to confirm the appointment in Agua Bendita Sanctuary, for today! Welcome to Agua Bendita.&quot; Cc&#39;d on it"
+    - id: 1a0d9b3c0739f005
+      threadId: 1a0d9b3c0739f005
+      from: buri@assistant.example
+      to: danny@team.example
+      subject: Agua Bendita confirmed you for today — no reply sent
+      date: Fri, 25 Sep 2026 10:53:51 -0700
+      body: "Ayerim Aranda (Grupo Mexico Real) wrote in on the Agua Bendita thread just now: &quot;Just to confirm the appointment in Agua Bendita Sanctuary, for today! Welcome to Agua Bendita.&quot; Cc&#39;d on it"
+    - id: 1a0d9b2d7fdf36e7
+      threadId: 1a0ca6e711233322
+      from: Ayerim Aranda <ventas4@grupomexicoreal.example>
+      to: '"buri@assistant.example" <buri@assistant.example>, "Anahí Jacinto" <ventas@aguabenditasanmigueldeallende.example>'
+      subject: "RE: Confirmation of visit - september 26"
+      date: Fri, 25 Sep 2026 17:52:46 +0000
+      body: "Dear Buri,\r
+
+        \r
+
+        A pleasure to greet you,\r
+
+        Just to confirm the appointment in Agua Bendita Sanctuary, for today!\r
+
+        \r
+
+        We're happy to have you here,\r
+
+        Welcome to Agua Bendita.\r
+
+        \r
+
+        [cid:1614e6e8-8877-4caa-a0eb-367ef219f150]\r
+
+        ________________________________\r
+
+        De: buri@assistant.example <buri@assistant.example>\r
+
+        Enviado: martes, 22 de septiembre de 2026 13:03\r
+
+        Para: Anahí Jacinto <ventas@aguabenditasanmigueldeallende.example>\r
+
+        Cc: Brenda Nava <coordinador.proyectos@aguabenditasanmigueldeallende.example>; Ayerim Aranda <ventas4@grupomexicoreal.example>; Marigel Piquent <direccion.comercial@grupomexicoreal.example>; Carlos de la Peña <revenue@grupomexicoreal.example>\r
+
+        Asunto: Re: Confirmation of visit - september 26\r
+
+        \r
+
+        Thanks Anahí — got it. Saturday September 26 at 12:00 pm, noted on our side.\r
+
+        \r
+
+        I'll confirm the final headcount for the visit before then. If\r
+
+        anything changes I'll let you know here.\r
+
+        \r
+
+        Buri H.\r\n"
+    - id: 1a0d608f232ce7cf
+      threadId: 1a0d608f232ce7cf
+      from: buri@assistant.example
+      to: betty@team.example
+      subject: Agua Bendita — date/time mismatch on their last note (Sept 26 noon vs Fri Sept 25, 2:15)
+      date: Thu, 24 Sep 2026 17:48:25 -0700
+      body: "Heads up: Anahí just wrote in on the &quot;Confirmation of visit - september 26&quot; thread saying it&#39;s a pleasure to receive us &quot;on September 26 at 12:00 pm,&quot; and gave a WhatsApp number"
+    - id: 1a0d608f098dbad3
+      threadId: 1a0d608f098dbad3
+      from: buri@assistant.example
+      to: danny@team.example
+      subject: Agua Bendita — date/time mismatch on their last note (Sept 26 noon vs Fri Sept 25, 2:15)
+      date: Thu, 24 Sep 2026 17:48:25 -0700
+      body: "Heads up: Anahí just wrote in on the &quot;Confirmation of visit - september 26&quot; thread saying it&#39;s a pleasure to receive us &quot;on September 26 at 12:00 pm,&quot; and gave a WhatsApp number"
+    - id: 1a0d608998ce2b16
+      threadId: 1a0d608998ce2b16
+      from: buri@assistant.example
+      to: betty@team.example
+      subject: Agua Bendita — stale 12:00 confirmation on the thread
+      date: Thu, 24 Sep 2026 17:48:02 -0700
+      body: "Anahí just wrote on the Agua Bendita thread: &quot;Friday, September 25 is perfect 12:00 pm.&quot; That&#39;s the old time — she already agreed to 2:15 pm yesterday afternoon, so this reads like a"
+    - id: 1a0d608974bc5462
+      threadId: 1a0d608974bc5462
+      from: buri@assistant.example
+      to: danny@team.example
+      subject: Agua Bendita — stale 12:00 confirmation on the thread
+      date: Thu, 24 Sep 2026 17:48:02 -0700
+      body: "Anahí just wrote on the Agua Bendita thread: &quot;Friday, September 25 is perfect 12:00 pm.&quot; That&#39;s the old time — she already agreed to 2:15 pm yesterday afternoon, so this reads like a"
+    - id: 1a0d6074385dab53
+      threadId: 1a0d6074385dab53
+      from: buri@assistant.example
+      to: betty@team.example
+      subject: Agua Bendita 2:15 — confirmed on calendar and trip sheet
+      date: Thu, 24 Sep 2026 17:46:35 -0700
+      body: "Betty — time change is already in. Agua Bendita is Friday 2:15 pm local on the calendar (shows 1:15 PDT) and the Trip Schedule tab matches. Friday, local time: Instituto Allende 12:00, Live Aqua 1:30,"
+    - id: 1a0d60741a868636
+      threadId: 1a0d60741a868636
+      from: buri@assistant.example
+      to: danny@team.example
+      subject: Agua Bendita 2:15 — confirmed on calendar and trip sheet
+      date: Thu, 24 Sep 2026 17:46:34 -0700
+      body: "Betty — time change is already in. Agua Bendita is Friday 2:15 pm local on the calendar (shows 1:15 PDT) and the Trip Schedule tab matches. Friday, local time: Instituto Allende 12:00, Live Aqua 1:30,"
+    - id: 1a0d605623aaf130
+      threadId: 1a0d605623aaf130
+      from: buri@assistant.example
+      to: danny@team.example
+      subject: Agua Bendita moved to Fri 2:15 PM — Trip Schedule updated
+      date: Thu, 24 Sep 2026 17:44:32 -0700
+      body: Looping you in since it&#39;s wedding-related. Betty got Agua Bendita moved from Friday noon to 2:15 PM local, so the Instituto Allende clash is gone. Calendar and the Trip Schedule tab both updated.
+    - id: 1a0d5a26e0fc4d1b
+      threadId: 1a0d5a26e0fc4d1b
+      from: buri@assistant.example
+      to: betty@team.example
+      subject: Agua Bendita moved to Friday 2:15 pm — tight against Rosewood
+      date: Thu, 24 Sep 2026 15:56:27 -0700
+      body: "Noted the change — Agua Bendita is now Friday 9/25 at 2:15 pm local, and I put it on the calendar with invites to both of you (blocked 2:15–3:00 pm local). One thing: Friday local times now run"
+    - id: 1a0d5a26df59f7ee
+      threadId: 1a0d5a26df59f7ee
+      from: buri@assistant.example
+      to: danny@team.example
+      subject: Agua Bendita moved to Friday 2:15 pm — tight against Rosewood
+      date: Thu, 24 Sep 2026 15:56:26 -0700
+      body: "Noted the change — Agua Bendita is now Friday 9/25 at 2:15 pm local, and I put it on the calendar with invites to both of you (blocked 2:15–3:00 pm local). One thing: Friday local times now run"
+    - id: 1a0d21fd10391367
+      threadId: 1a0d21d59ba5cbc3
+      from: buri@assistant.example
+      to: Betty <betty@team.example>
+      subject: "Re: SMA showings — how close the four venues are"
+      date: Wed, 23 Sep 2026 23:34:55 -0700
+      body: "Got it, my mistake — you were both already on that thread and I sent a separate copy on top of it. Recorded it: if you and Danny are already on the thread, one message on the thread, no extra email."
+    - id: 1a0d21ec34d0cf69
+      threadId: 1a0d21d59ba5cbc3
+      from: Betty <betty@team.example>
+      to: Buri H <buri@assistant.example>
+      subject: "Re: SMA showings — how close the four venues are"
+      date: Wed, 23 Sep 2026 23:33:36 -0700
+      body: "When you loop me and Danny in, don&#39;t send a separate email. This email is a duplicate ----------------------------------------------------- Betty betty@team.example | +1 555 0100 | https:"
+    - id: 1a0d21d59ba5cbc3
+      threadId: 1a0d21d59ba5cbc3
+      from: buri@assistant.example
+      to: betty@team.example, danny@team.example
+      subject: SMA showings — how close the four venues are
+      date: Wed, 23 Sep 2026 23:32:13 -0700
+      body: "Looping you both in — Betty asked how close Friday&#39;s showings are to each other. Three of the four are the same spot: Instituto Allende, Live Aqua and Rosewood are all centro histórico, walkable"
+    - id: 1a0d21d457676674
+      threadId: 1a0cf834e2ac7724
+      from: buri@assistant.example
+      to: Betty <betty@team.example>
+      subject: "Re: Live Aqua SMA — showing confirmed Fri 9/25 at 1:30 PM"
+      date: Wed, 23 Sep 2026 23:32:08 -0700
+      body: Three of the four are basically the same spot. Instituto Allende, Live Aqua and Rosewood are all centro histórico — walkable between them, few minutes each. So noon → 1:30 → 3:00 chains fine on foot.
+    - id: 1a0d21b8aef6c7fa
+      threadId: 1a0d21b8aef6c7fa
+      from: buri@assistant.example
+      to: betty@team.example, danny@team.example
+      subject: Trip Schedule tab — everything I know is on it now
+      date: Thu, 24 Sep 2026 01:30:15 -0500
+      body: "Betty asked me to put everything I&#39;m aware of on the Trip Schedule tab. Done — on top of the four confirmed Friday showings: - Luna Escondida, Fri 9/25 — not booked, waiting on a go-ahead (Calendly"
+    - id: 1a0d21b7392aef20
+      threadId: 1a0cf37acb234f57
+      from: buri@assistant.example
+      to: Betty <betty@team.example>
+      subject: "Re: SMA venues — mid-week status: 4 replied, 3 followed up, 2 things need your call"
+      date: Thu, 24 Sep 2026 01:30:09 -0500
+      body: "Everything I&#39;ve got is on the Trip Schedule tab now. On top of the four confirmed Friday showings I added: - Luna Escondida, Fri 9/25 — not booked, waiting on your go-ahead (Calendly). $45k day"
+    - id: 1a0d21b5a76e4dd3
+      threadId: 1a0cf834e2ac7724
+      from: Betty <betty@team.example>
+      to: Buri H <buri@assistant.example>
+      subject: "Re: Live Aqua SMA — showing confirmed Fri 9/25 at 1:30 PM"
+      date: Wed, 23 Sep 2026 23:29:52 -0700
+      body: How close are these geographically ----------------------------------------------------- Betty betty@team.example | +1 555 0100 | https://www.linkedin.com/in/member/ On Wed, Sep 23, 2026,
+    - id: 1a0cb37e6d6a6ddf
+      threadId: 1a0c069412338240
+      from: buri@assistant.example
+      to: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+      subject: "RE: Wedding venue showing request – Friday, September 25"
+      date: Tue, 22 Sep 2026 15:23:53 -0700
+      body: "Hi Daniela, Still nothing — third try, no attachment on my end. Whatever&#39;s stripping it isn&#39;t going to stop, so let&#39;s skip attachments: could you drop it in a Drive/Dropbox link, or just"
+    - id: 1a0cb3767cde3d0c
+      threadId: 1a0c069412338240
+      from: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+      to: '"buri@assistant.example" <buri@assistant.example>'
+      subject: "RE: Wedding venue showing request – Friday, September 25"
+      date: Tue, 22 Sep 2026 22:23:16 +0000
+      body: "Hola Buri, I made sure it was attached, I´ve change my email format let´s see if thats the matter Let me know, regards! -----Mensaje original----- De: buri@assistant.example &lt;buri@assistant.example&gt;"
+    - id: 1a0cb353b6ca7466
+      threadId: 1a0cb353b6ca7466
+      from: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+      to: '"betty@team.example" <betty@team.example>, "danny@team.example" <danny@team.example>'
+      subject: Wedding Site Betty & Danny
+      date: Tue, 22 Sep 2026 22:20:56 +0000
+      body: "***** IMPORTANT INFORMATION ***** This message and any attachment are confidential and may be privileged or otherwise protected from disclosure. If you are not the intended recipient, please notify the"
+    - id: 1a0cb352f421b957
+      threadId: 1a0c069412338240
+      from: buri@assistant.example
+      to: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+      subject: "RE: Wedding venue showing request – Friday, September 25"
+      date: Tue, 22 Sep 2026 15:20:55 -0700
+      body: Hi Daniela, Still nothing on my end — no attachment came through again. Something may be stripping it. Could you send it as a link (Drive/Dropbox) instead, or paste the key details in the body? Also
+    - id: 1a0cb34cd475faa4
+      threadId: 1a0c069412338240
+      from: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+      to: '"buri@assistant.example" <buri@assistant.example>'
+      subject: "RE: Wedding venue showing request – Friday, September 25"
+      date: Tue, 22 Sep 2026 22:20:26 +0000
+      body: "Hola! Thank you for letting me know, Is now attached. Regards, -----Mensaje original----- De: buri@assistant.example &lt;buri@assistant.example&gt; Enviado el: martes, 22 de septiembre de 2026 04:00 pm"
+    - id: 1a0cb21f68eb5085
+      threadId: 1a0c069412338240
+      from: buri@assistant.example
+      to: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+      subject: "RE: Wedding venue showing request – Friday, September 25"
+      date: Tue, 22 Sep 2026 14:59:55 -0700
+      body: Hi Daniela, Thanks! Nothing came through on my end though — the proposal doesn&#39;t seem to have attached. Could you resend it? Also, when you do, please copy Betty (betty@team.example) and Danny (
+    - id: 1a0cb2126e076ece
+      threadId: 1a0c069412338240
+      from: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+      to: '"buri@assistant.example" <buri@assistant.example>'
+      subject: "RE: Wedding venue showing request – Friday, September 25"
+      date: Tue, 22 Sep 2026 21:58:54 +0000
+      body: "Dear Buri! What a pleasure to connect with you. Please find our proposal enclosed. Regards, -----Mensaje original----- De: buri@assistant.example &lt;buri@assistant.example&gt; Enviado el: domingo, 20 de"
+    - id: 1a0c65f8037ed087
+      threadId: 1a0c65f8037ed087
+      from: '"Daniela DC. Cossio" <daniela.cossio@rosewoodhotels.example>'
+      to: '"betty@team.example" <betty@team.example>, "danny@team.example" <danny@team.example>'
+      subject: Wedding Site Betty & Danny
+      date: Mon, 21 Sep 2026 23:49:00 +0000
+      body: "***** IMPORTANT INFORMATION ***** This message and any attachment are confidential and may be privileged or otherwise protected from disclosure. If you are not the intended recipient, please notify the"
+    - id: 1a0c069412338240
+      threadId: 1a0c069412338240
+      from: buri@assistant.example
+      to: daniela.cossio@rosewoodhotels.example
+      subject: "RE: Wedding venue showing request – Friday, September 25"
+      date: Sun, 20 Sep 2026 13:01:58 -0700
+      body: "Hi Daniela, Following up on my note confirming the 3:00 PM showing on Friday, September 25. I&#39;ve now looped the couple in directly, so please include them on all replies going forward: - Betty —"
+    - id: 1a0c039904fb2c76
+      threadId: 1a0c039904fb2c76
+      from: buri@assistant.example
+      to: daniela.cossio@rosewoodhotels.example
+      subject: "RE: Wedding venue showing request – Friday, September 25"
+      date: Sun, 20 Sep 2026 12:09:53 -0700
+      body: "Hi Daniela, Following up on my last note — we&#39;d like to confirm the 3:00 PM slot on Friday, September 25. For the invitation: - My name: Buri H. (no agency) - Couple: Danny and Betty -"
+  calendar:
+    - id: 9i15ukr750benuts0ue7ukvui0
+      summary: Flight to México City (UA 1271)
+      start: 2026-09-24T10:50:00-07:00
+      end: 2026-09-24T15:15:00-07:00
+      location: San Francisco SFO
+    - id: _60q30c1g60o30e1i60o4ac1g60rj8gpl88rj2c1h84s34h9g60s30c1g60o30c1g6so3ggpp84q3gghh6gsk8h1g64o30c1g60o30c1g60o30c1g60o32c1g60o30c1g6gpj6ghk6co4ah1p6gqjih1k8ks3gdph6t2jgg9h64p3icq470rg
+      summary: Wedding venue showing request – Friday 9/25
+      start: 2026-09-25T11:00:00-07:00
+      end: 2026-09-25T11:30:00-07:00
+      location: "Instituto Allende Ancha de San Antonio # 20, San Miguel de Allende, Gto.  37700 Mexico-    Main Office"
+    - id: dp6jh4gb7vhtvksjvqplietpmk
+      summary: Venue walkthrough — Instituto Allende
+      start: 2026-09-25T11:00:00-07:00
+      end: 2026-09-25T12:30:00-07:00
+      location: Instituto Allende, Ancha de San Antonio 20, San Miguel de Allende, Gto., Mexico
+    - id: lhals9tnadqq33rcdu17nfh9gg
+      summary: Venue showing — Agua Bendita San Miguel de Allende
+      start: 2026-09-25T13:15:00-07:00
+      end: 2026-09-25T14:00:00-07:00
+      location: Agua Bendita, San Miguel de Allende, Gto., Mexico
+    - id: 6v4unds1b908u7e3pljkgkia5k
+      summary: Rosewood San Miguel de Allende — venue showing
+      start: 2026-09-25T14:00:00-07:00
+      end: 2026-09-25T15:30:00-07:00
+      location: Rosewood San Miguel de Allende, Nemesio Diez 11, Centro, San Miguel de Allende, Gto., Mexico
+    - id: _60q30c1g60o30e1i60o4ac1g60rj8gpl88rj2c1h84s34h9g60s30c1g60o30c1g8go42e9g8os4chhg6gsk8h1g64o30c1g60o30c1g60o30c1g60o32c1g60o30c1g6gp4cd9m70q3ega18l0k4d1k8h144ha48cr3egi16ss30e266t10
+      summary: "Wedding Site Betty & Danny "
+      start: 2026-09-25T14:00:00-07:00
+      end: 2026-09-25T15:00:00-07:00
+      location: Rosewood San Miguel de Allende (Nemesio Diez 11, Zona Centro, 37700  San Miguel de Allende, Guanajuato)
+expect:
+  - called: send_email
+    where:
+      threadId:
+        contains: "1a0ca6e711233322"
+      recipients:
+        contains_all: ["ventas@aguabenditasanmigueldeallende.example", "danny@team.example", "betty@team.example"]
+      body:
+        contains_any: ["40", "late", "behind"]
+    why: Agua Bendita hears we'll be ~40 minutes late, on its thread.
+  - called: send_email
+    where:
+      threadId:
+        contains: "1a0c069412338240"
+      recipients:
+        contains_all: ["daniela.cossio@rosewoodhotels.example", "danny@team.example", "betty@team.example"]
+      body:
+        contains_all: ["10"]
+        contains_any: ["saturday", "sat "]
+    why: Rosewood is asked about Saturday before 10am or after 5pm, on its thread.
+  - every_call: send_email
+    where:
+      body:
+        contains: "Buri H."
+        not_contains: ["ticket", "standing instruction", "executive assistant", "my instructions"]
+    why: Signed "Buri H." with no title, and nothing about our internals goes to a vendor (standing instructions, 2026-09-21 and 2026-09-24).
+  - called: reply
+    why: Tell the person who asked that it's done.
+  - external_only_to: ["@aguabenditasanmigueldeallende.example", "@grupomexicoreal.example", "@rosewoodhotels.example"]
+    why: Only the two venues on their own threads.
+  - rubric: >-
+      The Rosewood email asks to move the visit to Saturday before 10am or
+      after 5pm and, if that isn't possible, says the couple will be about
+      30–40 minutes late instead. It doesn't cancel Rosewood outright. The
+      Agua Bendita email says they'll be about 40 minutes late. Neither
+      commits to anything else.

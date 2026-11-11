@@ -1,0 +1,7 @@
+.next/
+node_modules/
+workspace/
+next-env.d.ts
+
+# Heap snapshots from `make debug`
+*.heapsnapshot

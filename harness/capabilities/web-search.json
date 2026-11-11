@@ -1,0 +1,8 @@
+{
+  "name": "web-search",
+  "description": "Web search and fetching via Fetch MCP server",
+  "server": {
+    "command": "bunx",
+    "args": ["fetch-mcp"]
+  }
+}

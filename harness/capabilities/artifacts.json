@@ -1,0 +1,15 @@
+{
+  "name": "artifacts",
+  "description": "Publish workspace files to the password-gated artifact host as a link that opens from any device. Holds an R2 token scoped to the bucket, which can't touch the Worker or the ACL; the tool only ever writes under shared/. Its ARTIFACTS_* values come from the portal's Settings → Artifacts, not the environment, and it's mounted only once all five are saved.",
+  "server": {
+    "command": "node",
+    "args": ["${HARNESS_ROOT}/tools/artifacts-mcp.mjs"],
+    "env": {
+      "ARTIFACTS_ORIGIN": "${ARTIFACTS_ORIGIN}",
+      "ARTIFACTS_PASSWORD": "${ARTIFACTS_PASSWORD}",
+      "ARTIFACTS_R2_ACCOUNT_ID": "${ARTIFACTS_R2_ACCOUNT_ID}",
+      "ARTIFACTS_R2_ACCESS_KEY_ID": "${ARTIFACTS_R2_ACCESS_KEY_ID}",
+      "ARTIFACTS_R2_SECRET_ACCESS_KEY": "${ARTIFACTS_R2_SECRET_ACCESS_KEY}"
+    }
+  }
+}
