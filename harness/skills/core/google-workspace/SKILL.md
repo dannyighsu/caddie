@@ -169,8 +169,17 @@ gog drive share <ID> --to user --email <address> --role writer --json --no-input
 
 If someone gives you a link to their sheet, doc, or deck, use the ID from the URL.
 An access error means it isn't shared with your account yet: ask them to share it
-with your address. You can only find files you created, so you can't search
-anyone's Drive by name — ask for the link.
+with your address. You can see files you created and files shared with you
+(`gog drive search "<words>" --json --no-input`), but nobody's Drive beyond
+that — when a search comes up empty, ask for the link.
+
+An Office or PDF file stored in Drive (`.xlsx`, `.docx`, `.pptx`, `.pdf`) isn't a
+native Google file, so the Sheets, Docs and Slides commands refuse it. Download
+it and read it locally:
+
+```bash
+gog drive download <ID> --out artifacts/<name>.xlsx --no-input
+```
 
 ## When gog itself fails
 

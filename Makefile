@@ -213,10 +213,13 @@ google-auth:
 
 # One-time Google Sheets/Docs/Slides auth for the gog CLI (the agent's
 # google-workspace skill). Reuses the OAuth client in portal/.env.local; gog
-# keeps the token in the OS keyring. Scopes: Sheets, Docs, Slides + Drive
-# limited to files gog creates or opens. Uses the manual flow with the client's
-# registered redirect URI (localhost:3456, shared with google-auth) so no extra
-# URI needs registering in Google Cloud.
+# keeps the token in the OS keyring. Scopes: Sheets, Docs, Slides + full Drive.
+# Full Drive, not drive.file: drive.file only reaches files gog created, so the
+# agent couldn't download a shared .xlsx/.docx/.pdf or find anything shared with
+# it. Re-running forces consent so a token with narrower scopes is replaced.
+# Uses the manual flow with the client's registered redirect URI
+# (localhost:3456, shared with google-auth) so no extra URI needs registering
+# in Google Cloud.
 #   make gog-auth ACCOUNT=agent@example.com
 gog-auth:
 	@test -n "$(ACCOUNT)" || { echo "usage: make gog-auth ACCOUNT=<the agent's Google account>"; exit 1; }
@@ -227,6 +230,6 @@ gog-auth:
 	printf '{"installed":{"client_id":"%s","client_secret":"%s","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://localhost"]}}' "$$id" "$$secret" > "$$creds"; \
 	gog auth credentials set "$$creds" && \
 	echo "After approving, the browser lands on a localhost:3456 page that won't load; paste that full URL here." && \
-	gog auth add "$(ACCOUNT)" --services sheets,docs,slides,drive --drive-scope file \
-		--manual --redirect-uri http://localhost:3456/oauth2callback && \
+	gog auth add "$(ACCOUNT)" --services sheets,docs,slides,drive --drive-scope full \
+		--force-consent --manual --redirect-uri http://localhost:3456/oauth2callback && \
 	gog auth doctor --check
