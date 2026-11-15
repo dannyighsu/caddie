@@ -200,12 +200,12 @@ export async function replyToEmail(
   messageId: string,
   text: string,
   opts?: { replyAll?: boolean },
-): Promise<{ messageId: string }> {
+): Promise<{ messageId: string; to: string; cc?: string }> {
   if (!messageId) throw new Error("replyToEmail: messageId is empty");
   const replyAll = opts?.replyAll ?? true;
   const self = await getSelfAddress();
   const res = await sendReply(self, messageId, text, replyAll);
-  return { messageId: res.messageId };
+  return { messageId: res.messageId, to: res.to, cc: res.cc };
 }
 
 /**

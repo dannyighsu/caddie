@@ -275,7 +275,9 @@ async function executeReply(req: ControlRequest): Promise<Record<string, unknown
         replyAll: req.replyAll,
       });
       await record(() => recordEmailReply(target.externalId, sent.messageId, message));
-      return { success: true, messageId: sent.messageId };
+      // Surface the resolved recipients: the run can't choose them, so this is
+      // its only chance to notice a reply went somewhere unexpected.
+      return { success: true, messageId: sent.messageId, to: sent.to, cc: sent.cc };
     }
     case "slack": {
       if (!isSlackConfigured()) return { success: false, error: "slack is not configured" };

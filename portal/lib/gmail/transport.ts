@@ -11,28 +11,20 @@ import { type gmail_v1 } from "googleapis";
 import { getGmailClient } from "./client";
 import { buildMimeMessage } from "./mime";
 import { extractParts, type GmailPart } from "./parts";
+import {
+  buildReplyContext,
+  getHeaderCI,
+  parseEmailAddresses,
+  selectReplyAnchor,
+  type ReplyContext,
+} from "./reply-address";
 
 // ── Address + header helpers ──────────────────────────────────────────
 
-export interface ParsedAddress {
-  name?: string;
-  email: string;
-}
-
-/** Parse a "Name <a@b>, c@d" header field into individual addresses. */
-export function parseEmailAddresses(field: string | undefined): ParsedAddress[] {
-  if (!field) return [];
-  return field
-    .split(",")
-    .map((raw) => raw.trim())
-    .filter(Boolean)
-    .map((token) => {
-      const m = token.match(/^(.*?)\s*<([^>]+)>$/);
-      if (m) return { name: m[1].replace(/^"|"$/g, "").trim() || undefined, email: m[2].trim() };
-      return { email: token.trim() };
-    })
-    .filter((a) => a.email);
-}
+// Addressing rules live in ./reply-address (pure, unit-tested); re-exported
+// here so the transport stays the single import surface for Gmail plumbing.
+export { parseEmailAddresses, selectReplyAnchor, buildReplyContext };
+export type { ParsedAddress } from "./reply-address";
 
 function headerMap(payload: gmail_v1.Schema$MessagePart | undefined): Record<string, string> {
   const out: Record<string, string> = {};
@@ -40,14 +32,6 @@ function headerMap(payload: gmail_v1.Schema$MessagePart | undefined): Record<str
     if (h.name && h.value != null && out[h.name] === undefined) out[h.name] = h.value;
   }
   return out;
-}
-
-function getHeaderCI(headers: Record<string, string>, name: string): string | undefined {
-  const target = name.toLowerCase();
-  for (const [k, v] of Object.entries(headers)) {
-    if (k.toLowerCase() === target && v) return v;
-  }
-  return undefined;
 }
 
 // ── Body extraction (prefer text/plain and text/html) ─────────────────
@@ -201,75 +185,34 @@ export async function getRfcMessageId(id: string): Promise<string | undefined> {
 
 // ── Outbound: reply-context reconstruction + send ─────────────────────
 
-interface ReplyContext {
-  to: string;
-  cc?: string;
-  inReplyTo?: string;
-  references?: string;
-  subject?: string;
-}
-
 /**
- * Resolve reply recipients + threading headers from a thread's last message.
+ * Resolve reply recipients + threading headers from a thread message.
  * Reply-all rebuilds To+Cc (minus self) exactly like a mail client; a plain
  * reply targets just the other party. Adapted from openclaw-gmail api-client.ts.
+ *
+ * `anchorMessageId` is the message being replied to; see
+ * {@link selectReplyAnchor}.
  */
 async function resolveReplyContext(
   threadId: string,
   selfEmail: string,
   replyAll: boolean,
+  anchorMessageId?: string,
 ): Promise<ReplyContext | null> {
   const gmail = await getGmailClient();
   const res = await gmail.users.threads.get({ userId: "me", id: threadId, format: "full" });
   const messages = res.data.messages ?? [];
   if (messages.length === 0) return null;
 
-  const last = messages[messages.length - 1];
-  const headers = headerMap(last.payload);
-  const selfLower = selfEmail.toLowerCase();
+  const anchor = selectReplyAnchor(messages, anchorMessageId);
+  if (!anchor) return null;
 
-  const fromField = getHeaderCI(headers, "From") ?? "";
-  const lastFromSelf = parseEmailAddresses(fromField).some((a) => a.email.toLowerCase() === selfLower);
-
-  // To: reply to the sender, unless the last message was ours (then reply to its recipients).
-  const to = lastFromSelf ? getHeaderCI(headers, "To") ?? "" : fromField;
-
-  let cc: string | undefined;
-  if (replyAll) {
-    const seen = new Set(parseEmailAddresses(to).map((a) => a.email.toLowerCase()));
-    seen.add(selfLower);
-    const ccSources = lastFromSelf
-      ? [getHeaderCI(headers, "Cc")]
-      : [getHeaderCI(headers, "To"), getHeaderCI(headers, "Cc")];
-    const candidates: string[] = [];
-    for (const field of ccSources) {
-      for (const addr of parseEmailAddresses(field)) {
-        const key = addr.email.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        candidates.push(addr.name ? `${addr.name} <${addr.email}>` : addr.email);
-      }
-    }
-    if (candidates.length > 0) cc = candidates.join(", ");
-  }
-
-  // Subject (Re:-prefixed) from the first message in the thread.
-  const firstSubject = getHeaderCI(headerMap(messages[0].payload), "Subject");
-  const subject = firstSubject
-    ? firstSubject.toLowerCase().startsWith("re:")
-      ? firstSubject
-      : `Re: ${firstSubject}`
-    : undefined;
-
-  const messageId = getHeaderCI(headers, "Message-ID");
-  const existingRefs = getHeaderCI(headers, "References");
-  return {
-    to,
-    cc,
-    subject,
-    inReplyTo: messageId,
-    references: messageId ? (existingRefs ? `${existingRefs} ${messageId}` : messageId) : existingRefs,
-  };
+  return buildReplyContext({
+    anchorHeaders: headerMap(anchor.payload),
+    threadSubject: getHeaderCI(headerMap(messages[0].payload), "Subject"),
+    selfEmail,
+    replyAll,
+  });
 }
 
 async function rawSend(opts: {
@@ -359,15 +302,19 @@ export async function sendThreadedEmail(
 }
 
 /**
- * Reply within the thread that contains `sourceMessageId`. Resolves the thread,
- * reconstructs recipients + threading headers, and sends as part of the thread.
+ * Reply to `sourceMessageId`. Resolves its thread, reconstructs recipients +
+ * threading headers **from that message** (not from the thread's latest one —
+ * see {@link selectReplyAnchor}), and sends as part of the thread.
+ *
+ * Returns the resolved recipients alongside the ids so the caller can surface
+ * who the reply actually went to.
  */
 export async function sendReply(
   self: string,
   sourceMessageId: string,
   text: string,
   replyAll: boolean,
-): Promise<{ messageId: string; threadId: string }> {
+): Promise<{ messageId: string; threadId: string; to: string; cc?: string }> {
   const gmail = await getGmailClient();
   // Find the thread this message belongs to.
   const src = await gmail.users.messages.get({
@@ -379,10 +326,10 @@ export async function sendReply(
   const threadId = src.data.threadId;
   if (!threadId) throw new Error(`sendReply: no threadId for message ${sourceMessageId}`);
 
-  const ctx = await resolveReplyContext(threadId, self, replyAll);
+  const ctx = await resolveReplyContext(threadId, self, replyAll, sourceMessageId);
   if (!ctx || !ctx.to) throw new Error(`sendReply: could not resolve recipients for thread ${threadId}`);
 
-  return rawSend({
+  const sent = await rawSend({
     from: self,
     to: ctx.to,
     cc: ctx.cc,
@@ -392,4 +339,5 @@ export async function sendReply(
     references: ctx.references,
     threadId,
   });
+  return { ...sent, to: ctx.to, cc: ctx.cc };
 }
