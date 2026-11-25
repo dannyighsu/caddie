@@ -10,6 +10,7 @@ import { resolve } from "path";
 import { readdir, readFile, access } from "fs/promises";
 import { capabilityVars, workspace } from "./harness";
 import { indexStatus } from "./workspace-index";
+import { inboundHealth } from "./gmail/poller";
 
 interface CapabilityDef {
   name: string;
@@ -23,7 +24,7 @@ interface CapabilityDef {
 
 export interface HealthCheckResult {
   name: string;
-  type: "mcp" | "flag" | "index";
+  type: "mcp" | "flag" | "index" | "inbound";
   status: "ok" | "error" | "skipped";
   message?: string;
 }
@@ -199,8 +200,22 @@ export async function checkAllCapabilities(): Promise<HealthCheckResult[]> {
   }
 
   results.push(indexHealth());
+  results.push(inboundEmailHealth());
 
   return results;
+}
+
+/**
+ * Inbound email polling: whether mail is actually reaching the agent.
+ *
+ * Here because a stalled poller is indistinguishable from a quiet mailbox from
+ * the outside — which is how inbound email stayed dead for five days once. The
+ * poller alerts on its own too (see ./gmail/poll-health); this is the pull-based
+ * half, so the portal's health list can be asked at any time.
+ */
+function inboundEmailHealth(): HealthCheckResult {
+  const h = inboundHealth();
+  return { name: "inbound-email", type: "inbound", status: h.status, message: h.message };
 }
 
 /** The workspace search index: whether it's on, current, and healthy. */
